@@ -12,6 +12,7 @@ import subprocess
 import re
 import os
 from function_names import FUNCTION_NAMES
+from file_modules import CODE_MODULES
 
 TOOLS_DIR = os.path.dirname(__file__)
 EXE_PATH = os.path.join(TOOLS_DIR, '..', 'disk', 'KARATEKA.EXE')
@@ -242,48 +243,52 @@ def main():
                 target = int(m.group(1), 16)
                 call_targets.add(target)
 
-    # === Generate output ===
-    lines = []
-    lines.append('; Karateka (1986) - DOS matching disassembly')
-    lines.append('; Compiled with Lattice C 2.1, IBM version by The Connelley Group')
-    lines.append('; Build: nasm -f bin src/karateka.asm -o build/NEW.EXE')
-    lines.append(';')
-    lines.append('; Memory layout:')
-    lines.append(';   0x0000-0x01FF  MZ Header (512 bytes)')
-    lines.append(';   0x0200-0x06CFF Code section (~27KB)')
-    lines.append(';   0x06D00-0x06FFF String tables (animation commands, filenames)')
-    lines.append(';   0x07000-0x0ADFF Animation/graphics data (~15KB)')
-    lines.append(';   0x0AE00-0x0AEFF Game strings')
-    lines.append(';   0x0AF00-0x124FF Graphics data (~30KB)')
-    lines.append(';   0x12500-0x155B6 More code + C runtime + data')
-    lines.append('')
+    # === Generate output split into module files ===
 
-    # MZ Header
-    lines.append('; ============================================================================')
-    lines.append('; MZ HEADER')
-    lines.append('; ============================================================================')
+    def get_module(offset):
+        """Return the module filename for a given code offset."""
+        for mod_start, mod_end, filename, desc in CODE_MODULES:
+            if mod_start <= offset < mod_end:
+                return filename
+        return None
+
+    # Dictionary of lines per module file
+    module_lines = {}
+    for _, _, filename, desc in CODE_MODULES:
+        module_lines[filename] = [f'; {desc}', '']
+
+    # Also prepare header and data
+    header_lines = []
+    header_lines.append('; MZ Header (512 bytes)')
+    header_lines.append('')
     for i in range(0, HEADER_SIZE, 16):
         chunk = exe_data[i:i+16]
         hex_bytes = ', '.join(f'0x{b:02X}' for b in chunk)
-        lines.append(f'db {hex_bytes}  ; {i:05X}')
-    lines.append('')
+        header_lines.append(f'db {hex_bytes}  ; {i:05X}')
+    header_lines.append('')
 
-    # Code section
-    lines.append('; ============================================================================')
-    lines.append('; CODE/DATA SECTION')
-    lines.append('; Entry point: CS:IP = 0000:0002')
-    lines.append('; ============================================================================')
-    lines.append('')
+    data_lines = []
+    data_lines.append('; Data section')
+    data_lines.append('; Everything after 0x6C9D is data (no call targets beyond this point)')
+    data_lines.append('')
 
     match_count = 0
     db_count = 0
     expected_offset = 0
+    current_module = None
 
-    # Emit data regions directly from binary, skip ndisasm for those
-    # First, build instruction index for fast lookup
-    instr_by_offset = {}
-    for offset, raw_bytes, instr in instructions:
-        instr_by_offset[offset] = (raw_bytes, instr)
+    def emit(line, offset=None):
+        """Emit a line to the correct module file."""
+        nonlocal current_module
+        if offset is not None:
+            mod = get_module(offset)
+            if mod:
+                current_module = mod
+        if current_module and current_module in module_lines:
+            module_lines[current_module].append(line)
+        else:
+            # Shouldn't happen for code section
+            pass
 
     # Emit code section (before DATA_START)
     for offset, raw_bytes, instr in instructions:
@@ -294,85 +299,111 @@ def main():
         if offset > expected_offset:
             gap = code_data[expected_offset:offset]
             hex_bytes = ', '.join(f'0x{b:02X}' for b in gap)
-            lines.append(f'db {hex_bytes}  ; {expected_offset:05X} (gap: {len(gap)} bytes)')
+            emit(f'db {hex_bytes}  ; {expected_offset:05X} (gap: {len(gap)} bytes)', expected_offset)
             db_count += 1
 
         expected_offset = offset + len(raw_bytes)
 
+        # Check if we're entering a new module
+        mod = get_module(offset)
+        if mod and mod != current_module:
+            current_module = mod
+
         # Emit function label
         if offset in call_targets:
-            lines.append('')
-            lines.append(f'; ---- function {func_name(offset)} ----')
-            lines.append(f'{func_name(offset)}:')
+            emit('', offset)
+            emit(f'; ---- function {func_name(offset)} ----', offset)
+            emit(f'{func_name(offset)}:', offset)
 
         # Emit jump target label
         if offset in label_offsets:
-            lines.append(f'{label_name(offset)}:')
+            emit(f'{label_name(offset)}:', offset)
 
         # Handle short jumps with labels
         if is_short_jump(raw_bytes):
             target = get_short_jump_target(raw_bytes, offset)
             mnem = get_short_jump_mnemonic(instr)
             if mnem and target in label_offsets:
-                lines.append(f'{mnem} short {label_name(target)}  ; {offset:05X} {instr}')
+                emit(f'{mnem} short {label_name(target)}  ; {offset:05X} {instr}', offset)
                 match_count += 1
                 continue
-            lines.append(format_db(raw_bytes, offset, instr))
+            emit(format_db(raw_bytes, offset, instr), offset)
             db_count += 1
             continue
 
         fixed = fix_instruction(instr, raw_bytes, offset, call_targets)
 
         if fixed is not None:
-            # Label-based calls don't need test_instruction (label won't resolve in isolation)
             is_label_call = fixed.startswith('call ') and not fixed.startswith('call 0x')
             if is_label_call or test_instruction(fixed, raw_bytes, offset):
-                lines.append(f'{fixed}  ; {offset:05X}')
+                emit(f'{fixed}  ; {offset:05X}', offset)
                 match_count += 1
                 continue
 
-        lines.append(format_db(raw_bytes, offset, instr))
+        emit(format_db(raw_bytes, offset, instr), offset)
         db_count += 1
 
     # Emit data regions directly from binary
-    lines.append('')
-    lines.append('; ============================================================================')
-    lines.append('; DATA SECTION')
-    lines.append('; Everything after 0x6C9D is data (no call targets beyond this point)')
-    lines.append('; ============================================================================')
-
     for region_start, region_end, region_name in DATA_REGIONS:
-        lines.append('')
-        lines.append(f'; --- {region_name} (0x{region_start:05X}-0x{region_end:05X}) ---')
+        data_lines.append(f'; --- {region_name} (0x{region_start:05X}-0x{region_end:05X}) ---')
 
         region_data = code_data[region_start:region_end]
         i = 0
         while i < len(region_data):
             abs_off = region_start + i
 
-            # Check if a known string starts here
             if abs_off in strings:
                 s = strings[abs_off]
-                str_len = len(s) + 1  # include null terminator
-                str_data = region_data[i:i+str_len]
-                # Emit as db 'string', 0
+                str_len = len(s) + 1
                 escaped = s.replace("'", "',0x27,'")
-                lines.append(f"db '{escaped}', 0  ; {abs_off:05X} \"{s}\"")
+                data_lines.append(f"db '{escaped}', 0  ; {abs_off:05X} \"{s}\"")
                 i += str_len
                 db_count += 1
                 continue
 
-            # Regular data line (16 bytes)
             end = min(i + 16, len(region_data))
             chunk = region_data[i:end]
-            lines.append(format_data_line(chunk, abs_off))
+            data_lines.append(format_data_line(chunk, abs_off))
             i += len(chunk)
             db_count += 1
 
-    lines.append('')
+        data_lines.append('')
+
+    # Write module files
+    for _, _, filename, _ in CODE_MODULES:
+        filepath = os.path.join(SRC_DIR, filename)
+        with open(filepath, 'w') as f:
+            f.write('\n'.join(module_lines[filename]) + '\n')
+
+    # Write header.asm
+    with open(os.path.join(SRC_DIR, 'header.asm'), 'w') as f:
+        f.write('\n'.join(header_lines) + '\n')
+
+    # Write data.asm
+    with open(os.path.join(SRC_DIR, 'data.asm'), 'w') as f:
+        f.write('\n'.join(data_lines) + '\n')
+
+    # Write master karateka.asm with %include directives
+    master = []
+    master.append('; Karateka (1986) - DOS matching disassembly')
+    master.append('; Compiled with Lattice C 2.1, IBM version by The Connelley Group')
+    master.append('; Build: nasm -f bin src/karateka.asm -o build/NEW.EXE')
+    master.append(';')
+    master.append('; Memory layout:')
+    master.append(';   0x0000-0x01FF  MZ Header (512 bytes)')
+    master.append(';   0x0200-0x06CFF Code section (~27KB)')
+    master.append(';   0x06D00-0x155B6 Data section (~56KB)')
+    master.append('')
+    master.append('%include "header.asm"')
+    master.append('')
+    for _, _, filename, desc in CODE_MODULES:
+        master.append(f'%include "{filename}"  ; {desc}')
+    master.append('')
+    master.append('%include "data.asm"')
+    master.append('')
 
     with open(ASM_PATH, 'w') as f:
-        f.write('\n'.join(lines) + '\n')
+        f.write('\n'.join(master) + '\n')
 
     total = match_count + db_count
     pct = match_count / total * 100 if total else 0

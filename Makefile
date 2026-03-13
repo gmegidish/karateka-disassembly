@@ -1,7 +1,9 @@
 all: verify
 
-build/NEW.EXE: src/karateka.asm | build
-	nasm -f bin src/karateka.asm -o build/NEW.EXE
+SRC_FILES := $(wildcard src/*.asm)
+
+build/NEW.EXE: $(SRC_FILES) | build
+	nasm -f bin -i src/ src/karateka.asm -o build/NEW.EXE
 
 build:
 	mkdir -p build
