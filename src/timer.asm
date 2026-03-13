@@ -136,11 +136,11 @@ ret  ; 018BE
 delay_ticks:
 mov [0xbce2],ax  ; 018BF
 mov ah,0x0  ; 018C2
-int 0x1a  ; 018C4
+int 0x1a  ; 018C4 - INT 1Ah/AH=00h: Get system timer tick count (CX:DX = ticks since midnight)
 add [0xbce2],dx  ; 018C6
 loc_018CA:
 mov ah,0x0  ; 018CA
-int 0x1a  ; 018CC
+int 0x1a  ; 018CC - INT 1Ah/AH=00h: Get system timer tick count (polling in loop)
 cmp dx,[0xbce2]  ; 018CE
 jnz short loc_018CA  ; 018D2 jnz 0x18ca
 ret  ; 018D4
@@ -163,7 +163,7 @@ ret  ; 018EE
 ; ---- function timer_mark ----
 timer_mark:
 mov ah,0x0  ; 018EF
-int 0x1a  ; 018F1
+int 0x1a  ; 018F1 - INT 1Ah/AH=00h: Get system timer tick count (save as timestamp)
 mov [0xbcd1],dx  ; 018F3
 ret  ; 018F7
 
@@ -171,7 +171,7 @@ ret  ; 018F7
 timer_wait_3ticks:
 loc_018F8:
 mov ah,0x0  ; 018F8
-int 0x1a  ; 018FA
+int 0x1a  ; 018FA - INT 1Ah/AH=00h: Get system timer tick count (wait until 3 ticks elapsed)
 db 0x8B, 0xC2  ; 018FC mov ax,dx
 sub dx,[0xbcd1]  ; 018FE
 cmp dx,0x3  ; 01902

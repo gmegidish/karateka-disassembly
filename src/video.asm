@@ -23,7 +23,7 @@ push bp  ; 00608
 db 0x8B, 0xEC  ; 00609 mov bp,sp
 mov ax,[bp+0x4]  ; 0060B
 mov ah,0x0  ; 0060E
-int 0x10  ; 00610
+int 0x10  ; 00610 - INT 10h/AH=00h: Set video mode (AL=mode number)
 pop bp  ; 00612
 ret  ; 00613
 push bp  ; 00614
@@ -34,7 +34,7 @@ mov ax,[bp+0x6]  ; 0061C
 db 0x8A, 0xF0  ; 0061F mov dh,al
 db 0x32, 0xFF  ; 00621 xor bh,bh
 mov ah,0x2  ; 00623
-int 0x10  ; 00625
+int 0x10  ; 00625 - INT 10h/AH=02h: Set cursor position (DH=row, DL=col, BH=page)
 pop bp  ; 00627
 ret  ; 00628
 

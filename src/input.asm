@@ -73,7 +73,7 @@ loc_041CE:
 cmp al,0x0  ; 041CE
 jnz short loc_041E8  ; 041D0 jnz 0x41e8
 mov ah,0x7  ; 041D2
-int 0x21  ; 041D4
+int 0x21  ; 041D4 - INT 21h/AH=07h: Direct char input without echo (blocking, reads extended key)
 cmp al,0x4b  ; 041D6
 jnz short loc_041DE  ; 041D8 jnz 0x41de
 mov al,0x34  ; 041DA
@@ -94,7 +94,7 @@ pop bp  ; 041F2
 ret  ; 041F3
 loc_041F4:
 mov ah,0x7  ; 041F4
-int 0x21  ; 041F6
+int 0x21  ; 041F6 - INT 21h/AH=07h: Direct char input without echo (consume remaining scancode byte)
 db 0x33, 0xC0  ; 041F8 xor ax,ax
 pop bp  ; 041FA
 ret  ; 041FB
@@ -106,7 +106,7 @@ mov al,[0xdf42]  ; 041FC
 cmp byte [0xdf43],0x0  ; 041FF
 jnz short loc_0420A  ; 04204 jnz 0x420a
 mov ah,0x7  ; 04206
-int 0x21  ; 04208
+int 0x21  ; 04208 - INT 21h/AH=07h: Direct char input without echo (blocking wait for keypress)
 loc_0420A:
 mov ah,0x0  ; 0420A
 mov byte [0xdf43],0x0  ; 0420C
@@ -115,7 +115,7 @@ jz short loc_04217  ; 04213 jz 0x4217
 jmp short loc_0422D  ; 04215 jmp 0x422d
 loc_04217:
 mov ah,0x7  ; 04217
-int 0x21  ; 04219
+int 0x21  ; 04219 - INT 21h/AH=07h: Direct char input without echo (read extended key scancode)
 cmp al,0x4b  ; 0421B
 jnz short loc_04225  ; 0421D jnz 0x4225
 mov al,0x34  ; 0421F
@@ -193,7 +193,7 @@ mov [si],al  ; 04288
 pop ds  ; 0428A
 mov ah,0x0  ; 0428B
 mov al,0x4  ; 0428D
-int 0x10  ; 0428F
+int 0x10  ; 0428F - INT 10h/AH=00h: Set video mode 4 (320x200, 4-color CGA graphics)
 push es  ; 04291
 mov es,word [0xdf48]  ; 04292
 mov di,0x1f40  ; 04296
@@ -290,10 +290,10 @@ ret  ; 04351
 
 ; ---- function check_graphics_card ----
 check_graphics_card:
-int 0x11  ; 04352
+int 0x11  ; 04352 - INT 11h: Get BIOS equipment list (returns installed hardware flags in AX)
 mov [0xdf4a],al  ; 04354
 mov ah,0xf  ; 04357
-int 0x10  ; 04359
+int 0x10  ; 04359 - INT 10h/AH=0Fh: Get current video mode (returns AL=mode, AH=columns, BH=page)
 mov [0xdf4b],al  ; 0435B
 call video_set_mode_4  ; 0435E
 jnc short loc_04368  ; 04361 jnc 0x4368
@@ -320,10 +320,10 @@ mov [si],bl  ; 04383
 pop ds  ; 04385
 mov ah,0x0  ; 04386
 mov al,[0xdf4b]  ; 04388
-int 0x10  ; 0438B
+int 0x10  ; 0438B - INT 10h/AH=00h: Restore original video mode
 mov dl,[0xdf4c]  ; 0438D
 mov ah,0xe  ; 04391
-int 0x21  ; 04393
+int 0x21  ; 04393 - INT 21h/AH=0Eh: Select default drive (DL=drive number, 0=A, 1=B, etc.)
 ret  ; 04395
 
 ; ---- function sub_04396 ----

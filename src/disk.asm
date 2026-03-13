@@ -39,7 +39,7 @@ ret  ; 016A2
 check_ctrl_q:
 mov dl,0xff  ; 016A3
 mov ah,0x6  ; 016A5
-int 0x21  ; 016A7
+int 0x21  ; 016A7 - INT 21h/AH=06h: Direct console I/O, DL=FFh = input (non-blocking key check)
 jz short loc_016AF  ; 016A9 jz 0x16af
 cmp al,0x11  ; 016AB
 jz short loc_016B0  ; 016AD jz 0x16b0
@@ -47,12 +47,12 @@ loc_016AF:
 ret  ; 016AF
 loc_016B0:
 mov ax,0x3  ; 016B0
-int 0x10  ; 016B3
+int 0x10  ; 016B3 - INT 10h/AH=00h: Set video mode 3 (80x25 text) before quitting
 mov ax,[0x15]  ; 016B5
 db 0x2D, 0x04, 0x00  ; 016B8 sub ax,0x4
 mov sp,ax  ; 016BB
 mov ax,0x4c01  ; 016BD
-int 0x21  ; 016C0
+int 0x21  ; 016C0 - INT 21h/AH=4Ch: Terminate program with exit code 1 (quit via Ctrl+Q)
 add [bp+si],ax  ; 016C2
 mov bx,[bp+0x6]  ; 016C4
 mov ch,0xa  ; 016C7
@@ -62,7 +62,7 @@ mov dl,[bp+0x4]  ; 016CD
 push ds  ; 016D0
 pop es  ; 016D1
 nop  ; 016D2
-int 0x13  ; 016D3
+int 0x13  ; 016D3 - INT 13h/AH=02h: Read disk sectors (CH=cyl, CL=sector, DH=head, DL=drive, ES:BX=buffer)
 dec di  ; 016D5
 jz short loc_01712  ; 016D6 jz 0x1712
 db 0x72, 0xE7  ; 016D8 jc 0x16c1
@@ -74,7 +74,7 @@ mov ch,0xa  ; 016E3
 mov cl,0xf1  ; 016E5
 mov dl,[bp+0x4]  ; 016E7
 mov dh,0x0  ; 016EA
-int 0x13  ; 016EC
+int 0x13  ; 016EC - INT 13h/AH=02h: Read disk sector (copy protection verification read)
 dec di  ; 016EE
 jz short loc_01712  ; 016EF jz 0x1712
 jnc short loc_016DD  ; 016F1 jnc 0x16dd
