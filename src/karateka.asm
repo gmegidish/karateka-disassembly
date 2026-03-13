@@ -241,7 +241,7 @@ db 0x25, 0x0F, 0x00  ; 00170 and ax,0xf
 db 0x81, 0xE3, 0xF0, 0xFF  ; 00173 and bx,0xfff0
 mov [0x65],bx  ; 00177
 mov [0x67],ax  ; 0017B
-call 0x4e99  ; 0017E
+call resource_manager  ; 0017E
 db 0x0B, 0xC0  ; 00181 or ax,ax
 jnz short loc_00139  ; 00183 jnz 0x139
 pop dx  ; 00185
@@ -292,7 +292,7 @@ db 0x8B, 0xC4  ; 001F0 mov ax,sp
 push ax  ; 001F2
 push ds  ; 001F3
 pop es  ; 001F4
-call 0x5b53  ; 001F5
+call main  ; 001F5
 cmp byte [0xf],0x2  ; 001F8
 jl short loc_00204  ; 001FD jl 0x204
 mov ax,0x4c00  ; 001FF
@@ -325,8 +325,8 @@ int 0x21  ; 00239
 loc_0023B:
 retf  ; 0023B
 
-; ---- function sub_0023C ----
-sub_0023C:
+; ---- function crt_exit ----
+crt_exit:
 cmp byte [0xf],0x2  ; 0023C
 jl short loc_0024C  ; 00241 jl 0x24c
 db 0x8B, 0xEC  ; 00243 mov bp,sp
@@ -339,8 +339,8 @@ db 0x2D, 0x04, 0x00  ; 0024F sub ax,0x4
 db 0x8B, 0xE0  ; 00252 mov sp,ax
 retf  ; 00254
 
-; ---- function sub_00255 ----
-sub_00255:
+; ---- function game_init ----
+game_init:
 push bp  ; 00255
 sub sp,0x4  ; 00256
 jc short loc_00261  ; 00259 jc 0x261
@@ -351,19 +351,19 @@ jmp 0x420  ; 00261
 loc_00264:
 db 0x8B, 0xEC  ; 00264 mov bp,sp
 mov word [bp+0x2],0x0  ; 00266
-call 0x4457  ; 0026B
-call 0x4552  ; 0026E
+call sub_04257  ; 0026B
+call check_graphics_card  ; 0026E
 test ax,ax  ; 00271
 jnz short loc_00281  ; 00273 jnz 0x281
 mov ax,0x41b7  ; 00275
 push ax  ; 00278
-call 0x5a9a  ; 00279
+call print_error  ; 00279
 db 0x8B, 0xE5  ; 0027C mov sp,bp
-call 0x4d7f  ; 0027E
+call show_insert_disk  ; 0027E
 loc_00281:
-call 0x4016  ; 00281
-call 0x4a2b  ; 00284
-call 0x4819  ; 00287
+call init_screen_buffers  ; 00281
+call install_handlers  ; 00284
+call init_controls  ; 00287
 test ax,ax  ; 0028A
 jnz short loc_00296  ; 0028C jnz 0x296
 mov word [0xdf46],0x1  ; 0028E
@@ -377,15 +377,15 @@ mov ax,0x337  ; 002A0
 push ax  ; 002A3
 db 0x33, 0xC0  ; 002A4 xor ax,ax
 push ax  ; 002A6
-call 0x189c  ; 002A7
+call disk_setup  ; 002A7
 db 0x8B, 0xE5  ; 002AA mov sp,bp
-call 0x1918  ; 002AC
+call load_game_disk  ; 002AC
 test ax,ax  ; 002AF
 jnz short loc_002B8  ; 002B1 jnz 0x2b8
-call 0x41fd  ; 002B3
+call check_disk_prompt  ; 002B3
 jmp short loc_0029C  ; 002B6 jmp 0x29c
 loc_002B8:
-call 0x1bae  ; 002B8
+call init_sound  ; 002B8
 db 0x33, 0xC0  ; 002BB xor ax,ax
 mov word [0x114],0xd  ; 002BD
 mov [0x118],ax  ; 002C3
@@ -409,11 +409,11 @@ mov [0x12c],ax  ; 002F6
 mov [0x130],ax  ; 002F9
 mov [0x166],ax  ; 002FC
 mov [0xd5aa],ax  ; 002FF
-call 0x5c7  ; 00302
+call game_main_loop  ; 00302
 db 0x33, 0xC0  ; 00305 xor ax,ax
 mov [0xfc],ax  ; 00307
 mov [0x130],ax  ; 0030A
-call 0x1aef  ; 0030D
+call timer_mark  ; 0030D
 mov word [0x16a],0x0  ; 00310
 cmp word [0x16a],0x1  ; 00316
 jz short loc_002B8  ; 0031B jz 0x2b8
@@ -421,12 +421,12 @@ cmp word [0xdf44],0x0  ; 0031D
 jg short loc_002B8  ; 00322 jg 0x2b8
 mov ax,0x1  ; 00324
 push ax  ; 00327
-call 0x4349  ; 00328
+call poll_keyboard  ; 00328
 db 0x8B, 0xE5  ; 0032B mov sp,bp
-call 0x1af8  ; 0032D
-call 0x24e1  ; 00330
-call 0x2ddd  ; 00333
-call 0xdc9  ; 00336
+call timer_wait_3ticks  ; 0032D
+call scene_update  ; 00330
+call level_setup  ; 00333
+call sub_00BC9  ; 00336
 mov ax,[0x154]  ; 00339
 test ax,ax  ; 0033C
 jng short loc_00383  ; 0033E jng 0x383
@@ -434,7 +434,7 @@ db 0x3D, 0x02, 0x00  ; 00340 cmp ax,0x2
 jnz short loc_00350  ; 00343 jnz 0x350
 mov ax,0x8  ; 00345
 push ax  ; 00348
-call 0x3dae  ; 00349
+call wait_vsync  ; 00349
 db 0x8B, 0xE5  ; 0034C mov sp,bp
 jmp short loc_0037D  ; 0034E jmp 0x37d
 loc_00350:
@@ -442,7 +442,7 @@ cmp word [0x154],0x3  ; 00350
 jnz short loc_00362  ; 00355 jnz 0x362
 mov ax,0x18  ; 00357
 push ax  ; 0035A
-call 0x3dae  ; 0035B
+call wait_vsync  ; 0035B
 db 0x8B, 0xE5  ; 0035E mov sp,bp
 jmp short loc_0037D  ; 00360 jmp 0x37d
 loc_00362:
@@ -450,13 +450,13 @@ cmp word [0x154],0x4  ; 00362
 jnz short loc_00374  ; 00367 jnz 0x374
 mov ax,0x16  ; 00369
 push ax  ; 0036C
-call 0x3dae  ; 0036D
+call wait_vsync  ; 0036D
 db 0x8B, 0xE5  ; 00370 mov sp,bp
 jmp short loc_0037D  ; 00372 jmp 0x37d
 loc_00374:
 mov ax,0x1  ; 00374
 push ax  ; 00377
-call 0x3dae  ; 00378
+call wait_vsync  ; 00378
 db 0x8B, 0xE5  ; 0037B mov sp,bp
 loc_0037D:
 mov word [0x154],0x0  ; 0037D
@@ -465,7 +465,7 @@ db 0x33, 0xC0  ; 00383 xor ax,ax
 cmp word [0x16a],0x0  ; 00385
 mov [0xee],ax  ; 0038A
 jnz short loc_00395  ; 0038D jnz 0x395
-call 0x33aa  ; 0038F
+call cutscene_play  ; 0038F
 mov [0x16a],ax  ; 00392
 loc_00395:
 cmp word [0x12a],0x2  ; 00395
@@ -473,20 +473,20 @@ jnz short loc_003AB  ; 0039A jnz 0x3ab
 mov word [0x12a],0x0  ; 0039C
 mov ax,0x1  ; 003A2
 push ax  ; 003A5
-call 0x3dae  ; 003A6
+call wait_vsync  ; 003A6
 db 0x8B, 0xE5  ; 003A9 mov sp,bp
 loc_003AB:
 cmp word [0x12a],0x1  ; 003AB
 jnz short loc_003C1  ; 003B0 jnz 0x3c1
 mov word [0x12a],0x2  ; 003B2
 mov word [0xc3a6],0x1  ; 003B8
-call 0x3c8a  ; 003BE
+call effect_fade  ; 003BE
 loc_003C1:
-call 0x321c  ; 003C1
+call scene_transition  ; 003C1
 jmp 0x516  ; 003C4
 
-; ---- function sub_003C7 ----
-sub_003C7:
+; ---- function game_main_loop ----
+game_main_loop:
 push bp  ; 003C7
 sub sp,0x4  ; 003C8
 jc short loc_003D3  ; 003CB jc 0x3d3
@@ -496,7 +496,7 @@ loc_003D3:
 jmp 0x420  ; 003D3
 loc_003D6:
 db 0x8B, 0xEC  ; 003D6 mov bp,sp
-call 0x4433  ; 003D8
+call flush_keyboard  ; 003D8
 db 0x33, 0xC0  ; 003DB xor ax,ax
 mov bx,0xce3e  ; 003DD
 push bx  ; 003E0
@@ -505,78 +505,78 @@ push bx  ; 003E4
 mov [0xf6],ax  ; 003E5
 mov [0x15c],ax  ; 003E8
 mov [0x15a],ax  ; 003EB
-call 0x1477  ; 003EE
+call init_figure  ; 003EE
 db 0x8B, 0xE5  ; 003F1 mov sp,bp
-call 0x1ba2  ; 003F3
+call play_sound  ; 003F3
 mov ax,0x5dc  ; 003F6
 push ax  ; 003F9
 mov ax,0x41fb  ; 003FA
 push ax  ; 003FD
-call 0x1152  ; 003FE
+call load_palette  ; 003FE
 db 0x8B, 0xE5  ; 00401 mov sp,bp
 mov word [0xea],0x0  ; 00403
 push word [0xea]  ; 00409
-call 0x1cc2  ; 0040D
+call combat_update  ; 0040D
 db 0x8B, 0xE5  ; 00410 mov sp,bp
 mov word [0xdf44],0x0  ; 00412
 mov ax,0xd  ; 00418
 push ax  ; 0041B
-call 0x1227  ; 0041C
+call load_animation  ; 0041C
 db 0x8B, 0xE5  ; 0041F mov sp,bp
-call 0x1127  ; 00421
+call animate_step  ; 00421
 test ax,ax  ; 00424
 jz short loc_0042E  ; 00426 jz 0x42e
-call 0x7ad  ; 00428
+call load_scene  ; 00428
 jmp 0x742  ; 0042B
 loc_0042E:
 db 0x33, 0xC0  ; 0042E xor ax,ax
 push ax  ; 00430
 mov ax,0x4204  ; 00431
 push ax  ; 00434
-call 0x1152  ; 00435
+call load_palette  ; 00435
 db 0x8B, 0xE5  ; 00438 mov sp,bp
-call 0x41b7  ; 0043A
+call draw_scene_element  ; 0043A
 test ax,ax  ; 0043D
 jz short loc_00447  ; 0043F jz 0x447
-call 0x7ad  ; 00441
+call load_scene  ; 00441
 jmp 0x742  ; 00444
 loc_00447:
-call 0x41da  ; 00447
+call draw_gate  ; 00447
 test ax,ax  ; 0044A
 jz short loc_00454  ; 0044C jz 0x454
-call 0x7ad  ; 0044E
+call load_scene  ; 0044E
 jmp 0x742  ; 00451
 loc_00454:
-call 0x10ee  ; 00454
+call animate_figure  ; 00454
 test ax,ax  ; 00457
 jz short loc_00461  ; 00459 jz 0x461
-call 0x7ad  ; 0045B
+call load_scene  ; 0045B
 jmp 0x742  ; 0045E
 loc_00461:
-call 0x413f  ; 00461
+call draw_health_bar  ; 00461
 test ax,ax  ; 00464
 jz short loc_0046E  ; 00466 jz 0x46e
-call 0x7ad  ; 00468
+call load_scene  ; 00468
 jmp 0x742  ; 0046B
 loc_0046E:
 mov word [0xe4],0x0  ; 0046E
-call 0xd4e  ; 00474
+call clear_screen  ; 00474
 mov word [0xee],0x1  ; 00477
 mov word [0xea],0x4  ; 0047D
 mov ax,0xbd04  ; 00483
 push ax  ; 00486
 mov ax,0x420e  ; 00487
 push ax  ; 0048A
-call 0x1477  ; 0048B
+call init_figure  ; 0048B
 db 0x8B, 0xE5  ; 0048E mov sp,bp
 mov ax,0x6  ; 00490
 push ax  ; 00493
-call 0x1227  ; 00494
+call load_animation  ; 00494
 db 0x8B, 0xE5  ; 00497 mov sp,bp
-call 0x1934  ; 00499
+call setup_screen  ; 00499
 test ax,ax  ; 0049C
 jz short loc_004A6  ; 0049E jz 0x4a6
-call 0x7ad  ; 004A0
+call load_scene  ; 004A0
 jmp 0x742  ; 004A3
 loc_004A6:
 mov word [0xea],0x0  ; 004A6
@@ -584,36 +584,36 @@ mov ax,0xbd04  ; 004AC
 push ax  ; 004AF
 mov ax,0x4214  ; 004B0
 push ax  ; 004B3
-call 0x1477  ; 004B4
+call init_figure  ; 004B4
 db 0x8B, 0xE5  ; 004B7 mov sp,bp
 mov ax,0x5dc  ; 004B9
 push ax  ; 004BC
 mov ax,0x41fb  ; 004BD
 push ax  ; 004C0
-call 0x1152  ; 004C1
+call load_palette  ; 004C1
 db 0x8B, 0xE5  ; 004C4 mov sp,bp
 db 0x33, 0xC0  ; 004C6 xor ax,ax
 push ax  ; 004C8
-call 0x1cc2  ; 004C9
+call combat_update  ; 004C9
 db 0x8B, 0xE5  ; 004CC mov sp,bp
-call 0x1934  ; 004CE
+call setup_screen  ; 004CE
 test ax,ax  ; 004D1
 jz short loc_004DA  ; 004D3 jz 0x4da
-call 0x7e5  ; 004D5
+call game_shutdown  ; 004D5
 jmp short loc_00542  ; 004D8 jmp 0x542
 loc_004DA:
 mov word [0xea],0x0  ; 004DA
 mov word [0xf4],0xfa  ; 004E0
 mov word [0x156],0x1  ; 004E6
-call 0x1aef  ; 004EC
+call timer_mark  ; 004EC
 mov word [bp+0x2],0x0  ; 004EF
 loc_004F4:
 cmp word [bp+0x2],0x1  ; 004F4
 jz short loc_00537  ; 004F8 jz 0x537
-call 0x1af8  ; 004FA
-call 0x24e1  ; 004FD
-call 0x2ddd  ; 00500
-call 0xdc9  ; 00503
+call timer_wait_3ticks  ; 004FA
+call scene_update  ; 004FD
+call level_setup  ; 00500
+call sub_00BC9  ; 00503
 mov ax,[0x154]  ; 00506
 test ax,ax  ; 00509
 jng short loc_0052C  ; 0050B jng 0x52c
@@ -621,30 +621,30 @@ db 0x3D, 0x02, 0x00  ; 0050D cmp ax,0x2
 jnz short loc_0051D  ; 00510 jnz 0x51d
 mov ax,0x8  ; 00512
 push ax  ; 00515
-call 0x3dae  ; 00516
+call wait_vsync  ; 00516
 db 0x8B, 0xE5  ; 00519 mov sp,bp
 jmp short loc_00526  ; 0051B jmp 0x526
 loc_0051D:
 mov ax,0x1  ; 0051D
 push ax  ; 00520
-call 0x3dae  ; 00521
+call wait_vsync  ; 00521
 db 0x8B, 0xE5  ; 00524 mov sp,bp
 loc_00526:
 mov word [0x154],0x0  ; 00526
 loc_0052C:
-call 0x321c  ; 0052C
-call 0x769  ; 0052F
+call scene_transition  ; 0052C
+call game_scene  ; 0052F
 mov [bp+0x2],ax  ; 00532
 jmp short loc_004F4  ; 00535 jmp 0x4f4
 loc_00537:
 db 0x33, 0xC0  ; 00537 xor ax,ax
 push ax  ; 00539
-call 0x1d27  ; 0053A
+call combat_check_hit  ; 0053A
 db 0x8B, 0xE5  ; 0053D mov sp,bp
 jmp 0x612  ; 0053F
 loc_00542:
 mov word [0x10c],0x41  ; 00542
-call 0x4433  ; 00548
+call flush_keyboard  ; 00548
 db 0x33, 0xC0  ; 0054B xor ax,ax
 mov [0xdf43],al  ; 0054D
 mov [0xea],ax  ; 00550
@@ -657,8 +657,8 @@ add sp,0x4  ; 00564
 pop bp  ; 00567
 ret  ; 00568
 
-; ---- function sub_00569 ----
-sub_00569:
+; ---- function game_scene ----
+game_scene:
 push bp  ; 00569
 sub sp,0x2  ; 0056A
 jc short loc_00575  ; 0056D jc 0x575
@@ -678,7 +678,7 @@ cmp ax,[0x104]  ; 0058B
 jz short loc_0059E  ; 0058F jz 0x59e
 mov ax,0x1  ; 00591
 push ax  ; 00594
-call 0x4349  ; 00595
+call poll_keyboard  ; 00595
 db 0x8B, 0xE5  ; 00598 mov sp,bp
 test ax,ax  ; 0059A
 jz short loc_005A6  ; 0059C jz 0x5a6
@@ -693,22 +693,22 @@ add sp,0x2  ; 005A8
 pop bp  ; 005AB
 ret  ; 005AC
 
-; ---- function sub_005AD ----
-sub_005AD:
+; ---- function load_scene ----
+load_scene:
 push bp  ; 005AD
 db 0x8B, 0xEC  ; 005AE mov bp,sp
-call 0x11bb  ; 005B0
+call load_background  ; 005B0
 mov ax,0x5dc  ; 005B3
 push ax  ; 005B6
 mov ax,0x41fb  ; 005B7
 push ax  ; 005BA
-call 0x1152  ; 005BB
+call load_palette  ; 005BB
 db 0x8B, 0xE5  ; 005BE mov sp,bp
 db 0x33, 0xC0  ; 005C0 xor ax,ax
 push ax  ; 005C2
-call 0x1cc2  ; 005C3
+call combat_update  ; 005C3
 db 0x8B, 0xE5  ; 005C6 mov sp,bp
-call 0xd4e  ; 005C8
+call clear_screen  ; 005C8
 db 0x33, 0xC0  ; 005CB xor ax,ax
 mov bx,0xbd04  ; 005CD
 push bx  ; 005D0
@@ -716,27 +716,27 @@ mov bx,0x4214  ; 005D1
 push bx  ; 005D4
 mov [0xdf44],ax  ; 005D5
 mov [0xea],ax  ; 005D8
-call 0x1477  ; 005DB
+call init_figure  ; 005DB
 db 0x8B, 0xE5  ; 005DE mov sp,bp
-call 0x1934  ; 005E0
+call setup_screen  ; 005E0
 pop bp  ; 005E3
 ret  ; 005E4
 
-; ---- function sub_005E5 ----
-sub_005E5:
+; ---- function game_shutdown ----
+game_shutdown:
 push bp  ; 005E5
 db 0x8B, 0xEC  ; 005E6 mov bp,sp
 mov ax,0x5dc  ; 005E8
 push ax  ; 005EB
 mov ax,0x41fb  ; 005EC
 push ax  ; 005EF
-call 0x1152  ; 005F0
+call load_palette  ; 005F0
 db 0x8B, 0xE5  ; 005F3 mov sp,bp
 db 0x33, 0xC0  ; 005F5 xor ax,ax
 push ax  ; 005F7
-call 0x1cc2  ; 005F8
+call combat_update  ; 005F8
 db 0x8B, 0xE5  ; 005FB mov sp,bp
-call 0xd4e  ; 005FD
+call clear_screen  ; 005FD
 mov word [0xdf44],0x0  ; 00600
 pop bp  ; 00606
 ret  ; 00607
@@ -759,11 +759,11 @@ int 0x10  ; 00625
 pop bp  ; 00627
 ret  ; 00628
 
-; ---- function sub_00629 ----
-sub_00629:
+; ---- function calc_screen_offset ----
+calc_screen_offset:
 push bp  ; 00629
 db 0x8B, 0xEC  ; 0062A mov bp,sp
-call 0x42d5  ; 0062C
+call sub_040D5  ; 0062C
 shl ax,1  ; 0062F
 mov [0x421a],ax  ; 00631
 mov ax,[bp+0x4]  ; 00634
@@ -773,8 +773,8 @@ db 0x8B, 0xC2  ; 0063C mov ax,dx
 pop bp  ; 0063E
 ret  ; 0063F
 
-; ---- function sub_00640 ----
-sub_00640:
+; ---- function init_actor ----
+init_actor:
 push bp  ; 00640
 db 0x8B, 0xEC  ; 00641 mov bp,sp
 mov byte [0x422c],0x0  ; 00643
@@ -826,7 +826,7 @@ mov al,[0x4223]  ; 006C2
 cbw  ; 006C5
 db 0x8B, 0xF8  ; 006C6 mov di,ax
 loc_006C8:
-call 0xd5e  ; 006C8
+call draw_screen  ; 006C8
 dec di  ; 006CB
 jnz short loc_006C8  ; 006CC jnz 0x6c8
 dec byte [0x4222]  ; 006CE
@@ -840,7 +840,7 @@ mov [0x422a],al  ; 006DF
 mov di,[0x4230]  ; 006E2
 add di,0x4f  ; 006E6
 loc_006E9:
-call 0xd5e  ; 006E9
+call draw_screen  ; 006E9
 cmp al,0x0  ; 006EC
 jz short loc_0071B  ; 006EE jz 0x71b
 mov cx,0x8  ; 006F0
@@ -908,7 +908,7 @@ mov al,[0x4223]  ; 0078A
 mov [0x422a],al  ; 0078D
 mov di,[0x421c]  ; 00790
 loc_00794:
-call 0xd5e  ; 00794
+call draw_screen  ; 00794
 cmp al,0x0  ; 00797
 jz short loc_007DB  ; 00799 jz 0x7db
 mov cx,0x8  ; 0079B
@@ -950,7 +950,7 @@ mov al,[0x4223]  ; 007F3
 mov [0x422a],al  ; 007F6
 mov di,[0x4230]  ; 007F9
 loc_007FD:
-call 0xd5e  ; 007FD
+call draw_screen  ; 007FD
 cmp al,0x0  ; 00800
 jz short loc_00831  ; 00802 jz 0x831
 mov cx,0x8  ; 00804
@@ -979,8 +979,8 @@ loc_0083A:
 pop bp  ; 0083A
 ret  ; 0083B
 
-; ---- function sub_0083C ----
-sub_0083C:
+; ---- function process_animation ----
+process_animation:
 push bp  ; 0083C
 db 0x8B, 0xEC  ; 0083D mov bp,sp
 mov byte [0x422c],0x0  ; 0083F
@@ -1045,7 +1045,7 @@ mov al,[0x4223]  ; 008E0
 cbw  ; 008E3
 db 0x8B, 0xF8  ; 008E4 mov di,ax
 loc_008E6:
-call 0xd5e  ; 008E6
+call draw_screen  ; 008E6
 dec di  ; 008E9
 jnz short loc_008E6  ; 008EA jnz 0x8e6
 add word [bp+0x6],0x4  ; 008EC
@@ -1062,7 +1062,7 @@ cmp byte [bp+0x4],0xc8  ; 00908
 jc short loc_00911  ; 0090C jc 0x911
 jmp 0xc6b  ; 0090E
 loc_00911:
-call 0xd5e  ; 00911
+call draw_screen  ; 00911
 cmp al,0x0  ; 00914
 jz short loc_00936  ; 00916 jz 0x936
 mov ah,0x0  ; 00918
@@ -1085,8 +1085,8 @@ dec byte [0x4222]  ; 00943
 jnz short loc_0094C  ; 00947 jnz 0x94c
 jmp 0xc69  ; 00949
 
-; ---- function sub_0094C ----
-sub_0094C:
+; ---- function run_cutscene ----
+run_cutscene:
 loc_0094C:
 mov al,[0x4222]  ; 0094C
 cbw  ; 0094F
@@ -1141,7 +1141,7 @@ mov al,[0x4223]  ; 009CA
 db 0x8A, 0xD8  ; 009CD mov bl,al
 mov di,[0x4232]  ; 009CF
 loc_009D3:
-call 0xd5e  ; 009D3
+call draw_screen  ; 009D3
 cmp al,0x0  ; 009D6
 jz short loc_00A0B  ; 009D8 jz 0xa0b
 cmp byte [0x4226],0x0  ; 009DA
@@ -1181,7 +1181,7 @@ cmp byte [bp+0x4],0xc8  ; 00A32
 jc short loc_00A3B  ; 00A36 jc 0xa3b
 jmp 0xd1e  ; 00A38
 loc_00A3B:
-call 0xd5e  ; 00A3B
+call draw_screen  ; 00A3B
 cmp al,0x0  ; 00A3E
 jz short loc_00A60  ; 00A40 jz 0xa60
 mov ah,0x0  ; 00A42
@@ -1283,8 +1283,8 @@ dec byte [0x422a]  ; 00B45
 jnz short loc_00B22  ; 00B49 jnz 0xb22
 jmp 0xc69  ; 00B4B
 
-; ---- function sub_00B4E ----
-sub_00B4E:
+; ---- function clear_screen ----
+clear_screen:
 push es  ; 00B4E
 push ds  ; 00B4F
 pop es  ; 00B50
@@ -1295,8 +1295,8 @@ rep stosw  ; 00B5A
 pop es  ; 00B5C
 ret  ; 00B5D
 
-; ---- function sub_00B5E ----
-sub_00B5E:
+; ---- function draw_screen ----
+draw_screen:
 cmp byte [0x422c],0x0  ; 00B5E
 jz short loc_00B70  ; 00B63 jz 0xb70
 mov dl,[0x422d]  ; 00B65
@@ -1343,7 +1343,7 @@ ret  ; 00BC8
 sub_00BC9:
 mov word [0xbb2e],0x3  ; 00BC9
 mov al,[0xbb32]  ; 00BCF
-call 0xe52  ; 00BD2
+call draw_sprite  ; 00BD2
 loc_00BD5:
 mov si,[0xbb2e]  ; 00BD5
 mov al,[si-0x44d0]  ; 00BD9
@@ -1361,12 +1361,12 @@ jz short loc_00C05  ; 00BF8 jz 0xc05
 xor dx,0x4000  ; 00BFA
 push dx  ; 00BFE
 push ax  ; 00BFF
-call 0x840  ; 00C00
+call init_actor  ; 00C00
 jmp short loc_00C0A  ; 00C03 jmp 0xc0a
 loc_00C05:
 push dx  ; 00C05
 push ax  ; 00C06
-call 0xa3c  ; 00C07
+call process_animation  ; 00C07
 loc_00C0A:
 add sp,0x6  ; 00C0A
 add word [0xbb2e],0x4  ; 00C0D
@@ -1376,32 +1376,32 @@ cmp byte [0xbb31],0x0  ; 00C14
 jnz short loc_00C42  ; 00C19 jnz 0xc42
 cmp word [0xee],0x0  ; 00C1B
 jz short loc_00C32  ; 00C20 jz 0xc32
-call 0xf68  ; 00C22
+call update_display  ; 00C22
 mov al,[0xbb30]  ; 00C25
 mov ah,0x0  ; 00C28
 push ax  ; 00C2A
-call 0x3dae  ; 00C2B
+call wait_vsync  ; 00C2B
 add sp,0x2  ; 00C2E
 ret  ; 00C31
 loc_00C32:
-call 0xf89  ; 00C32
+call draw_background  ; 00C32
 mov al,[0xbb30]  ; 00C35
 mov ah,0x0  ; 00C38
 push ax  ; 00C3A
-call 0x3dae  ; 00C3B
+call wait_vsync  ; 00C3B
 add sp,0x2  ; 00C3E
 ret  ; 00C41
 loc_00C42:
-call 0xfef  ; 00C42
+call draw_figure  ; 00C42
 mov al,[0xbb30]  ; 00C45
 mov ah,0x0  ; 00C48
 push ax  ; 00C4A
-call 0x3dae  ; 00C4B
+call wait_vsync  ; 00C4B
 add sp,0x2  ; 00C4E
 ret  ; 00C51
 
-; ---- function sub_00C52 ----
-sub_00C52:
+; ---- function draw_sprite ----
+draw_sprite:
 push es  ; 00C52
 push ds  ; 00C53
 pop es  ; 00C54
@@ -1416,10 +1416,10 @@ rep stosw  ; 00C6D
 jmp short loc_00C7F  ; 00C6F jmp 0xc7f
 nop  ; 00C71
 loc_00C72:
-call 0xd4e  ; 00C72
+call clear_screen  ; 00C72
 cmp byte [0xbcd0],0x0  ; 00C75
 jnz short loc_00C7F  ; 00C7A jnz 0xc7f
-call 0x321c  ; 00C7C
+call scene_transition  ; 00C7C
 loc_00C7F:
 cmp word [0xea],0x2  ; 00C7F
 jnl short loc_00CE6  ; 00C84 jnl 0xce6
@@ -1442,7 +1442,7 @@ db 0x33, 0xC0  ; 00CB4 xor ax,ax
 mov cx,0x78  ; 00CB6
 rep stosw  ; 00CB9
 loc_00CBB:
-call 0xfd0  ; 00CBB
+call scroll_screen  ; 00CBB
 lea di,[0x3357]  ; 00CBE
 mov bl,0xf  ; 00CC2
 mov dx,0x9999  ; 00CC4
@@ -1463,7 +1463,7 @@ pop es  ; 00CE4
 ret  ; 00CE5
 loc_00CE6:
 push ax  ; 00CE6
-call 0xfd0  ; 00CE7
+call scroll_screen  ; 00CE7
 pop ax  ; 00CEA
 cmp word [0xea],0x3  ; 00CEB
 jnl short loc_00D39  ; 00CF0 jnl 0xd39
@@ -1519,8 +1519,8 @@ jnz short loc_00D53  ; 00D64 jnz 0xd53
 pop es  ; 00D66
 ret  ; 00D67
 
-; ---- function sub_00D68 ----
-sub_00D68:
+; ---- function update_display ----
+update_display:
 mov bx,0x0  ; 00D68
 lea si,[0x337]  ; 00D6B
 push es  ; 00D6F
@@ -1536,8 +1536,8 @@ jnz short loc_00D75  ; 00D85 jnz 0xd75
 pop es  ; 00D87
 ret  ; 00D88
 
-; ---- function sub_00D89 ----
-sub_00D89:
+; ---- function draw_background ----
+draw_background:
 mov dl,0xa8  ; 00D89
 lea si,[0xd37]  ; 00D8B
 mov bx,0x40  ; 00D8F
@@ -1567,8 +1567,8 @@ jnz short loc_00DBE  ; 00DCC jnz 0xdbe
 pop es  ; 00DCE
 ret  ; 00DCF
 
-; ---- function sub_00DD0 ----
-sub_00DD0:
+; ---- function scroll_screen ----
+scroll_screen:
 lea di,[0x26d7]  ; 00DD0
 mov cx,0x690  ; 00DD4
 cmp word [0xea],0x2  ; 00DD7
@@ -1584,8 +1584,8 @@ rep stosw  ; 00DEB
 pop es  ; 00DED
 ret  ; 00DEE
 
-; ---- function sub_00DEF ----
-sub_00DEF:
+; ---- function draw_figure ----
+draw_figure:
 push bp  ; 00DEF
 db 0x33, 0xDB  ; 00DF0 xor bx,bx
 push es  ; 00DF2
@@ -1608,7 +1608,7 @@ or [es:bx+di],al  ; 00E22
 add si,0xa0  ; 00E25
 add bp,0x2  ; 00E29
 loop 0xe01  ; 00E2C
-call 0x10e8  ; 00E2E
+call erase_figure  ; 00E2E
 lea si,[0x337]  ; 00E31
 db 0x33, 0xED  ; 00E35 xor bp,bp
 mov cx,0x64  ; 00E37
@@ -1626,7 +1626,7 @@ or [es:bx+di],al  ; 00E5B
 add si,0xa0  ; 00E5E
 add bp,0x2  ; 00E62
 loop 0xe3a  ; 00E65
-call 0x10e8  ; 00E67
+call erase_figure  ; 00E67
 lea si,[0x337]  ; 00E6A
 db 0x33, 0xED  ; 00E6E xor bp,bp
 mov cx,0x64  ; 00E70
@@ -1644,7 +1644,7 @@ or [es:bx+di],al  ; 00E94
 add si,0xa0  ; 00E97
 add bp,0x2  ; 00E9B
 loop 0xe73  ; 00E9E
-call 0x10e8  ; 00EA0
+call erase_figure  ; 00EA0
 lea si,[0x337]  ; 00EA3
 db 0x33, 0xED  ; 00EA7 xor bp,bp
 mov cx,0x64  ; 00EA9
@@ -1662,7 +1662,7 @@ or [es:bx+di],al  ; 00ECD
 add si,0xa0  ; 00ED0
 add bp,0x2  ; 00ED4
 loop 0xeac  ; 00ED7
-call 0x10e8  ; 00ED9
+call erase_figure  ; 00ED9
 inc bx  ; 00EDC
 cmp bx,0x50  ; 00EDD
 jz short loc_00EE5  ; 00EE0 jz 0xee5
@@ -1672,15 +1672,15 @@ pop es  ; 00EE5
 pop bp  ; 00EE6
 ret  ; 00EE7
 
-; ---- function sub_00EE8 ----
-sub_00EE8:
+; ---- function erase_figure ----
+erase_figure:
 mov cx,0x3e8  ; 00EE8
 loop 0xeeb  ; 00EEB
 ret  ; 00EED
 
-; ---- function sub_00EEE ----
-sub_00EEE:
-call 0xd4e  ; 00EEE
+; ---- function animate_figure ----
+animate_figure:
+call clear_screen  ; 00EEE
 push es  ; 00EF1
 push ds  ; 00EF2
 pop es  ; 00EF3
@@ -1688,43 +1688,43 @@ mov cx,0x820  ; 00EF4
 lea si,[0xa6d6]  ; 00EF7
 lea di,[0x1917]  ; 00EFB
 rep movsw  ; 00EFF
-call 0xf68  ; 00F01
+call update_display  ; 00F01
 mov ax,0x12  ; 00F04
-call 0x1ad5  ; 00F07
+call delay_with_input  ; 00F07
 mov ax,0xb4  ; 00F0A
 push ax  ; 00F0D
 mov ax,0x28  ; 00F0E
 push ax  ; 00F11
 mov ax,0x5c  ; 00F12
 push ax  ; 00F15
-call 0xa3c  ; 00F16
+call process_animation  ; 00F16
 add sp,0x6  ; 00F19
-call 0xf68  ; 00F1C
+call update_display  ; 00F1C
 mov ax,0x48  ; 00F1F
-call 0x1ad5  ; 00F22
+call delay_with_input  ; 00F22
 pop es  ; 00F25
 ret  ; 00F26
 
-; ---- function sub_00F27 ----
-sub_00F27:
-call 0xd4e  ; 00F27
+; ---- function animate_step ----
+animate_step:
+call clear_screen  ; 00F27
 mov ax,0x73  ; 00F2A
 push ax  ; 00F2D
 mov ax,0x6a  ; 00F2E
 push ax  ; 00F31
 mov ax,0x5b  ; 00F32
 push ax  ; 00F35
-call 0xa3c  ; 00F36
+call process_animation  ; 00F36
 add sp,0x6  ; 00F39
-call 0xf68  ; 00F3C
+call update_display  ; 00F3C
 mov word [0x168],0x1  ; 00F3F
 mov ax,0x48  ; 00F45
-call 0x1ad5  ; 00F48
+call delay_with_input  ; 00F48
 mov word [0x168],0x0  ; 00F4B
 ret  ; 00F51
 
-; ---- function sub_00F52 ----
-sub_00F52:
+; ---- function load_palette ----
+load_palette:
 push bp  ; 00F52
 sub sp,0xe  ; 00F53
 jc short loc_00F5E  ; 00F56 jc 0xf5e
@@ -1737,7 +1737,7 @@ db 0x8B, 0xEC  ; 00F61 mov bp,sp
 mov ax,0x8000  ; 00F63
 push ax  ; 00F66
 push word [bp+0x12]  ; 00F67
-call 0x186d  ; 00F6A
+call set_cga_palette  ; 00F6A
 db 0x8B, 0xE5  ; 00F6D mov sp,bp
 mov bx,[bp+0x14]  ; 00F6F
 add bx,0xa6d6  ; 00F72
@@ -1746,7 +1746,7 @@ push cx  ; 00F79
 push bx  ; 00F7A
 push ax  ; 00F7B
 mov [bp+0x6],ax  ; 00F7C
-call 0x51dd  ; 00F7F
+call load_file  ; 00F7F
 db 0x8B, 0xE5  ; 00F82 mov sp,bp
 mov si,[bp+0x14]  ; 00F84
 mov al,[si-0x5929]  ; 00F87
@@ -1762,18 +1762,18 @@ push bx  ; 00F9E
 push ax  ; 00F9F
 push word [bp+0x6]  ; 00FA0
 mov [bp+0x8],bx  ; 00FA3
-call 0x51dd  ; 00FA6
+call load_file  ; 00FA6
 db 0x8B, 0xE5  ; 00FA9 mov sp,bp
 push word [bp+0x6]  ; 00FAB
-call 0x57f9  ; 00FAE
+call load_resource  ; 00FAE
 db 0x8B, 0xE5  ; 00FB1 mov sp,bp
 mov ax,[bp+0x8]  ; 00FB3
 add sp,0xe  ; 00FB6
 pop bp  ; 00FB9
 ret  ; 00FBA
 
-; ---- function sub_00FBB ----
-sub_00FBB:
+; ---- function load_background ----
+load_background:
 push bp  ; 00FBB
 sub sp,0xc  ; 00FBC
 jc short loc_00FC7  ; 00FBF jc 0xfc7
@@ -1783,12 +1783,12 @@ loc_00FC7:
 jmp 0x420  ; 00FC7
 loc_00FCA:
 db 0x8B, 0xEC  ; 00FCA mov bp,sp
-call 0xd4e  ; 00FCC
+call clear_screen  ; 00FCC
 mov ax,0x8000  ; 00FCF
 push ax  ; 00FD2
 mov ax,0xbc78  ; 00FD3
 push ax  ; 00FD6
-call 0x186d  ; 00FD7
+call set_cga_palette  ; 00FD7
 db 0x8B, 0xE5  ; 00FDA mov sp,bp
 mov bx,0x2  ; 00FDC
 push bx  ; 00FDF
@@ -1796,7 +1796,7 @@ mov bx,0x337  ; 00FE0
 push bx  ; 00FE3
 push ax  ; 00FE4
 mov [bp+0x4],ax  ; 00FE5
-call 0x51dd  ; 00FE8
+call load_file  ; 00FE8
 db 0x8B, 0xE5  ; 00FEB mov sp,bp
 mov al,[0x338]  ; 00FED
 xor ah,ah  ; 00FF0
@@ -1810,22 +1810,22 @@ mov ax,0x337  ; 00FFF
 push ax  ; 01002
 push word [bp+0x4]  ; 01003
 mov [bp+0x6],bx  ; 01006
-call 0x51dd  ; 01009
+call load_file  ; 01009
 db 0x8B, 0xE5  ; 0100C mov sp,bp
 push word [bp+0x4]  ; 0100E
-call 0x57f9  ; 01011
+call load_resource  ; 01011
 db 0x8B, 0xE5  ; 01014 mov sp,bp
-call 0xf68  ; 01016
+call update_display  ; 01016
 mov ax,0x19  ; 01019
 push ax  ; 0101C
-call 0x3dae  ; 0101D
+call wait_vsync  ; 0101D
 db 0x8B, 0xE5  ; 01020 mov sp,bp
 add sp,0xc  ; 01022
 pop bp  ; 01025
 ret  ; 01026
 
-; ---- function sub_01027 ----
-sub_01027:
+; ---- function load_animation ----
+load_animation:
 push bp  ; 01027
 sub sp,0x2a  ; 01028
 jc short loc_01033  ; 0102B jc 0x1033
@@ -1841,19 +1841,19 @@ db 0x8B, 0xF0  ; 0103D mov si,ax
 push word [si+0x264]  ; 0103F
 lea ax,[bp+0x16]  ; 01043
 push ax  ; 01046
-call 0x58de  ; 01047
+call load_resource_2  ; 01047
 db 0x8B, 0xE5  ; 0104A mov sp,bp
 mov ax,0x32d  ; 0104C
 push ax  ; 0104F
 lea ax,[bp+0x16]  ; 01050
 push ax  ; 01053
-call 0x5d9c  ; 01054
+call load_resource_3  ; 01054
 db 0x8B, 0xE5  ; 01057 mov sp,bp
 mov ax,0x8000  ; 01059
 push ax  ; 0105C
 lea ax,[bp+0x16]  ; 0105D
 push ax  ; 01060
-call 0x186d  ; 01061
+call set_cga_palette  ; 01061
 db 0x8B, 0xE5  ; 01064 mov sp,bp
 mov bx,[0x160]  ; 01066
 add bx,0x443c  ; 0106A
@@ -1862,10 +1862,10 @@ push cx  ; 01071
 push bx  ; 01072
 push ax  ; 01073
 mov [bp+0x8],ax  ; 01074
-call 0x51dd  ; 01077
+call load_file  ; 01077
 db 0x8B, 0xE5  ; 0107A mov sp,bp
 push word [bp+0x8]  ; 0107C
-call 0x57f9  ; 0107F
+call load_resource  ; 0107F
 db 0x8B, 0xE5  ; 01082 mov sp,bp
 mov word [bp+0xc],0x0  ; 01084
 loc_01089:
@@ -1917,19 +1917,19 @@ db 0x8B, 0xF0  ; 01100 mov si,ax
 push word [si+0x264]  ; 01102
 lea ax,[bp+0x16]  ; 01106
 push ax  ; 01109
-call 0x58de  ; 0110A
+call load_resource_2  ; 0110A
 db 0x8B, 0xE5  ; 0110D mov sp,bp
 mov ax,0x332  ; 0110F
 push ax  ; 01112
 lea ax,[bp+0x16]  ; 01113
 push ax  ; 01116
-call 0x5d9c  ; 01117
+call load_resource_3  ; 01117
 db 0x8B, 0xE5  ; 0111A mov sp,bp
 mov ax,0x8000  ; 0111C
 push ax  ; 0111F
 lea ax,[bp+0x16]  ; 01120
 push ax  ; 01123
-call 0x186d  ; 01124
+call set_cga_palette  ; 01124
 db 0x8B, 0xE5  ; 01127 mov sp,bp
 mov bx,[bp+0xa]  ; 01129
 mov cx,[0x160]  ; 0112C
@@ -1939,10 +1939,10 @@ push cx  ; 01135
 push ax  ; 01136
 mov [bp+0x8],ax  ; 01137
 mov [bp+0x10],bx  ; 0113A
-call 0x51dd  ; 0113D
+call load_file  ; 0113D
 db 0x8B, 0xE5  ; 01140 mov sp,bp
 push word [bp+0x8]  ; 01142
-call 0x57f9  ; 01145
+call load_resource  ; 01145
 db 0x8B, 0xE5  ; 01148 mov sp,bp
 cmp word [0x160],0x0  ; 0114A
 jnz short loc_01157  ; 0114F jnz 0x1157
@@ -1955,19 +1955,19 @@ db 0x8B, 0xF0  ; 0115C mov si,ax
 push word [si+0x2c0]  ; 0115E
 lea ax,[bp+0x16]  ; 01162
 push ax  ; 01165
-call 0x58de  ; 01166
+call load_resource_2  ; 01166
 db 0x8B, 0xE5  ; 01169 mov sp,bp
 mov ax,0x32d  ; 0116B
 push ax  ; 0116E
 lea ax,[bp+0x16]  ; 0116F
 push ax  ; 01172
-call 0x5d9c  ; 01173
+call load_resource_3  ; 01173
 db 0x8B, 0xE5  ; 01176 mov sp,bp
 mov ax,0x8000  ; 01178
 push ax  ; 0117B
 lea ax,[bp+0x16]  ; 0117C
 push ax  ; 0117F
-call 0x186d  ; 01180
+call set_cga_palette  ; 01180
 db 0x8B, 0xE5  ; 01183 mov sp,bp
 mov bx,[0x164]  ; 01185
 add bx,0x893a  ; 01189
@@ -1976,10 +1976,10 @@ push cx  ; 01190
 push bx  ; 01191
 push ax  ; 01192
 mov [bp+0x8],ax  ; 01193
-call 0x51dd  ; 01196
+call load_file  ; 01196
 db 0x8B, 0xE5  ; 01199 mov sp,bp
 push word [bp+0x8]  ; 0119B
-call 0x57f9  ; 0119E
+call load_resource  ; 0119E
 db 0x8B, 0xE5  ; 011A1 mov sp,bp
 mov word [bp+0xc],0x0  ; 011A3
 loc_011A8:
@@ -2031,19 +2031,19 @@ db 0x8B, 0xF0  ; 0121F mov si,ax
 push word [si+0x2c0]  ; 01221
 lea ax,[bp+0x16]  ; 01225
 push ax  ; 01228
-call 0x58de  ; 01229
+call load_resource_2  ; 01229
 db 0x8B, 0xE5  ; 0122C mov sp,bp
 mov ax,0x332  ; 0122E
 push ax  ; 01231
 lea ax,[bp+0x16]  ; 01232
 push ax  ; 01235
-call 0x5d9c  ; 01236
+call load_resource_3  ; 01236
 db 0x8B, 0xE5  ; 01239 mov sp,bp
 mov ax,0x8000  ; 0123B
 push ax  ; 0123E
 lea ax,[bp+0x16]  ; 0123F
 push ax  ; 01242
-call 0x186d  ; 01243
+call set_cga_palette  ; 01243
 db 0x8B, 0xE5  ; 01246 mov sp,bp
 mov bx,[0x164]  ; 01248
 add bx,0x893a  ; 0124C
@@ -2051,10 +2051,10 @@ push word [bp+0xa]  ; 01250
 push bx  ; 01253
 push ax  ; 01254
 mov [bp+0x8],ax  ; 01255
-call 0x51dd  ; 01258
+call load_file  ; 01258
 db 0x8B, 0xE5  ; 0125B mov sp,bp
 push word [bp+0x8]  ; 0125D
-call 0x57f9  ; 01260
+call load_resource  ; 01260
 db 0x8B, 0xE5  ; 01263 mov sp,bp
 cmp word [0x164],0x0  ; 01265
 jnz short loc_01272  ; 0126A jnz 0x1272
@@ -2065,8 +2065,8 @@ add sp,0x2a  ; 01272
 pop bp  ; 01275
 ret  ; 01276
 
-; ---- function sub_01277 ----
-sub_01277:
+; ---- function init_figure ----
+init_figure:
 push bp  ; 01277
 sub sp,0x66  ; 01278
 jc short loc_01283  ; 0127B jc 0x1283
@@ -2083,12 +2083,12 @@ loc_01290:
 mov ax,0xbc83  ; 01290
 push ax  ; 01293
 push word [bp+0x6a]  ; 01294
-call 0x4a3c  ; 01297
+call restore_int_vectors  ; 01297
 db 0x8B, 0xE5  ; 0129A mov sp,bp
 test ax,ax  ; 0129C
 mov [bp+0x64],ax  ; 0129E
 jnz short loc_012A8  ; 012A1 jnz 0x12a8
-call 0x41fd  ; 012A3
+call check_disk_prompt  ; 012A3
 jmp short loc_01290  ; 012A6 jmp 0x1290
 loc_012A8:
 push word [bp+0x64]  ; 012A8
@@ -2096,7 +2096,7 @@ mov ax,0x50  ; 012AB
 push ax  ; 012AE
 lea ax,[bp+0x2]  ; 012AF
 push ax  ; 012B2
-call 0x4d0a  ; 012B3
+call bounds_check  ; 012B3
 db 0x8B, 0xE5  ; 012B6 mov sp,bp
 test ax,ax  ; 012B8
 mov [bp+0x52],ax  ; 012BA
@@ -2108,12 +2108,12 @@ push ax  ; 012C6
 push word [bp+0x6c]  ; 012C7
 lea ax,[bp+0x2]  ; 012CA
 push ax  ; 012CD
-call 0x14eb  ; 012CE
+call setup_figure_data  ; 012CE
 db 0x8B, 0xE5  ; 012D1 mov sp,bp
 jmp short loc_012A8  ; 012D3 jmp 0x12a8
 loc_012D5:
 push word [bp+0x64]  ; 012D5
-call 0x4c37  ; 012D8
+call collision_check  ; 012D8
 db 0x8B, 0xE5  ; 012DB mov sp,bp
 mov ax,[bp+0x5a]  ; 012DD
 mov [0xbd02],ax  ; 012E0
@@ -2122,8 +2122,8 @@ add sp,0x66  ; 012E6
 pop bp  ; 012E9
 ret  ; 012EA
 
-; ---- function sub_012EB ----
-sub_012EB:
+; ---- function setup_figure_data ----
+setup_figure_data:
 push bp  ; 012EB
 sub sp,0x12  ; 012EC
 jc short loc_012F7  ; 012EF jc 0x12f7
@@ -2158,7 +2158,7 @@ mov ax,0x5  ; 0132F
 push ax  ; 01332
 push word [si+0x1e8]  ; 01333
 push word [bp+0x16]  ; 01337
-call 0x5d2e  ; 0133A
+call sub_05B2E  ; 0133A
 db 0x8B, 0xE5  ; 0133D mov sp,bp
 mov [bp+0x10],al  ; 0133F
 xor ah,ah  ; 01342
@@ -2197,7 +2197,7 @@ push bx  ; 0138A
 mov ax,0xbc85  ; 0138B
 push ax  ; 0138E
 push dx  ; 0138F
-call 0x5941  ; 01390
+call sub_05741  ; 01390
 db 0x8B, 0xE5  ; 01393 mov sp,bp
 jmp 0x1868  ; 01395
 mov si,[bp+0x1a]  ; 01398
@@ -2220,7 +2220,7 @@ push bx  ; 013BE
 mov ax,0xbc85  ; 013BF
 push ax  ; 013C2
 push dx  ; 013C3
-call 0x5941  ; 013C4
+call sub_05741  ; 013C4
 db 0x8B, 0xE5  ; 013C7 mov sp,bp
 jmp 0x1868  ; 013C9
 mov si,[bp+0x1a]  ; 013CC
@@ -2247,7 +2247,7 @@ push bx  ; 013FA
 mov ax,0xbc88  ; 013FB
 push ax  ; 013FE
 push dx  ; 013FF
-call 0x5941  ; 01400
+call sub_05741  ; 01400
 db 0x8B, 0xE5  ; 01403 mov sp,bp
 mov si,[bp+0x1a]  ; 01405
 mov ax,[si]  ; 01408
@@ -2306,7 +2306,7 @@ push cx  ; 01481
 mov ax,0xbc91  ; 01482
 push ax  ; 01485
 push dx  ; 01486
-call 0x5941  ; 01487
+call sub_05741  ; 01487
 db 0x8B, 0xE5  ; 0148A mov sp,bp
 mov si,[bp+0x1a]  ; 0148C
 mov ax,[si]  ; 0148F
@@ -2362,7 +2362,7 @@ push bx  ; 01506
 mov ax,0xbc85  ; 01507
 push ax  ; 0150A
 push dx  ; 0150B
-call 0x5941  ; 0150C
+call sub_05741  ; 0150C
 db 0x8B, 0xE5  ; 0150F mov sp,bp
 jmp 0x1868  ; 01511
 mov si,[bp+0x1a]  ; 01514
@@ -2399,7 +2399,7 @@ push bx  ; 0155E
 mov ax,0xbc85  ; 0155F
 push ax  ; 01562
 push dx  ; 01563
-call 0x5941  ; 01564
+call sub_05741  ; 01564
 db 0x8B, 0xE5  ; 01567 mov sp,bp
 jmp 0x1868  ; 01569
 mov si,[bp+0x1a]  ; 0156C
@@ -2435,7 +2435,7 @@ push cx  ; 015B0
 mov ax,0xbc9d  ; 015B1
 push ax  ; 015B4
 push dx  ; 015B5
-call 0x5941  ; 015B6
+call sub_05741  ; 015B6
 db 0x8B, 0xE5  ; 015B9 mov sp,bp
 jmp 0x1868  ; 015BB
 mov si,[bp+0x1a]  ; 015BE
@@ -2453,7 +2453,7 @@ push ax  ; 015D9
 mov ax,0xbc85  ; 015DA
 push ax  ; 015DD
 push bx  ; 015DE
-call 0x5941  ; 015DF
+call sub_05741  ; 015DF
 db 0x8B, 0xE5  ; 015E2 mov sp,bp
 mov si,[bp+0x1a]  ; 015E4
 mov ax,[si]  ; 015E7
@@ -2484,7 +2484,7 @@ push bx  ; 01620
 mov ax,0xbc85  ; 01621
 push ax  ; 01624
 push dx  ; 01625
-call 0x5941  ; 01626
+call sub_05741  ; 01626
 db 0x8B, 0xE5  ; 01629 mov sp,bp
 jmp short loc_01668  ; 0162B jmp 0x1668
 mov si,[bp+0x1a]  ; 0162D
@@ -2515,8 +2515,8 @@ add sp,0x12  ; 01668
 pop bp  ; 0166B
 ret  ; 0166C
 
-; ---- function sub_0166D ----
-sub_0166D:
+; ---- function set_cga_palette ----
+set_cga_palette:
 push bp  ; 0166D
 sub sp,0x4  ; 0166E
 jc short loc_01679  ; 01671 jc 0x1679
@@ -2529,12 +2529,12 @@ db 0x8B, 0xEC  ; 0167C mov bp,sp
 loc_0167E:
 push word [bp+0xa]  ; 0167E
 push word [bp+0x8]  ; 01681
-call 0x4fb9  ; 01684
+call file_manager  ; 01684
 db 0x8B, 0xE5  ; 01687 mov sp,bp
 mov [bp+0x2],ax  ; 01689
 inc ax  ; 0168C
 jnz short loc_01694  ; 0168D jnz 0x1694
-call 0x41fd  ; 0168F
+call check_disk_prompt  ; 0168F
 jmp short loc_0167E  ; 01692 jmp 0x167e
 loc_01694:
 mov ax,[bp+0x2]  ; 01694
@@ -2542,15 +2542,15 @@ add sp,0x4  ; 01697
 pop bp  ; 0169A
 ret  ; 0169B
 
-; ---- function sub_0169C ----
-sub_0169C:
+; ---- function disk_setup ----
+disk_setup:
 mov sp,bp  ; 0169C
 mov ax,0x2b8  ; 0169E
 push ax  ; 016A1
 ret  ; 016A2
 
-; ---- function sub_016A3 ----
-sub_016A3:
+; ---- function check_ctrl_q ----
+check_ctrl_q:
 mov dl,0xff  ; 016A3
 mov ah,0x6  ; 016A5
 int 0x21  ; 016A7
@@ -2612,8 +2612,8 @@ pop es  ; 01715
 pop bp  ; 01716
 ret  ; 01717
 
-; ---- function sub_01718 ----
-sub_01718:
+; ---- function load_game_disk ----
+load_game_disk:
 db 0x33, 0xDB  ; 01718 xor bx,bx
 db 0x33, 0xC0  ; 0171A xor ax,ax
 mov cl,[bx-0x435c]  ; 0171C
@@ -2628,10 +2628,10 @@ mov ax,0x1  ; 01730
 loc_01733:
 ret  ; 01733
 
-; ---- function sub_01734 ----
-sub_01734:
+; ---- function setup_screen ----
+setup_screen:
 mov byte [0xbcd0],0x1  ; 01734
-call 0x1a6c  ; 01739
+call sub_0186C  ; 01739
 mov word [0xbce6],0x0  ; 0173C
 mov byte [0xbcd7],0x0  ; 01742
 loc_01747:
@@ -2644,10 +2644,10 @@ push word [0xbce6]  ; 01756
 call word near [bx-0x4318]  ; 0175A
 cmp word [0x156],0x0  ; 0175E
 jz short loc_0177A  ; 01763 jz 0x177a
-call 0x4349  ; 01765
+call poll_keyboard  ; 01765
 db 0x3D, 0x00, 0x00  ; 01768 cmp ax,0x0
 jz short loc_0177A  ; 0176B jz 0x177a
-call 0x43fc  ; 0176D
+call wait_for_key  ; 0176D
 pop word [0xbce6]  ; 01770
 mov byte [0xbcd0],0x0  ; 01774
 ret  ; 01779
@@ -2695,11 +2695,11 @@ ret  ; 017FA
 
 ; ---- function sub_017FB ----
 sub_017FB:
-call 0xdc9  ; 017FB
+call sub_00BC9  ; 017FB
 inc word [0xbce6]  ; 017FE
 cmp word [0xbcd8],0x1  ; 01802
 jnz short loc_0180C  ; 01807 jnz 0x180c
-call 0x43fc  ; 01809
+call wait_for_key  ; 01809
 loc_0180C:
 ret  ; 0180C
 mov bl,[si+0x1]  ; 0180D
@@ -2729,7 +2729,7 @@ cmp word [0xbcd8],0x0  ; 01856
 jnz short loc_01866  ; 0185B jnz 0x1866
 mov al,[si-0x42fb]  ; 0185D
 mov ah,0x0  ; 01861
-call 0x1abf  ; 01863
+call delay_ticks  ; 01863
 loc_01866:
 add word [0xbce6],0x2  ; 01866
 ret  ; 0186B
@@ -2746,8 +2746,8 @@ inc word [0xbce6]  ; 0188E
 ret  ; 01892
 cmp word [0xbcd8],0x1  ; 01893
 jnz short loc_018A5  ; 01898 jnz 0x18a5
-call 0x19fb  ; 0189A
-call 0x1a6c  ; 0189D
+call sub_017FB  ; 0189A
+call sub_0186C  ; 0189D
 sub word [0xbce6],0x2  ; 018A0
 loc_018A5:
 mov byte [0xbcd7],0x2  ; 018A5
@@ -2759,8 +2759,8 @@ add [0xbcd5],ax  ; 018B5
 add word [0xbce6],0x2  ; 018B9
 ret  ; 018BE
 
-; ---- function sub_018BF ----
-sub_018BF:
+; ---- function delay_ticks ----
+delay_ticks:
 mov [0xbce2],ax  ; 018BF
 mov ah,0x0  ; 018C2
 int 0x1a  ; 018C4
@@ -2772,14 +2772,14 @@ cmp dx,[0xbce2]  ; 018CE
 jnz short loc_018CA  ; 018D2 jnz 0x18ca
 ret  ; 018D4
 
-; ---- function sub_018D5 ----
-sub_018D5:
+; ---- function delay_with_input ----
+delay_with_input:
 shr ax,1  ; 018D5
 mov [0xbce4],ax  ; 018D7
 loc_018DA:
 mov ax,0x2  ; 018DA
-call 0x1abf  ; 018DD
-call 0x4349  ; 018E0
+call delay_ticks  ; 018DD
+call poll_keyboard  ; 018E0
 db 0x3D, 0x00, 0x00  ; 018E3 cmp ax,0x0
 jnz short loc_018EE  ; 018E6 jnz 0x18ee
 dec word [0xbce4]  ; 018E8
@@ -2787,15 +2787,15 @@ jnz short loc_018DA  ; 018EC jnz 0x18da
 loc_018EE:
 ret  ; 018EE
 
-; ---- function sub_018EF ----
-sub_018EF:
+; ---- function timer_mark ----
+timer_mark:
 mov ah,0x0  ; 018EF
 int 0x1a  ; 018F1
 mov [0xbcd1],dx  ; 018F3
 ret  ; 018F7
 
-; ---- function sub_018F8 ----
-sub_018F8:
+; ---- function timer_wait_3ticks ----
+timer_wait_3ticks:
 loc_018F8:
 mov ah,0x0  ; 018F8
 int 0x1a  ; 018FA
@@ -2806,8 +2806,8 @@ jc short loc_018F8  ; 01905 jc 0x18f8
 mov [0xbcd1],ax  ; 01907
 ret  ; 0190A
 
-; ---- function sub_0190B ----
-sub_0190B:
+; ---- function set_music_callback ----
+set_music_callback:
 push bp  ; 0190B
 db 0x8B, 0xEC  ; 0190C mov bp,sp
 mov ax,[bp+0x2]  ; 0190E
@@ -2820,18 +2820,18 @@ lea ax,[0xbd04]  ; 01920
 mov [0xbce0],bp  ; 01924
 push ax  ; 01928
 push word [bp+0x4]  ; 01929
-call 0x1477  ; 0192C
+call init_figure  ; 0192C
 add sp,0x4  ; 0192F
 mov bp,[0xbce0]  ; 01932
 push word [bp+0x6]  ; 01936
-call 0x1227  ; 01939
+call load_animation  ; 01939
 add sp,0x2  ; 0193C
 mov bp,[0xbce0]  ; 0193F
 mov word [0xe4],0x0  ; 01943
-call 0xd4e  ; 01949
+call clear_screen  ; 01949
 mov word [0xee],0x1  ; 0194C
 mov word [0xea],0x4  ; 01952
-call 0x1934  ; 01958
+call setup_screen  ; 01958
 mov word [0xd652],0xffff  ; 0195B
 mov ax,[0xbcda]  ; 01961
 mov [0xea],ax  ; 01964
@@ -2870,15 +2870,15 @@ dec cl  ; 0199D
 jnz short loc_01983  ; 0199F jnz 0x1983
 ret  ; 019A1
 
-; ---- function sub_019A2 ----
-sub_019A2:
+; ---- function play_sound ----
+play_sound:
 lea bx,[0xce3e]  ; 019A2
 lea di,[0xcdea]  ; 019A6
-call 0x1b7e  ; 019AA
+call sub_0197E  ; 019AA
 ret  ; 019AD
 
-; ---- function sub_019AE ----
-sub_019AE:
+; ---- function init_sound ----
+init_sound:
 push bp  ; 019AE
 sub sp,0x4  ; 019AF
 jc short loc_019BA  ; 019B2 jc 0x19ba
@@ -2892,9 +2892,9 @@ mov ax,0xc428  ; 019BF
 push ax  ; 019C2
 mov ax,0xd59c  ; 019C3
 push ax  ; 019C6
-call 0x1477  ; 019C7
+call init_figure  ; 019C7
 db 0x8B, 0xE5  ; 019CA mov sp,bp
-call 0x1b76  ; 019CC
+call sub_01976  ; 019CC
 db 0x33, 0xC0  ; 019CF xor ax,ax
 mov bx,0x5  ; 019D1
 push bx  ; 019D4
@@ -2903,14 +2903,14 @@ mov [0x160],ax  ; 019D8
 mov [0x162],ax  ; 019DB
 mov [0x164],ax  ; 019DE
 mov [0x15e],ax  ; 019E1
-call 0x1227  ; 019E4
+call load_animation  ; 019E4
 db 0x8B, 0xE5  ; 019E7 mov sp,bp
 add sp,0x4  ; 019E9
 pop bp  ; 019EC
 ret  ; 019ED
 
-; ---- function sub_019EE ----
-sub_019EE:
+; ---- function stop_sound ----
+stop_sound:
 push bp  ; 019EE
 sub sp,0xc  ; 019EF
 jc short loc_019FA  ; 019F2 jc 0x19fa
@@ -2995,8 +2995,8 @@ add sp,0xc  ; 01ABD
 pop bp  ; 01AC0
 ret  ; 01AC1
 
-; ---- function sub_01AC2 ----
-sub_01AC2:
+; ---- function combat_update ----
+combat_update:
 push bp  ; 01AC2
 sub sp,0x4  ; 01AC3
 jc short loc_01ACE  ; 01AC6 jc 0x1ace
@@ -3007,7 +3007,7 @@ jmp 0x420  ; 01ACE
 loc_01AD1:
 db 0x8B, 0xEC  ; 01AD1 mov bp,sp
 push word [bp+0x8]  ; 01AD3
-call 0x1227  ; 01AD6
+call load_animation  ; 01AD6
 db 0x8B, 0xE5  ; 01AD9 mov sp,bp
 mov ax,[bp+0x8]  ; 01ADB
 db 0x3D, 0x04, 0x00  ; 01ADE cmp ax,0x4
@@ -3017,35 +3017,35 @@ db 0x8B, 0xF0  ; 01AE5 mov si,ax
 mov ax,0xc102  ; 01AE7
 push ax  ; 01AEA
 push word [si+0x21c]  ; 01AEB
-call 0x1477  ; 01AEF
+call init_figure  ; 01AEF
 db 0x8B, 0xE5  ; 01AF2 mov sp,bp
 cmp word [bp+0x8],0x2  ; 01AF4
 jnl short loc_01B05  ; 01AF8 jnl 0x1b05
 mov ax,0x1  ; 01AFA
 push ax  ; 01AFD
-call 0x1bee  ; 01AFE
+call stop_sound  ; 01AFE
 db 0x8B, 0xE5  ; 01B01 mov sp,bp
 jmp short loc_01B0E  ; 01B03 jmp 0x1b0e
 loc_01B05:
 mov ax,0x6  ; 01B05
 push ax  ; 01B08
-call 0x1bee  ; 01B09
+call stop_sound  ; 01B09
 db 0x8B, 0xE5  ; 01B0C mov sp,bp
 loc_01B0E:
 cmp word [bp+0x8],0x2  ; 01B0E
 jnz short loc_01B17  ; 01B12 jnz 0x1b17
-call 0x42a1  ; 01B14
+call update_score  ; 01B14
 loc_01B17:
 push word [bp+0x8]  ; 01B17
-call 0x1d27  ; 01B1A
+call combat_check_hit  ; 01B1A
 db 0x8B, 0xE5  ; 01B1D mov sp,bp
-call 0x4433  ; 01B1F
+call flush_keyboard  ; 01B1F
 add sp,0x4  ; 01B22
 pop bp  ; 01B25
 ret  ; 01B26
 
-; ---- function sub_01B27 ----
-sub_01B27:
+; ---- function combat_check_hit ----
+combat_check_hit:
 push bp  ; 01B27
 sub sp,0x6  ; 01B28
 jc short loc_01B33  ; 01B2B jc 0x1b33
@@ -3086,7 +3086,7 @@ mov [0x102],cx  ; 01B92
 mov [0x106],dx  ; 01B96
 mov [0x104],dx  ; 01B9A
 mov [0x10a],bx  ; 01B9E
-call 0x1e58  ; 01BA2
+call combat_apply_damage  ; 01BA2
 db 0x8B, 0xE5  ; 01BA5 mov sp,bp
 cmp word [bp+0xa],0x3  ; 01BA7
 jnz short loc_01BED  ; 01BAB jnz 0x1bed
@@ -3149,8 +3149,8 @@ add sp,0x6  ; 01C53
 pop bp  ; 01C56
 ret  ; 01C57
 
-; ---- function sub_01C58 ----
-sub_01C58:
+; ---- function combat_apply_damage ----
+combat_apply_damage:
 push bp  ; 01C58
 sub sp,0x2  ; 01C59
 jc short loc_01C64  ; 01C5C jc 0x1c64
@@ -3215,8 +3215,8 @@ add sp,0x2  ; 01D02
 pop bp  ; 01D05
 ret  ; 01D06
 
-; ---- function sub_01D07 ----
-sub_01D07:
+; ---- function combat_ai ----
+combat_ai:
 push bp  ; 01D07
 sub sp,0x6  ; 01D08
 jc short loc_01D13  ; 01D0B jc 0x1d13
@@ -3235,21 +3235,21 @@ ret  ; 01D26
 loc_01D27:
 db 0x33, 0xC0  ; 01D27 xor ax,ax
 push ax  ; 01D29
-call 0x4349  ; 01D2A
+call poll_keyboard  ; 01D2A
 db 0x8B, 0xE5  ; 01D2D mov sp,bp
 test ax,ax  ; 01D2F
 jz short loc_01D82  ; 01D31 jz 0x1d82
-call 0x1f8a  ; 01D33
+call sub_01D8A  ; 01D33
 push ax  ; 01D36
 mov [bp+0x4],ax  ; 01D37
-call 0x1fd5  ; 01D3A
+call sub_01DD5  ; 01D3A
 db 0x8B, 0xE5  ; 01D3D mov sp,bp
 mov [bp+0x2],ax  ; 01D3F
 inc ax  ; 01D42
 jz short loc_01D61  ; 01D43 jz 0x1d61
 push word [bp+0x4]  ; 01D45
 push word [bp+0x2]  ; 01D48
-call 0x214e  ; 01D4B
+call sub_01F4E  ; 01D4B
 db 0x8B, 0xE5  ; 01D4E mov sp,bp
 mov [bp+0x2],ax  ; 01D50
 inc ax  ; 01D53
@@ -3293,21 +3293,21 @@ jnz short loc_01DBB  ; 01DA5 jnz 0x1dbb
 loc_01DA7:
 db 0x33, 0xC0  ; 01DA7 xor ax,ax
 push ax  ; 01DA9
-call 0x4349  ; 01DAA
+call poll_keyboard  ; 01DAA
 db 0x8B, 0xE5  ; 01DAD mov sp,bp
 test ax,ax  ; 01DAF
 jz short loc_01DCD  ; 01DB1 jz 0x1dcd
-call 0x43fc  ; 01DB3
+call wait_for_key  ; 01DB3
 mov [bp+0x2],ax  ; 01DB6
 jmp short loc_01DA7  ; 01DB9 jmp 0x1da7
 loc_01DBB:
 db 0x33, 0xC0  ; 01DBB xor ax,ax
 push ax  ; 01DBD
-call 0x4349  ; 01DBE
+call poll_keyboard  ; 01DBE
 db 0x8B, 0xE5  ; 01DC1 mov sp,bp
 test ax,ax  ; 01DC3
 jz short loc_01DCD  ; 01DC5 jz 0x1dcd
-call 0x43fc  ; 01DC7
+call wait_for_key  ; 01DC7
 mov [bp+0x2],ax  ; 01DCA
 loc_01DCD:
 mov ax,[bp+0x2]  ; 01DCD
@@ -3335,7 +3335,7 @@ add word [bp+0xa],0x20  ; 01DF3
 loc_01DF7:
 cmp word [bp+0xa],0x6a  ; 01DF7
 jnz short loc_01E0E  ; 01DFB jnz 0x1e0e
-call 0x4441  ; 01DFD
+call consume_key  ; 01DFD
 mov word [0xdf46],0x0  ; 01E00
 mov ax,0xffff  ; 01E06
 add sp,0x6  ; 01E09
@@ -3344,7 +3344,7 @@ ret  ; 01E0D
 loc_01E0E:
 cmp word [bp+0xa],0x6b  ; 01E0E
 jnz short loc_01E25  ; 01E12 jnz 0x1e25
-call 0x4441  ; 01E14
+call consume_key  ; 01E14
 mov word [0xdf46],0x1  ; 01E17
 mov ax,0xffff  ; 01E1D
 add sp,0x6  ; 01E20
@@ -3621,8 +3621,8 @@ add sp,0x2  ; 02059
 pop bp  ; 0205C
 ret  ; 0205D
 
-; ---- function sub_0205E ----
-sub_0205E:
+; ---- function math_multiply ----
+math_multiply:
 push bp  ; 0205E
 sub sp,0x4  ; 0205F
 jc short loc_0206A  ; 02062 jc 0x206a
@@ -3658,13 +3658,13 @@ cmp word [0x170],0x0  ; 020A8
 jnz short loc_020BA  ; 020AD jnz 0x20ba
 mov ax,0xb  ; 020AF
 push ax  ; 020B2
-call 0x3dae  ; 020B3
+call wait_vsync  ; 020B3
 db 0x8B, 0xE5  ; 020B6 mov sp,bp
 jmp short loc_020C3  ; 020B8 jmp 0x20c3
 loc_020BA:
 mov ax,0x14  ; 020BA
 push ax  ; 020BD
-call 0x3dae  ; 020BE
+call wait_vsync  ; 020BE
 db 0x8B, 0xE5  ; 020C1 mov sp,bp
 loc_020C3:
 db 0x33, 0xC0  ; 020C3 xor ax,ax
@@ -3705,7 +3705,7 @@ jnz short loc_02130  ; 02117 jnz 0x2130
 mov word [0x16c],0x0  ; 02119
 mov ax,0x1  ; 0211F
 push ax  ; 02122
-call 0x829  ; 02123
+call calc_screen_offset  ; 02123
 db 0x8B, 0xE5  ; 02126 mov sp,bp
 db 0x05, 0x11, 0x00  ; 02128 add ax,0x11
 add sp,0x4  ; 0212B
@@ -3723,7 +3723,7 @@ ret  ; 02144
 loc_02145:
 mov ax,[0x10c]  ; 02145
 jmp 0x248b  ; 02148
-call 0x1f07  ; 0214B
+call combat_ai  ; 0214B
 mov [bp+0x2],ax  ; 0214E
 inc ax  ; 02151
 jnz short loc_02159  ; 02152 jnz 0x2159
@@ -3733,7 +3733,7 @@ mov ax,[bp+0x2]  ; 02159
 add sp,0x4  ; 0215C
 pop bp  ; 0215F
 ret  ; 02160
-call 0x1f07  ; 02161
+call combat_ai  ; 02161
 mov [bp+0x2],ax  ; 02164
 inc ax  ; 02167
 jnz short loc_02171  ; 02168 jnz 0x2171
@@ -3746,7 +3746,7 @@ mov ax,[bp+0x2]  ; 02175
 add sp,0x4  ; 02178
 pop bp  ; 0217B
 ret  ; 0217C
-call 0x1f07  ; 0217D
+call combat_ai  ; 0217D
 mov [bp+0x2],ax  ; 02180
 inc ax  ; 02183
 jnz short loc_0218D  ; 02184 jnz 0x218d
@@ -3759,7 +3759,7 @@ mov ax,[bp+0x2]  ; 02191
 add sp,0x4  ; 02194
 pop bp  ; 02197
 ret  ; 02198
-call 0x1f07  ; 02199
+call combat_ai  ; 02199
 db 0x3D, 0x17, 0x00  ; 0219C cmp ax,0x17
 mov [bp+0x2],ax  ; 0219F
 jng short loc_021C2  ; 021A2 jng 0x21c2
@@ -3784,7 +3784,7 @@ mov ax,[bp+0x2]  ; 021D3
 add sp,0x4  ; 021D6
 pop bp  ; 021D9
 ret  ; 021DA
-call 0x1f07  ; 021DB
+call combat_ai  ; 021DB
 db 0x3D, 0x0C, 0x00  ; 021DE cmp ax,0xc
 mov [bp+0x2],ax  ; 021E1
 jnz short loc_021F5  ; 021E4 jnz 0x21f5
@@ -3812,7 +3812,7 @@ db 0x33, 0xC0  ; 02211 xor ax,ax
 add sp,0x4  ; 02213
 pop bp  ; 02216
 ret  ; 02217
-call 0x1f07  ; 02218
+call combat_ai  ; 02218
 mov [bp+0x2],ax  ; 0221B
 inc ax  ; 0221E
 jnz short loc_02229  ; 0221F jnz 0x2229
@@ -3825,7 +3825,7 @@ mov ax,[bp+0x2]  ; 02229
 add sp,0x4  ; 0222C
 pop bp  ; 0222F
 ret  ; 02230
-call 0x1f07  ; 02231
+call combat_ai  ; 02231
 mov [bp+0x2],ax  ; 02234
 inc ax  ; 02237
 jnz short loc_0223F  ; 02238 jnz 0x223f
@@ -3878,8 +3878,8 @@ add sp,0x4  ; 0229F
 pop bp  ; 022A2
 ret  ; 022A3
 
-; ---- function sub_022A4 ----
-sub_022A4:
+; ---- function math_divide ----
+math_divide:
 push bp  ; 022A4
 db 0x8B, 0xEC  ; 022A5 mov bp,sp
 mov di,[bp+0x4]  ; 022A7
@@ -3895,8 +3895,8 @@ pop es  ; 022B9
 pop bp  ; 022BA
 ret  ; 022BB
 
-; ---- function sub_022BC ----
-sub_022BC:
+; ---- function math_modulo ----
+math_modulo:
 push bp  ; 022BC
 db 0x8B, 0xEC  ; 022BD mov bp,sp
 mov di,[bp+0x4]  ; 022BF
@@ -3915,8 +3915,8 @@ add [di+0x5],ax  ; 022DC
 pop bp  ; 022DF
 ret  ; 022E0
 
-; ---- function sub_022E1 ----
-sub_022E1:
+; ---- function scene_update ----
+scene_update:
 mov byte [0xbb30],0x0  ; 022E1
 mov word [0xbb31],0x0  ; 022E6
 mov ax,[0xbcd5]  ; 022EC
@@ -3931,7 +3931,7 @@ push word [0xc3a2]  ; 02304
 push word [0xc3a0]  ; 02308
 lea ax,[0xbb33]  ; 0230C
 push ax  ; 02310
-call 0x24a4  ; 02311
+call math_divide  ; 02311
 add sp,0x6  ; 02314
 mov [0xd5a4],ax  ; 02317
 cmp word [0xf8],0x1  ; 0231A
@@ -3944,10 +3944,10 @@ cmp byte [bx-0x3bd8],0xff  ; 02328
 jnz short loc_0235C  ; 0232D jnz 0x235c
 cmp word [0x156],0x0  ; 0232F
 jz short loc_0233B  ; 02334 jz 0x233b
-call 0x2c49  ; 02336
+call anim_process  ; 02336
 jmp short loc_0233E  ; 02339 jmp 0x233e
 loc_0233B:
-call 0x225e  ; 0233B
+call math_multiply  ; 0233B
 loc_0233E:
 db 0x3D, 0x2A, 0x00  ; 0233E cmp ax,0x2a
 jc short loc_02345  ; 02341 jc 0x2345
@@ -4046,7 +4046,7 @@ push ax  ; 02447
 lea ax,[0xbb33]  ; 02448
 add ax,[0xd5a4]  ; 0244C
 push ax  ; 02450
-call 0x24bc  ; 02451
+call math_modulo  ; 02451
 add sp,0x6  ; 02454
 add word [0xd5a4],0x8  ; 02457
 add word [0xc3d2],0x11  ; 0245C
@@ -4057,7 +4057,7 @@ loc_0246B:
 mov si,[0xcde8]  ; 0246B
 cmp byte [si-0x31c2],0xff  ; 0246F
 jnz short loc_02491  ; 02474 jnz 0x2491
-call 0x2805  ; 02476
+call math_random  ; 02476
 cmp word [0xfa],0x1  ; 02479
 jng short loc_02483  ; 0247E jng 0x2483
 jmp 0x27cd  ; 02480
@@ -4184,7 +4184,7 @@ lea ax,[0xbb33]  ; 025DE
 add ax,[0xd5a4]  ; 025E2
 push ax  ; 025E6
 mov [0xd5a8],ax  ; 025E7
-call 0x24a4  ; 025EA
+call math_divide  ; 025EA
 add sp,0x6  ; 025ED
 add [0xd5a4],ax  ; 025F0
 mov si,[0xd5a4]  ; 025F4
@@ -4193,8 +4193,8 @@ add si,0x3  ; 025FD
 mov [0xbb2e],si  ; 02600
 ret  ; 02604
 
-; ---- function sub_02605 ----
-sub_02605:
+; ---- function math_random ----
+math_random:
 push bp  ; 02605
 sub sp,0xc  ; 02606
 jc short loc_02611  ; 02609 jc 0x2611
@@ -4343,7 +4343,7 @@ ret  ; 02767
 loc_02768:
 mov ax,0x2  ; 02768
 push ax  ; 0276B
-call 0x829  ; 0276C
+call calc_screen_offset  ; 0276C
 db 0x8B, 0xE5  ; 0276F mov sp,bp
 mov bx,0xc  ; 02771
 imul bx  ; 02774
@@ -4428,7 +4428,7 @@ pop bp  ; 0282B
 ret  ; 0282C
 loc_0282D:
 push word [bp+0x6]  ; 0282D
-call 0x2b41  ; 02830
+call sub_02941  ; 02830
 db 0x8B, 0xE5  ; 02833 mov sp,bp
 add sp,0xc  ; 02835
 pop bp  ; 02838
@@ -4444,7 +4444,7 @@ loc_02848:
 cmp word [bp+0x6],0x2c  ; 02848
 jng short loc_0285B  ; 0284C jng 0x285b
 push word [bp+0x6]  ; 0284E
-call 0x2b41  ; 02851
+call sub_02941  ; 02851
 db 0x8B, 0xE5  ; 02854 mov sp,bp
 add sp,0xc  ; 02856
 pop bp  ; 02859
@@ -4452,7 +4452,7 @@ ret  ; 0285A
 loc_0285B:
 mov ax,0xff  ; 0285B
 push ax  ; 0285E
-call 0x829  ; 0285F
+call calc_screen_offset  ; 0285F
 db 0x8B, 0xE5  ; 02862 mov sp,bp
 cmp word [bp+0x6],0x1c  ; 02864
 mov [bp+0xa],ax  ; 02868
@@ -4497,13 +4497,13 @@ db 0x3D, 0x08, 0x00  ; 028C2 cmp ax,0x8
 jnl short loc_028D7  ; 028C5 jnl 0x28d7
 db 0x3D, 0x04, 0x00  ; 028C7 cmp ax,0x4
 jng short loc_028D7  ; 028CA jng 0x28d7
-call 0x2c0f  ; 028CC
+call anim_interpolate  ; 028CC
 db 0x05, 0x14, 0x00  ; 028CF add ax,0x14
 add sp,0xc  ; 028D2
 pop bp  ; 028D5
 ret  ; 028D6
 loc_028D7:
-call 0x2c0f  ; 028D7
+call anim_interpolate  ; 028D7
 add sp,0xc  ; 028DA
 pop bp  ; 028DD
 ret  ; 028DE
@@ -4522,13 +4522,13 @@ db 0x03, 0xF0  ; 028F7 add si,ax
 mov ax,[bp+0xa]  ; 028F9
 cmp ax,[si-0x29e8]  ; 028FC
 jl short loc_0290A  ; 02900 jl 0x290a
-call 0x2be9  ; 02902
+call anim_frame_update  ; 02902
 add sp,0xc  ; 02905
 pop bp  ; 02908
 ret  ; 02909
 loc_0290A:
 push word [bp+0x6]  ; 0290A
-call 0x2b41  ; 0290D
+call sub_02941  ; 0290D
 db 0x8B, 0xE5  ; 02910 mov sp,bp
 add sp,0xc  ; 02912
 pop bp  ; 02915
@@ -4587,7 +4587,7 @@ mov [bp+0x4],ax  ; 0297D
 loc_02980:
 mov ax,0xff  ; 02980
 push ax  ; 02983
-call 0x829  ; 02984
+call calc_screen_offset  ; 02984
 db 0x8B, 0xE5  ; 02987 mov sp,bp
 cmp ax,[bp+0x4]  ; 02989
 jng short loc_02995  ; 0298C jng 0x2995
@@ -4636,8 +4636,8 @@ add sp,0x6  ; 029E4
 pop bp  ; 029E7
 ret  ; 029E8
 
-; ---- function sub_029E9 ----
-sub_029E9:
+; ---- function anim_frame_update ----
+anim_frame_update:
 push bp  ; 029E9
 sub sp,0x2  ; 029EA
 jc short loc_029F5  ; 029ED jc 0x29f5
@@ -4649,7 +4649,7 @@ loc_029F8:
 db 0x8B, 0xEC  ; 029F8 mov bp,sp
 mov ax,0x2  ; 029FA
 push ax  ; 029FD
-call 0x829  ; 029FE
+call calc_screen_offset  ; 029FE
 db 0x8B, 0xE5  ; 02A01 mov sp,bp
 inc ax  ; 02A03
 inc ax  ; 02A04
@@ -4661,8 +4661,8 @@ db 0x8B, 0xEC  ; 02A0B mov bp,sp
 pop bp  ; 02A0D
 ret  ; 02A0E
 
-; ---- function sub_02A0F ----
-sub_02A0F:
+; ---- function anim_interpolate ----
+anim_interpolate:
 push bp  ; 02A0F
 sub sp,0x2  ; 02A10
 jc short loc_02A1B  ; 02A13 jc 0x2a1b
@@ -4676,7 +4676,7 @@ cmp word [0xf2],0x1  ; 02A20
 jnz short loc_02A38  ; 02A25 jnz 0x2a38
 mov ax,0x1  ; 02A27
 push ax  ; 02A2A
-call 0x829  ; 02A2B
+call calc_screen_offset  ; 02A2B
 db 0x8B, 0xE5  ; 02A2E mov sp,bp
 db 0x05, 0x04, 0x00  ; 02A30 add ax,0x4
 add sp,0x2  ; 02A33
@@ -4685,15 +4685,15 @@ ret  ; 02A37
 loc_02A38:
 mov ax,0x2  ; 02A38
 push ax  ; 02A3B
-call 0x829  ; 02A3C
+call calc_screen_offset  ; 02A3C
 db 0x8B, 0xE5  ; 02A3F mov sp,bp
 db 0x05, 0x04, 0x00  ; 02A41 add ax,0x4
 add sp,0x2  ; 02A44
 pop bp  ; 02A47
 ret  ; 02A48
 
-; ---- function sub_02A49 ----
-sub_02A49:
+; ---- function anim_process ----
+anim_process:
 push bp  ; 02A49
 sub sp,0xa  ; 02A4A
 jc short loc_02A55  ; 02A4D jc 0x2a55
@@ -4717,7 +4717,7 @@ mov [bp+0x4],ax  ; 02A75
 jnz short loc_02A8B  ; 02A78 jnz 0x2a8b
 mov ax,0xb  ; 02A7A
 push ax  ; 02A7D
-call 0x3dae  ; 02A7E
+call wait_vsync  ; 02A7E
 db 0x8B, 0xE5  ; 02A81 mov sp,bp
 mov ax,0xf  ; 02A83
 add sp,0xa  ; 02A86
@@ -4732,7 +4732,7 @@ cmp word [0x110],0x43  ; 02A99
 jnz short loc_02AB1  ; 02A9E jnz 0x2ab1
 mov ax,0x1  ; 02AA0
 push ax  ; 02AA3
-call 0x829  ; 02AA4
+call calc_screen_offset  ; 02AA4
 db 0x8B, 0xE5  ; 02AA7 mov sp,bp
 db 0x05, 0x11, 0x00  ; 02AA9 add ax,0x11
 add sp,0xa  ; 02AAC
@@ -4773,7 +4773,7 @@ loc_02AF5:
 cmp word [bp+0x4],0x2c  ; 02AF5
 jng short loc_02B08  ; 02AF9 jng 0x2b08
 push word [bp+0x4]  ; 02AFB
-call 0x2d94  ; 02AFE
+call anim_command  ; 02AFE
 db 0x8B, 0xE5  ; 02B01 mov sp,bp
 add sp,0xa  ; 02B03
 pop bp  ; 02B06
@@ -4781,7 +4781,7 @@ ret  ; 02B07
 loc_02B08:
 mov ax,0xff  ; 02B08
 push ax  ; 02B0B
-call 0x829  ; 02B0C
+call calc_screen_offset  ; 02B0C
 db 0x8B, 0xE5  ; 02B0F mov sp,bp
 cmp word [bp+0x4],0x1c  ; 02B11
 mov [bp+0x8],ax  ; 02B15
@@ -4799,7 +4799,7 @@ mov ax,[bp+0x8]  ; 02B2F
 cmp ax,[si-0x2a24]  ; 02B32
 jl short loc_02B45  ; 02B36 jl 0x2b45
 push word [bp+0x4]  ; 02B38
-call 0x2d94  ; 02B3B
+call anim_command  ; 02B3B
 db 0x8B, 0xE5  ; 02B3E mov sp,bp
 add sp,0xa  ; 02B40
 pop bp  ; 02B43
@@ -4815,7 +4815,7 @@ db 0x8B, 0xF0  ; 02B53 mov si,ax
 mov ax,[bp+0x8]  ; 02B55
 cmp ax,[si-0x29f2]  ; 02B58
 jl short loc_02B66  ; 02B5C jl 0x2b66
-call 0x2c0f  ; 02B5E
+call anim_interpolate  ; 02B5E
 add sp,0xa  ; 02B61
 pop bp  ; 02B64
 ret  ; 02B65
@@ -4830,20 +4830,20 @@ db 0x8B, 0xF0  ; 02B74 mov si,ax
 mov ax,[bp+0x8]  ; 02B76
 cmp ax,[si-0x29c0]  ; 02B79
 jl short loc_02B87  ; 02B7D jl 0x2b87
-call 0x2be9  ; 02B7F
+call anim_frame_update  ; 02B7F
 add sp,0xa  ; 02B82
 pop bp  ; 02B85
 ret  ; 02B86
 loc_02B87:
 push word [bp+0x4]  ; 02B87
-call 0x2d94  ; 02B8A
+call anim_command  ; 02B8A
 db 0x8B, 0xE5  ; 02B8D mov sp,bp
 add sp,0xa  ; 02B8F
 pop bp  ; 02B92
 ret  ; 02B93
 
-; ---- function sub_02B94 ----
-sub_02B94:
+; ---- function anim_command ----
+anim_command:
 push bp  ; 02B94
 sub sp,0x2  ; 02B95
 jc short loc_02BA0  ; 02B98 jc 0x2ba0
@@ -4855,7 +4855,7 @@ loc_02BA3:
 db 0x8B, 0xEC  ; 02BA3 mov bp,sp
 mov ax,0xff  ; 02BA5
 push ax  ; 02BA8
-call 0x829  ; 02BA9
+call calc_screen_offset  ; 02BA9
 db 0x8B, 0xE5  ; 02BAC mov sp,bp
 db 0x3D, 0x32, 0x00  ; 02BAE cmp ax,0x32
 jng short loc_02BC0  ; 02BB1 jng 0x2bc0
@@ -4882,8 +4882,8 @@ add sp,0x2  ; 02BD8
 pop bp  ; 02BDB
 ret  ; 02BDC
 
-; ---- function sub_02BDD ----
-sub_02BDD:
+; ---- function level_setup ----
+level_setup:
 push bp  ; 02BDD
 sub sp,0x8  ; 02BDE
 jc short loc_02BE9  ; 02BE1 jc 0x2be9
@@ -4929,7 +4929,7 @@ jnz short loc_02C4B  ; 02C3C jnz 0x2c4b
 loc_02C3E:
 cmp word [0xd5ac],0x18  ; 02C3E
 jnz short loc_02C4B  ; 02C43 jnz 0x2c4b
-call 0x3198  ; 02C45
+call anim_set_figure  ; 02C45
 jmp 0x2fb0  ; 02C48
 loc_02C4B:
 mov ax,[0x10c]  ; 02C4B
@@ -4940,7 +4940,7 @@ jnz short loc_02C65  ; 02C56 jnz 0x2c65
 loc_02C58:
 cmp word [0xd5ac],0xc  ; 02C58
 jnz short loc_02C65  ; 02C5D jnz 0x2c65
-call 0x3198  ; 02C5F
+call anim_set_figure  ; 02C5F
 jmp 0x2fb0  ; 02C62
 loc_02C65:
 mov ax,[0x10c]  ; 02C65
@@ -4954,7 +4954,7 @@ cmp word [0xd5ac],0x0  ; 02C75
 jz short loc_02C7F  ; 02C7A jz 0x2c7f
 jmp 0x2fb0  ; 02C7C
 loc_02C7F:
-call 0x3198  ; 02C7F
+call anim_set_figure  ; 02C7F
 jmp 0x2fb0  ; 02C82
 loc_02C85:
 cmp word [0xfa],0x0  ; 02C85
@@ -4976,20 +4976,20 @@ jnl short loc_02CBB  ; 02CB0 jnl 0x2cbb
 mov word [0x154],0x1  ; 02CB2
 jmp 0x2fb0  ; 02CB8
 loc_02CBB:
-call 0x312d  ; 02CBB
+call anim_set_bg  ; 02CBB
 mov ax,[0x10c]  ; 02CBE
 dec ax  ; 02CC1
 dec ax  ; 02CC2
 push ax  ; 02CC3
 db 0x33, 0xC0  ; 02CC4 xor ax,ax
 push ax  ; 02CC6
-call 0x4641  ; 02CC7
+call update_position  ; 02CC7
 db 0x8B, 0xE5  ; 02CCA mov sp,bp
 cmp word [0x130],0x5  ; 02CCC
 jz short loc_02CD6  ; 02CD1 jz 0x2cd6
 jmp 0x2fb0  ; 02CD3
 loc_02CD6:
-call 0x3d19  ; 02CD6
+call effect_scroll_right  ; 02CD6
 mov word [0x114],0x5  ; 02CD9
 mov ax,[0x122]  ; 02CDF
 mov bx,[0x104]  ; 02CE2
@@ -5006,7 +5006,7 @@ dec ax  ; 02CFF
 push word [0xd5b0]  ; 02D00
 push word [bp+0x4]  ; 02D04
 push ax  ; 02D07
-call 0x45aa  ; 02D08
+call apply_gravity  ; 02D08
 db 0x8B, 0xE5  ; 02D0B mov sp,bp
 db 0x3D, 0x04, 0x00  ; 02D0D cmp ax,0x4
 mov [bp+0x6],ax  ; 02D10
@@ -5068,7 +5068,7 @@ dec ax  ; 02DA6
 push ax  ; 02DA7
 db 0x33, 0xC0  ; 02DA8 xor ax,ax
 push ax  ; 02DAA
-call 0x4641  ; 02DAB
+call update_position  ; 02DAB
 db 0x8B, 0xE5  ; 02DAE mov sp,bp
 mov ax,[0x11e]  ; 02DB0
 test ax,ax  ; 02DB3
@@ -5111,7 +5111,7 @@ dec ax  ; 02E14
 push word [0xd5ae]  ; 02E15
 push word [bp+0x4]  ; 02E19
 push ax  ; 02E1C
-call 0x45aa  ; 02E1D
+call apply_gravity  ; 02E1D
 db 0x8B, 0xE5  ; 02E20 mov sp,bp
 db 0x3D, 0x04, 0x00  ; 02E22 cmp ax,0x4
 mov [bp+0x6],ax  ; 02E25
@@ -5174,7 +5174,7 @@ mov ax,0x9  ; 02EC0
 push ax  ; 02EC3
 mov ax,0x1  ; 02EC4
 push ax  ; 02EC7
-call 0x4641  ; 02EC8
+call update_position  ; 02EC8
 db 0x8B, 0xE5  ; 02ECB mov sp,bp
 jmp short loc_02EDF  ; 02ECD jmp 0x2edf
 loc_02ECF:
@@ -5183,7 +5183,7 @@ db 0x05, 0x04, 0x00  ; 02ED2 add ax,0x4
 push ax  ; 02ED5
 mov ax,0x1  ; 02ED6
 push ax  ; 02ED9
-call 0x4641  ; 02EDA
+call update_position  ; 02EDA
 db 0x8B, 0xE5  ; 02EDD mov sp,bp
 loc_02EDF:
 cmp word [0xf8],0x0  ; 02EDF
@@ -5221,8 +5221,8 @@ add sp,0x8  ; 02F28
 pop bp  ; 02F2B
 ret  ; 02F2C
 
-; ---- function sub_02F2D ----
-sub_02F2D:
+; ---- function anim_set_bg ----
+anim_set_bg:
 push bp  ; 02F2D
 sub sp,0x4  ; 02F2E
 jc short loc_02F39  ; 02F31 jc 0x2f39
@@ -5260,8 +5260,8 @@ add sp,0x4  ; 02F93
 pop bp  ; 02F96
 ret  ; 02F97
 
-; ---- function sub_02F98 ----
-sub_02F98:
+; ---- function anim_set_figure ----
+anim_set_figure:
 push bp  ; 02F98
 sub sp,0x2  ; 02F99
 jc short loc_02FA4  ; 02F9C jc 0x2fa4
@@ -5309,14 +5309,14 @@ dec ax  ; 0300D
 push ax  ; 0300E
 db 0x33, 0xC0  ; 0300F xor ax,ax
 push ax  ; 03011
-call 0x4641  ; 03012
+call update_position  ; 03012
 db 0x8B, 0xE5  ; 03015 mov sp,bp
 add sp,0x2  ; 03017
 pop bp  ; 0301A
 ret  ; 0301B
 
-; ---- function sub_0301C ----
-sub_0301C:
+; ---- function scene_transition ----
+scene_transition:
 cmp word [0xf8],0x0  ; 0301C
 jz short loc_03029  ; 03021 jz 0x3029
 mov word [0x116],0x0  ; 03023
@@ -5357,11 +5357,11 @@ db 0x03, 0xC3  ; 0307F add ax,bx
 db 0x2D, 0x02, 0x00  ; 03081 sub ax,0x2
 lea di,[0x3f87]  ; 03084
 db 0x03, 0xF8  ; 03088 add di,ax
-call 0x3362  ; 0308A
+call cutscene_step  ; 0308A
 jmp short loc_03096  ; 0308D jmp 0x3096
 loc_0308F:
 mov bx,[0x116]  ; 0308F
-call 0x337f  ; 03093
+call sub_0317F  ; 03093
 loc_03096:
 mov ax,[0x114]  ; 03096
 sub ax,[0xd650]  ; 03099
@@ -5378,11 +5378,11 @@ shl ax,1  ; 030B2
 db 0x03, 0xC3  ; 030B4 add ax,bx
 lea di,[0x3fd7]  ; 030B6
 db 0x2B, 0xF8  ; 030BA sub di,ax
-call 0x3362  ; 030BC
+call cutscene_step  ; 030BC
 jmp short loc_030F3  ; 030BF jmp 0x30f3
 loc_030C1:
 mov bx,[0x114]  ; 030C1
-call 0x3396  ; 030C5
+call sub_03196  ; 030C5
 jmp short loc_030F3  ; 030C8 jmp 0x30f3
 loc_030CA:
 lea di,[0x3cb7]  ; 030CA
@@ -5393,7 +5393,7 @@ mov bx,[0x116]  ; 030D5
 cmp bx,0x0  ; 030D9
 jz short loc_030E4  ; 030DC jz 0x30e4
 loc_030DE:
-call 0x337f  ; 030DE
+call sub_0317F  ; 030DE
 dec bx  ; 030E1
 jg short loc_030DE  ; 030E2 jg 0x30de
 loc_030E4:
@@ -5401,7 +5401,7 @@ mov bx,[0x114]  ; 030E4
 cmp bx,0x0  ; 030E8
 jz short loc_030F3  ; 030EB jz 0x30f3
 loc_030ED:
-call 0x3396  ; 030ED
+call sub_03196  ; 030ED
 dec bx  ; 030F0
 jg short loc_030ED  ; 030F1 jg 0x30ed
 loc_030F3:
@@ -5418,9 +5418,9 @@ cmp word [0x116],0x2  ; 0310C
 jg short loc_0312C  ; 03111 jg 0x312c
 mov byte [0xd670],0x1  ; 03113
 lea di,[0x3f88]  ; 03118
-call 0x3362  ; 0311C
+call cutscene_step  ; 0311C
 lea di,[0x3f8b]  ; 0311F
-call 0x3362  ; 03123
+call cutscene_step  ; 03123
 mov word [0xd652],0x0  ; 03126
 loc_0312C:
 cmp byte [0xd671],0x0  ; 0312C
@@ -5432,17 +5432,17 @@ cmp word [0x114],0x2  ; 03139
 jg short loc_03159  ; 0313E jg 0x3159
 mov byte [0xd671],0x1  ; 03140
 lea di,[0x3fd4]  ; 03145
-call 0x3362  ; 03149
+call cutscene_step  ; 03149
 lea di,[0x3fd1]  ; 0314C
-call 0x3362  ; 03150
+call cutscene_step  ; 03150
 mov word [0xd650],0x0  ; 03153
 loc_03159:
 pop word [0x114]  ; 03159
 pop word [0x116]  ; 0315D
 ret  ; 03161
 
-; ---- function sub_03162 ----
-sub_03162:
+; ---- function cutscene_step ----
+cutscene_step:
 mov cx,0x7  ; 03162
 mov word [di],0x0  ; 03165
 add di,0x50  ; 03169
@@ -5468,7 +5468,7 @@ db 0x2D, 0x02, 0x00  ; 03185 sub ax,0x2
 lea di,[0x3f87]  ; 03188
 db 0x03, 0xF8  ; 0318C add di,ax
 lea si,[0xd654]  ; 0318E
-call 0x336f  ; 03192
+call sub_0316F  ; 03192
 ret  ; 03195
 
 ; ---- function sub_03196 ----
@@ -5479,11 +5479,11 @@ db 0x03, 0xC3  ; 0319A add ax,bx
 lea di,[0x3fd7]  ; 0319C
 db 0x2B, 0xF8  ; 031A0 sub di,ax
 lea si,[0xd662]  ; 031A2
-call 0x336f  ; 031A6
+call sub_0316F  ; 031A6
 ret  ; 031A9
 
-; ---- function sub_031AA ----
-sub_031AA:
+; ---- function cutscene_play ----
+cutscene_play:
 push bp  ; 031AA
 sub sp,0x6  ; 031AB
 jc short loc_031B6  ; 031AE jc 0x31b6
@@ -5497,7 +5497,7 @@ cmp word [0xd672],0x6  ; 031BB
 jnz short loc_031D1  ; 031C0 jnz 0x31d1
 mov ax,0xc  ; 031C2
 push ax  ; 031C5
-call 0x3dae  ; 031C6
+call wait_vsync  ; 031C6
 db 0x8B, 0xE5  ; 031C9 mov sp,bp
 mov word [0xd672],0x0  ; 031CB
 loc_031D1:
@@ -5525,9 +5525,9 @@ ret  ; 0320C
 loc_0320D:
 mov ax,0xa  ; 0320D
 push ax  ; 03210
-call 0x3dae  ; 03211
+call wait_vsync  ; 03211
 db 0x8B, 0xE5  ; 03214 mov sp,bp
-call 0x4156  ; 03216
+call draw_ui_element  ; 03216
 mov word [0xd674],0x0  ; 03219
 mov ax,0x1  ; 0321F
 add sp,0x6  ; 03222
@@ -5611,7 +5611,7 @@ db 0x3D, 0x01, 0x00  ; 032EF cmp ax,0x1
 jnz short loc_032F9  ; 032F2 jnz 0x32f9
 add word [0x12c],0x2  ; 032F4
 loc_032F9:
-call 0x3cd0  ; 032F9
+call effect_scroll_left  ; 032F9
 jmp short loc_0332A  ; 032FC jmp 0x332a
 loc_032FE:
 cmp word [0x12c],0x0  ; 032FE
@@ -5629,7 +5629,7 @@ mov [0x12c],ax  ; 0331C
 jnz short loc_03327  ; 0331F jnz 0x3327
 mov word [0xd67c],0xa  ; 03321
 loc_03327:
-call 0x3cd0  ; 03327
+call effect_scroll_left  ; 03327
 loc_0332A:
 cmp word [0x12c],0x1  ; 0332A
 jng short loc_03349  ; 0332F jng 0x3349
@@ -5664,7 +5664,7 @@ cmp word [0x10c],0x44  ; 03375
 jnz short loc_03385  ; 0337A jnz 0x3385
 mov ax,0x3  ; 0337C
 push ax  ; 0337F
-call 0x3dae  ; 03380
+call wait_vsync  ; 03380
 db 0x8B, 0xE5  ; 03383 mov sp,bp
 loc_03385:
 mov word [bp+0x4],0x0  ; 03385
@@ -5702,7 +5702,7 @@ mov [0xea],ax  ; 033DB
 inc ax  ; 033DE
 push ax  ; 033DF
 mov [0xea],ax  ; 033E0
-call 0x1cc2  ; 033E3
+call combat_update  ; 033E3
 db 0x8B, 0xE5  ; 033E6 mov sp,bp
 mov ax,0x6  ; 033E8
 mov bx,0x1  ; 033EB
@@ -5728,19 +5728,19 @@ mov ax,0x7  ; 03426
 push ax  ; 03429
 mov ax,0xd680  ; 0342A
 push ax  ; 0342D
-call 0x1b0b  ; 0342E
+call set_music_callback  ; 0342E
 db 0x8B, 0xE5  ; 03431 mov sp,bp
 mov ax,[0xea]  ; 03433
 inc ax  ; 03436
 push ax  ; 03437
 mov [0xea],ax  ; 03438
-call 0x1cc2  ; 0343B
+call combat_update  ; 0343B
 db 0x8B, 0xE5  ; 0343E mov sp,bp
 mov ax,0x5dc  ; 03440
 push ax  ; 03443
 mov ax,0xd687  ; 03444
 push ax  ; 03447
-call 0x1152  ; 03448
+call load_palette  ; 03448
 db 0x8B, 0xE5  ; 0344B mov sp,bp
 mov word [0x118],0x20  ; 0344D
 mov word [0x110],0x46  ; 03453
@@ -5755,19 +5755,19 @@ mov ax,0x8  ; 0346C
 push ax  ; 0346F
 mov ax,0xd690  ; 03470
 push ax  ; 03473
-call 0x1b0b  ; 03474
+call set_music_callback  ; 03474
 db 0x8B, 0xE5  ; 03477 mov sp,bp
 mov ax,[0xea]  ; 03479
 inc ax  ; 0347C
 push ax  ; 0347D
 mov [0xea],ax  ; 0347E
-call 0x1cc2  ; 03481
+call combat_update  ; 03481
 db 0x8B, 0xE5  ; 03484 mov sp,bp
 mov ax,0x5dc  ; 03486
 push ax  ; 03489
 mov ax,0xd687  ; 0348A
 push ax  ; 0348D
-call 0x1152  ; 0348E
+call load_palette  ; 0348E
 db 0x8B, 0xE5  ; 03491 mov sp,bp
 mov word [0x10e],0xc8  ; 03493
 mov word [0xe2],0x1  ; 03499
@@ -5779,7 +5779,7 @@ ret  ; 034AB
 mov ax,[0x104]  ; 034AC
 cmp ax,[0x106]  ; 034AF
 jnl short loc_034BF  ; 034B3 jnl 0x34bf
-call 0x3d5c  ; 034B5
+call effect_dissolve  ; 034B5
 db 0x33, 0xC0  ; 034B8 xor ax,ax
 add sp,0x6  ; 034BA
 pop bp  ; 034BD
@@ -5789,7 +5789,7 @@ mov ax,0xa  ; 034BF
 push ax  ; 034C2
 mov ax,0xd696  ; 034C3
 push ax  ; 034C6
-call 0x1b0b  ; 034C7
+call set_music_callback  ; 034C7
 db 0x8B, 0xE5  ; 034CA mov sp,bp
 mov ax,0x1  ; 034CC
 mov word [0xbb2a],0xffff  ; 034CF
@@ -5798,7 +5798,7 @@ inc bx  ; 034D9
 push bx  ; 034DA
 mov [0x130],ax  ; 034DB
 mov [0xea],bx  ; 034DE
-call 0x1cc2  ; 034E2
+call combat_update  ; 034E2
 db 0x8B, 0xE5  ; 034E5 mov sp,bp
 mov ax,[0xbcd5]  ; 034E7
 mov word [0x12e],0x1  ; 034EA
@@ -5833,24 +5833,24 @@ mov ax,0xc  ; 03536
 push ax  ; 03539
 mov ax,0xd69c  ; 0353A
 push ax  ; 0353D
-call 0x1b0b  ; 0353E
+call set_music_callback  ; 0353E
 db 0x8B, 0xE5  ; 03541 mov sp,bp
 mov ax,[0xea]  ; 03543
 inc ax  ; 03546
 push ax  ; 03547
 mov [0xea],ax  ; 03548
-call 0x1cc2  ; 0354B
+call combat_update  ; 0354B
 db 0x8B, 0xE5  ; 0354E mov sp,bp
 mov ax,0xce3e  ; 03550
 push ax  ; 03553
 mov ax,0xd6a2  ; 03554
 push ax  ; 03557
-call 0x1477  ; 03558
+call init_figure  ; 03558
 db 0x8B, 0xE5  ; 0355B mov sp,bp
-call 0x1ba2  ; 0355D
+call play_sound  ; 0355D
 mov word [0x130],0x6  ; 03560
 push word [0x130]  ; 03566
-call 0x3c2d  ; 0356A
+call effect_wipe  ; 0356A
 db 0x8B, 0xE5  ; 0356D mov sp,bp
 mov ax,0x114  ; 0356F
 mov [0x10e],ax  ; 03572
@@ -5902,7 +5902,7 @@ mov word [0xfa],0x2  ; 03603
 cmp word [si+0x132],0x0  ; 03609
 jng short loc_03626  ; 0360E jng 0x3626
 push word [0xea]  ; 03610
-call 0x1e58  ; 03614
+call combat_apply_damage  ; 03614
 db 0x8B, 0xE5  ; 03617 mov sp,bp
 mov ax,[0x130]  ; 03619
 shl ax,1  ; 0361C
@@ -5928,13 +5928,13 @@ loc_03654:
 mov word [0x104],0x130  ; 03654
 loc_0365A:
 push word [0x130]  ; 0365A
-call 0x3c2d  ; 0365E
+call effect_wipe  ; 0365E
 db 0x8B, 0xE5  ; 03661 mov sp,bp
 db 0x33, 0xC0  ; 03663 xor ax,ax
 add sp,0x6  ; 03665
 pop bp  ; 03668
 ret  ; 03669
-call 0x3d5c  ; 0366A
+call effect_dissolve  ; 0366A
 db 0x33, 0xC0  ; 0366D xor ax,ax
 add sp,0x6  ; 0366F
 pop bp  ; 03672
@@ -5943,8 +5943,8 @@ cmp word [0x130],0x7  ; 03674
 jnz short loc_03697  ; 03679 jnz 0x3697
 cmp word [0x10c],0x40  ; 0367B
 jng short loc_03690  ; 03680 jng 0x3690
-call 0x1934  ; 03682
-call 0x4171  ; 03685
+call setup_screen  ; 03682
+call show_dialog  ; 03685
 mov ax,0x1  ; 03688
 add sp,0x6  ; 0368B
 pop bp  ; 0368E
@@ -5967,7 +5967,7 @@ db 0x8B, 0xF0  ; 036AC mov si,ax
 mov ax,[si+0x142]  ; 036AE
 push word [0x130]  ; 036B2
 mov [0x12e],ax  ; 036B6
-call 0x3c2d  ; 036B9
+call effect_wipe  ; 036B9
 db 0x8B, 0xE5  ; 036BC mov sp,bp
 cmp word [0x130],0x7  ; 036BE
 jnz short loc_0370E  ; 036C3 jnz 0x370e
@@ -5976,19 +5976,19 @@ mov ax,0xbd04  ; 036CB
 push ax  ; 036CE
 mov ax,0xd6a9  ; 036CF
 push ax  ; 036D2
-call 0x1477  ; 036D3
+call init_figure  ; 036D3
 db 0x8B, 0xE5  ; 036D6 mov sp,bp
 mov ax,0xb  ; 036D8
 push ax  ; 036DB
-call 0x1227  ; 036DC
+call load_animation  ; 036DC
 db 0x8B, 0xE5  ; 036DF mov sp,bp
 mov ax,0xce3e  ; 036E1
 push ax  ; 036E4
 mov ax,0xd6af  ; 036E5
 push ax  ; 036E8
-call 0x1477  ; 036E9
+call init_figure  ; 036E9
 db 0x8B, 0xE5  ; 036EC mov sp,bp
-call 0x1ba2  ; 036EE
+call play_sound  ; 036EE
 mov word [0xfa],0x0  ; 036F1
 mov word [0x10e],0xc8  ; 036F7
 mov ax,0x1  ; 036FD
@@ -6088,20 +6088,20 @@ mov ax,0x9  ; 037FC
 push ax  ; 037FF
 mov ax,0xd6b6  ; 03800
 push ax  ; 03803
-call 0x1b0b  ; 03804
+call set_music_callback  ; 03804
 db 0x8B, 0xE5  ; 03807 mov sp,bp
 mov ax,0x2  ; 03809
 push ax  ; 0380C
-call 0x1227  ; 0380D
+call load_animation  ; 0380D
 db 0x8B, 0xE5  ; 03810 mov sp,bp
 mov ax,0x5dc  ; 03812
 push ax  ; 03815
 mov ax,0xd687  ; 03816
 push ax  ; 03819
-call 0x1152  ; 0381A
+call load_palette  ; 0381A
 db 0x8B, 0xE5  ; 0381D mov sp,bp
 push word [0xea]  ; 0381F
-call 0x1e58  ; 03823
+call combat_apply_damage  ; 03823
 db 0x8B, 0xE5  ; 03826 mov sp,bp
 mov word [0x118],0x20  ; 03828
 mov word [0x110],0x46  ; 0382E
@@ -6127,9 +6127,9 @@ jnz short loc_0389C  ; 03869 jnz 0x389c
 mov word [0xd676],0x1  ; 0386B
 mov ax,0x18  ; 03871
 push ax  ; 03874
-call 0x3dae  ; 03875
+call wait_vsync  ; 03875
 db 0x8B, 0xE5  ; 03878 mov sp,bp
-call 0x3d19  ; 0387A
+call effect_scroll_right  ; 0387A
 db 0x33, 0xC0  ; 0387D xor ax,ax
 mov bx,[0xbcd5]  ; 0387F
 add bx,0x128  ; 03883
@@ -6141,7 +6141,7 @@ mov [0x10e],bx  ; 03896
 jmp short loc_038EC  ; 0389A jmp 0x38ec
 loc_0389C:
 push word [0xea]  ; 0389C
-call 0x1e58  ; 038A0
+call combat_apply_damage  ; 038A0
 db 0x8B, 0xE5  ; 038A3 mov sp,bp
 mov word [0xd676],0x0  ; 038A5
 cmp word [0xea],0x2  ; 038AB
@@ -6165,7 +6165,7 @@ sub ax,[0xbcd5]  ; 038DA
 db 0x3D, 0x1E, 0x00  ; 038DE cmp ax,0x1e
 jng short loc_038EC  ; 038E1 jng 0x38ec
 push word [0xea]  ; 038E3
-call 0x1e58  ; 038E7
+call combat_apply_damage  ; 038E7
 db 0x8B, 0xE5  ; 038EA mov sp,bp
 loc_038EC:
 db 0x33, 0xC0  ; 038EC xor ax,ax
@@ -6194,12 +6194,12 @@ jng short loc_0395F  ; 03929 jng 0x395f
 dec word [0x130]  ; 0392B
 mov word [0x12e],0x1  ; 0392F
 push word [0x130]  ; 03935
-call 0x3c2d  ; 03939
+call effect_wipe  ; 03939
 db 0x8B, 0xE5  ; 0393C mov sp,bp
 cmp word [0x130],0x2  ; 0393E
 jnz short loc_0394E  ; 03943 jnz 0x394e
 mov word [0xc3a6],0x2  ; 03945
-call 0x3c8a  ; 0394B
+call effect_fade  ; 0394B
 loc_0394E:
 mov ax,0x114  ; 0394E
 mov [0xbcd5],ax  ; 03951
@@ -6284,8 +6284,8 @@ add sp,0x6  ; 03A28
 pop bp  ; 03A2B
 ret  ; 03A2C
 
-; ---- function sub_03A2D ----
-sub_03A2D:
+; ---- function effect_wipe ----
+effect_wipe:
 push bp  ; 03A2D
 sub sp,0x2  ; 03A2E
 jc short loc_03A39  ; 03A31 jc 0x3a39
@@ -6319,13 +6319,13 @@ loc_03A7B:
 mov ax,[0x12e]  ; 03A7B
 add [0xc3a6],ax  ; 03A7E
 loc_03A82:
-call 0x3c8a  ; 03A82
+call effect_fade  ; 03A82
 add sp,0x2  ; 03A85
 pop bp  ; 03A88
 ret  ; 03A89
 
-; ---- function sub_03A8A ----
-sub_03A8A:
+; ---- function effect_fade ----
+effect_fade:
 push bp  ; 03A8A
 sub sp,0x4  ; 03A8B
 jc short loc_03A96  ; 03A8E jc 0x3a96
@@ -6351,8 +6351,8 @@ add sp,0x4  ; 03ACB
 pop bp  ; 03ACE
 ret  ; 03ACF
 
-; ---- function sub_03AD0 ----
-sub_03AD0:
+; ---- function effect_scroll_left ----
+effect_scroll_left:
 push bp  ; 03AD0
 sub sp,0x4  ; 03AD1
 jc short loc_03ADC  ; 03AD4 jc 0x3adc
@@ -6379,8 +6379,8 @@ add sp,0x4  ; 03B14
 pop bp  ; 03B17
 ret  ; 03B18
 
-; ---- function sub_03B19 ----
-sub_03B19:
+; ---- function effect_scroll_right ----
+effect_scroll_right:
 push bp  ; 03B19
 sub sp,0x2  ; 03B1A
 jc short loc_03B25  ; 03B1D jc 0x3b25
@@ -6396,7 +6396,7 @@ mov ax,[0xce28]  ; 03B36
 mov bx,0x2  ; 03B39
 push bx  ; 03B3C
 mov [0xcde8],ax  ; 03B3D
-call 0x829  ; 03B40
+call calc_screen_offset  ; 03B40
 db 0x8B, 0xE5  ; 03B43 mov sp,bp
 mov bx,0xc  ; 03B45
 imul bx  ; 03B48
@@ -6408,8 +6408,8 @@ add sp,0x2  ; 03B57
 pop bp  ; 03B5A
 ret  ; 03B5B
 
-; ---- function sub_03B5C ----
-sub_03B5C:
+; ---- function effect_dissolve ----
+effect_dissolve:
 push bp  ; 03B5C
 sub sp,0x2  ; 03B5D
 jc short loc_03B68  ; 03B60 jc 0x3b68
@@ -6421,7 +6421,7 @@ loc_03B6B:
 db 0x8B, 0xEC  ; 03B6B mov bp,sp
 mov ax,0x1  ; 03B6D
 push ax  ; 03B70
-call 0x3dae  ; 03B71
+call wait_vsync  ; 03B71
 db 0x8B, 0xE5  ; 03B74 mov sp,bp
 sub word [0xbcd5],0x4  ; 03B76
 mov ax,[0x116]  ; 03B7B
@@ -6445,8 +6445,8 @@ add sp,0x2  ; 03BA9
 pop bp  ; 03BAC
 ret  ; 03BAD
 
-; ---- function sub_03BAE ----
-sub_03BAE:
+; ---- function wait_vsync ----
+wait_vsync:
 push bp  ; 03BAE
 db 0x8B, 0xEC  ; 03BAF mov bp,sp
 mov bx,[bp+0x4]  ; 03BB1
@@ -6480,8 +6480,8 @@ ret  ; 03BE8
 mov cx,0x2  ; 03BE9
 loc_03BEC:
 push cx  ; 03BEC
-call 0x3fd5  ; 03BED
-call 0x3fb9  ; 03BF0
+call screen_copy_region  ; 03BED
+call screen_copy  ; 03BF0
 pop cx  ; 03BF3
 inc cx  ; 03BF4
 cmp cx,0x28  ; 03BF5
@@ -6491,8 +6491,8 @@ ret  ; 03BFB
 mov cx,0x2  ; 03BFC
 loc_03BFF:
 push cx  ; 03BFF
-call 0x3fd5  ; 03C00
-call 0x3fb9  ; 03C03
+call screen_copy_region  ; 03C00
+call screen_copy  ; 03C03
 pop cx  ; 03C06
 inc cx  ; 03C07
 inc cx  ; 03C08
@@ -6503,8 +6503,8 @@ ret  ; 03C0F
 mov cx,0x2  ; 03C10
 loc_03C13:
 push cx  ; 03C13
-call 0x3fd5  ; 03C14
-call 0x3fb9  ; 03C17
+call screen_copy_region  ; 03C14
+call screen_copy  ; 03C17
 pop cx  ; 03C1A
 inc cx  ; 03C1B
 inc cx  ; 03C1C
@@ -6515,8 +6515,8 @@ ret  ; 03C23
 mov bl,0xa  ; 03C24
 loc_03C26:
 mov cx,0x5  ; 03C26
-call 0x3fb9  ; 03C29
-call 0x3fd5  ; 03C2C
+call screen_copy  ; 03C29
+call screen_copy_region  ; 03C2C
 dec bl  ; 03C2F
 jnz short loc_03C26  ; 03C31 jnz 0x3c26
 pop bp  ; 03C33
@@ -6524,8 +6524,8 @@ ret  ; 03C34
 mov bl,0x10  ; 03C35
 loc_03C37:
 mov cx,0xa  ; 03C37
-call 0x3fb9  ; 03C3A
-call 0x3fd5  ; 03C3D
+call screen_copy  ; 03C3A
+call screen_copy_region  ; 03C3D
 dec bl  ; 03C40
 jnz short loc_03C37  ; 03C42 jnz 0x3c37
 pop bp  ; 03C44
@@ -6533,8 +6533,8 @@ ret  ; 03C45
 mov cx,0x10  ; 03C46
 loc_03C49:
 push cx  ; 03C49
-call 0x3fd5  ; 03C4A
-call 0x3fb9  ; 03C4D
+call screen_copy_region  ; 03C4A
+call screen_copy  ; 03C4D
 pop cx  ; 03C50
 shr cx,1  ; 03C51
 cmp cx,0x1  ; 03C53
@@ -6544,30 +6544,30 @@ ret  ; 03C59
 mov bl,0x3  ; 03C5A
 loc_03C5C:
 mov cx,0x10  ; 03C5C
-call 0x3fb9  ; 03C5F
-call 0x3fd5  ; 03C62
+call screen_copy  ; 03C5F
+call screen_copy_region  ; 03C62
 dec bl  ; 03C65
 jnz short loc_03C5C  ; 03C67 jnz 0x3c5c
 pop bp  ; 03C69
 ret  ; 03C6A
 mov ax,[0xd710]  ; 03C6B
 mov [0xd6f8],al  ; 03C6E
-call 0x3fde  ; 03C71
+call sub_03DDE  ; 03C71
 pop bp  ; 03C74
 ret  ; 03C75
 mov ax,[0xd712]  ; 03C76
 mov [0xd6f8],al  ; 03C79
-call 0x3fde  ; 03C7C
+call sub_03DDE  ; 03C7C
 pop bp  ; 03C7F
 ret  ; 03C80
 mov ax,[0xd714]  ; 03C81
 mov [0xd6f8],al  ; 03C84
-call 0x3fde  ; 03C87
+call sub_03DDE  ; 03C87
 pop bp  ; 03C8A
 ret  ; 03C8B
 mov ax,[0xd716]  ; 03C8C
 mov [0xd6f8],al  ; 03C8F
-call 0x3fde  ; 03C92
+call sub_03DDE  ; 03C92
 pop bp  ; 03C95
 ret  ; 03C96
 mov bx,0xd736  ; 03C97
@@ -6671,7 +6671,7 @@ dec byte [0xd701]  ; 03D59
 jnz short loc_03D7F  ; 03D5D jnz 0x3d7f
 cmp byte [0xd700],0x80  ; 03D5F
 jl short loc_03D69  ; 03D64 jl 0x3d69
-call 0x3fd5  ; 03D66
+call screen_copy_region  ; 03D66
 loc_03D69:
 mov cl,[0xd703]  ; 03D69
 mov al,[0xd700]  ; 03D6D
@@ -6687,7 +6687,7 @@ dec byte [0xd702]  ; 03D83
 jnz short loc_03D7F  ; 03D87 jnz 0x3d7f
 cmp byte [0xd700],0x80  ; 03D89
 jl short loc_03D93  ; 03D8E jl 0x3d93
-call 0x3fd5  ; 03D90
+call screen_copy_region  ; 03D90
 loc_03D93:
 mov dl,[0xd703]  ; 03D93
 dec dl  ; 03D97
@@ -6703,8 +6703,8 @@ jnz short loc_03D4A  ; 03DAF jnz 0x3d4a
 add word [0xd6fd],0x3  ; 03DB1
 jmp 0x3f01  ; 03DB6
 
-; ---- function sub_03DB9 ----
-sub_03DB9:
+; ---- function screen_copy ----
+screen_copy:
 push dx  ; 03DB9
 push bx  ; 03DBA
 mov bx,[0xd70e]  ; 03DBB
@@ -6725,8 +6725,8 @@ pop bx  ; 03DD2
 pop dx  ; 03DD3
 ret  ; 03DD4
 
-; ---- function sub_03DD5 ----
-sub_03DD5:
+; ---- function screen_copy_region ----
+screen_copy_region:
 push ax  ; 03DD5
 in al,byte 0x61  ; 03DD6
 xor al,0x2  ; 03DD8
@@ -6750,7 +6750,7 @@ xor al,[0xd70d]  ; 03DF6
 jns short loc_03E10  ; 03DFA jns 0x3e10
 xor al,[0xd70d]  ; 03DFC
 mov [0xd70d],al  ; 03E00
-call 0x3fd5  ; 03E03
+call screen_copy_region  ; 03E03
 loc_03E06:
 shl al,1  ; 03E06
 dec dl  ; 03E08
@@ -6762,8 +6762,8 @@ loc_03E10:
 xor al,[0xd70d]  ; 03E10
 jmp short loc_03E06  ; 03E14 jmp 0x3e06
 
-; ---- function sub_03E16 ----
-sub_03E16:
+; ---- function init_screen_buffers ----
+init_screen_buffers:
 mov ax,[0xb87a]  ; 03E16
 mov bx,[0xb89c]  ; 03E19
 mov [0xb89c],ax  ; 03E1D
@@ -6805,8 +6805,8 @@ cmp bx,0x24  ; 03E76
 jl short loc_03E45  ; 03E79 jl 0x3e45
 ret  ; 03E7B
 
-; ---- function sub_03E7C ----
-sub_03E7C:
+; ---- function swap_screen_buffers ----
+swap_screen_buffers:
 mov byte [0xdbb1],0x0  ; 03E7C
 loc_03E81:
 mov bl,[si]  ; 03E81
@@ -6846,7 +6846,7 @@ rcr dx,1  ; 03EC5
 dec ch  ; 03EC7
 jnz short loc_03EBD  ; 03EC9 jnz 0x3ebd
 db 0x33, 0xC0  ; 03ECB xor ax,ax
-call 0x4129  ; 03ECD
+call sub_03F29  ; 03ECD
 xchg dh,dl  ; 03ED0
 xchg ah,al  ; 03ED2
 or [di],dx  ; 03ED4
@@ -6903,103 +6903,103 @@ jnz short loc_03F36  ; 03F3C jnz 0x3f36
 loc_03F3E:
 ret  ; 03F3E
 
-; ---- function sub_03F3F ----
-sub_03F3F:
-call 0xd4e  ; 03F3F
-call 0xf68  ; 03F42
+; ---- function draw_health_bar ----
+draw_health_bar:
+call clear_screen  ; 03F3F
+call update_display  ; 03F42
 mov al,[0xdbb5]  ; 03F45
 mov [0xdbb3],al  ; 03F48
 lea ax,[0xdbb6]  ; 03F4B
 mov [0xddbe],ax  ; 03F4F
-call 0x4228  ; 03F52
+call sub_04028  ; 03F52
 ret  ; 03F55
 
-; ---- function sub_03F56 ----
-sub_03F56:
-call 0xd4e  ; 03F56
-call 0xf68  ; 03F59
+; ---- function draw_ui_element ----
+draw_ui_element:
+call clear_screen  ; 03F56
+call update_display  ; 03F59
 lea di,[0x20b6]  ; 03F5C
 lea si,[0xdeb6]  ; 03F60
-call 0x407c  ; 03F64
-call 0xf68  ; 03F67
+call swap_screen_buffers  ; 03F64
+call update_display  ; 03F67
 mov ax,0x48  ; 03F6A
-call 0x1ad5  ; 03F6D
+call delay_with_input  ; 03F6D
 ret  ; 03F70
 
-; ---- function sub_03F71 ----
-sub_03F71:
-call 0x4433  ; 03F71
-call 0xd4e  ; 03F74
-call 0xf68  ; 03F77
+; ---- function show_dialog ----
+show_dialog:
+call flush_keyboard  ; 03F71
+call clear_screen  ; 03F74
+call update_display  ; 03F77
 push word [0xddc0]  ; 03F7A
 lea si,[0xddc1]  ; 03F7E
 lea di,[0x977]  ; 03F82
 loc_03F86:
 push di  ; 03F86
-call 0x407c  ; 03F87
+call swap_screen_buffers  ; 03F87
 pop di  ; 03F8A
 add di,0x3c0  ; 03F8B
 inc si  ; 03F8F
 dec byte [0xddc0]  ; 03F90
 jnz short loc_03F86  ; 03F94 jnz 0x3f86
 pop word [0xddc0]  ; 03F96
-call 0xf68  ; 03F9A
+call update_display  ; 03F9A
 loc_03F9D:
 mov ax,0x15  ; 03F9D
 push ax  ; 03FA0
-call 0x3dae  ; 03FA1
+call wait_vsync  ; 03FA1
 pop ax  ; 03FA4
-call 0x4349  ; 03FA5
+call poll_keyboard  ; 03FA5
 cmp word [0xdf44],0x0  ; 03FA8
 jnz short loc_03FB6  ; 03FAD jnz 0x3fb6
 cmp al,0x0  ; 03FAF
 jz short loc_03F9D  ; 03FB1 jz 0x3f9d
-call 0x43fc  ; 03FB3
+call wait_for_key  ; 03FB3
 loc_03FB6:
 ret  ; 03FB6
 
-; ---- function sub_03FB7 ----
-sub_03FB7:
-call 0xd4e  ; 03FB7
+; ---- function draw_scene_element ----
+draw_scene_element:
+call clear_screen  ; 03FB7
 lea di,[0x1d92]  ; 03FBA
 lea si,[0xdebe]  ; 03FBE
-call 0x407c  ; 03FC2
+call swap_screen_buffers  ; 03FC2
 lea di,[0x228b]  ; 03FC5
 lea si,[0xdec8]  ; 03FC9
-call 0x407c  ; 03FCD
-call 0xf68  ; 03FD0
+call swap_screen_buffers  ; 03FCD
+call update_display  ; 03FD0
 mov ax,0x48  ; 03FD3
-call 0x1ad5  ; 03FD6
+call delay_with_input  ; 03FD6
 ret  ; 03FD9
 
-; ---- function sub_03FDA ----
-sub_03FDA:
-call 0xd4e  ; 03FDA
+; ---- function draw_gate ----
+draw_gate:
+call clear_screen  ; 03FDA
 lea di,[0x1d8d]  ; 03FDD
 lea si,[0xded7]  ; 03FE1
-call 0x407c  ; 03FE5
+call swap_screen_buffers  ; 03FE5
 lea di,[0x2287]  ; 03FE8
 lea si,[0xdee6]  ; 03FEC
-call 0x407c  ; 03FF0
-call 0xf68  ; 03FF3
+call swap_screen_buffers  ; 03FF0
+call update_display  ; 03FF3
 mov ax,0x48  ; 03FF6
-call 0x1ad5  ; 03FF9
+call delay_with_input  ; 03FF9
 ret  ; 03FFC
 
-; ---- function sub_03FFD ----
-sub_03FFD:
-call 0xd4e  ; 03FFD
+; ---- function check_disk_prompt ----
+check_disk_prompt:
+call clear_screen  ; 03FFD
 lea di,[0x1b01]  ; 04000
 lea si,[0xdefa]  ; 04004
-call 0x407c  ; 04008
+call swap_screen_buffers  ; 04008
 lea di,[0x2009]  ; 0400B
 lea si,[0xdf12]  ; 0400F
-call 0x407c  ; 04013
+call swap_screen_buffers  ; 04013
 lea di,[0x24ff]  ; 04016
 lea si,[0xdf26]  ; 0401A
-call 0x407c  ; 0401E
-call 0xf68  ; 04021
-call 0x43fc  ; 04024
+call swap_screen_buffers  ; 0401E
+call update_display  ; 04021
+call wait_for_key  ; 04024
 ret  ; 04027
 
 ; ---- function sub_04028 ----
@@ -7018,7 +7018,7 @@ pop es  ; 0403D
 rep stosw  ; 0403E
 pop es  ; 04040
 lea di,[0x337]  ; 04041
-call 0x407c  ; 04045
+call swap_screen_buffers  ; 04045
 inc si  ; 04048
 mov [0xddbe],si  ; 04049
 db 0x33, 0xD2  ; 0404D xor dx,dx
@@ -7045,7 +7045,7 @@ add dx,0x50  ; 0407A
 cmp dx,0x460  ; 0407D
 jnl short loc_04099  ; 04081 jnl 0x4099
 push dx  ; 04083
-call 0x4349  ; 04084
+call poll_keyboard  ; 04084
 db 0x3D, 0x00, 0x00  ; 04087 cmp ax,0x0
 jz short loc_04090  ; 0408A jz 0x4090
 pop dx  ; 0408C
@@ -7054,7 +7054,7 @@ pop bx  ; 0408E
 ret  ; 0408F
 loc_04090:
 mov ax,0x1  ; 04090
-call 0x1abf  ; 04093
+call delay_ticks  ; 04093
 pop dx  ; 04096
 jmp short loc_0404F  ; 04097 jmp 0x404f
 loc_04099:
@@ -7063,8 +7063,8 @@ jnz short loc_0402E  ; 0409D jnz 0x402e
 pop es  ; 0409F
 ret  ; 040A0
 
-; ---- function sub_040A1 ----
-sub_040A1:
+; ---- function update_score ----
+update_score:
 lea si,[0x255]  ; 040A1
 mov bx,0x2c0  ; 040A5
 loc_040A8:
@@ -7100,7 +7100,7 @@ lea ax,[bp+0x2]  ; 040DB
 push ax  ; 040DE
 db 0x33, 0xC0  ; 040DF xor ax,ax
 push ax  ; 040E1
-call 0x4323  ; 040E2
+call sub_04123  ; 040E2
 db 0x8B, 0xE5  ; 040E5 mov sp,bp
 mov ax,[bp+0x2]  ; 040E7
 mov bx,0xe5d  ; 040EA
@@ -7114,7 +7114,7 @@ push ax  ; 040FC
 mov ax,0x1  ; 040FD
 push ax  ; 04100
 mov [bp+0x2],dx  ; 04101
-call 0x4323  ; 04104
+call sub_04123  ; 04104
 db 0x8B, 0xE5  ; 04107 mov sp,bp
 mov ax,[bp+0x2]  ; 04109
 add sp,0x4  ; 0410C
@@ -7126,7 +7126,7 @@ lea ax,[bp+0x4]  ; 04114
 push ax  ; 04117
 mov ax,0x1  ; 04118
 push ax  ; 0411B
-call 0x4323  ; 0411C
+call sub_04123  ; 0411C
 db 0x8B, 0xE5  ; 0411F mov sp,bp
 pop bp  ; 04121
 ret  ; 04122
@@ -7153,11 +7153,11 @@ add sp,0x2  ; 04144
 pop bp  ; 04147
 ret  ; 04148
 
-; ---- function sub_04149 ----
-sub_04149:
+; ---- function poll_keyboard ----
+poll_keyboard:
 push bp  ; 04149
 db 0x8B, 0xEC  ; 0414A mov bp,sp
-call 0x18a3  ; 0414C
+call check_ctrl_q  ; 0414C
 nop  ; 0414F
 nop  ; 04150
 nop  ; 04151
@@ -7166,7 +7166,7 @@ cmp word [0xdf46],0x0  ; 04154
 jnz short loc_04169  ; 04159 jnz 0x4169
 db 0x33, 0xC0  ; 0415B xor ax,ax
 push ax  ; 0415D
-call 0x46d3  ; 0415E
+call check_joystick  ; 0415E
 pop bx  ; 04161
 cmp al,0x0  ; 04162
 jz short loc_04169  ; 04164 jz 0x4169
@@ -7186,7 +7186,7 @@ cmp al,0x1b  ; 04177
 jz short loc_041F4  ; 04179 jz 0x41f4
 cmp al,0x12  ; 0417B
 jnz short loc_0418C  ; 0417D jnz 0x418c
-call 0x4441  ; 0417F
+call consume_key  ; 0417F
 mov word [0xdf44],0x1  ; 04182
 db 0x33, 0xC0  ; 04188 xor ax,ax
 pop bp  ; 0418A
@@ -7194,7 +7194,7 @@ ret  ; 0418B
 loc_0418C:
 cmp al,0x13  ; 0418C
 jnz short loc_041A7  ; 0418E jnz 0x41a7
-call 0x4441  ; 04190
+call consume_key  ; 04190
 inc byte [0xd6bc]  ; 04193
 cmp byte [0xd6bc],0x3  ; 04197
 jc short loc_041A3  ; 0419C jc 0x41a3
@@ -7208,16 +7208,16 @@ cmp word [0x168],0x1  ; 041A7
 jnz short loc_041CE  ; 041AC jnz 0x41ce
 cmp al,0x16  ; 041AE
 jnz short loc_041CE  ; 041B0 jnz 0x41ce
-call 0x4441  ; 041B2
+call consume_key  ; 041B2
 mov ax,0xbe  ; 041B5
 push ax  ; 041B8
 mov ax,0x96  ; 041B9
 push ax  ; 041BC
 mov ax,0x5d  ; 041BD
 push ax  ; 041C0
-call 0xa3c  ; 041C1
+call process_animation  ; 041C1
 add sp,0x6  ; 041C4
-call 0xf68  ; 041C7
+call update_display  ; 041C7
 db 0x33, 0xC0  ; 041CA xor ax,ax
 pop bp  ; 041CC
 ret  ; 041CD
@@ -7251,8 +7251,8 @@ db 0x33, 0xC0  ; 041F8 xor ax,ax
 pop bp  ; 041FA
 ret  ; 041FB
 
-; ---- function sub_041FC ----
-sub_041FC:
+; ---- function wait_for_key ----
+wait_for_key:
 loc_041FC:
 mov al,[0xdf42]  ; 041FC
 cmp byte [0xdf43],0x0  ; 041FF
@@ -7280,14 +7280,14 @@ mov al,0x36  ; 04229
 mov ah,0x0  ; 0422B
 loc_0422D:
 push ax  ; 0422D
-call 0x4433  ; 0422E
+call flush_keyboard  ; 0422E
 pop ax  ; 04231
 ret  ; 04232
 
-; ---- function sub_04233 ----
-sub_04233:
+; ---- function flush_keyboard ----
+flush_keyboard:
 loc_04233:
-call 0x18a3  ; 04233
+call check_ctrl_q  ; 04233
 nop  ; 04236
 nop  ; 04237
 nop  ; 04238
@@ -7295,13 +7295,13 @@ jnz short loc_04233  ; 04239 jnz 0x4233
 mov byte [0xdf43],0x0  ; 0423B
 ret  ; 04240
 
-; ---- function sub_04241 ----
-sub_04241:
+; ---- function consume_key ----
+consume_key:
 push word [0xd6bc]  ; 04241
 mov byte [0xd6bc],0x0  ; 04245
 mov ax,0x5  ; 0424A
 push ax  ; 0424D
-call 0x3dae  ; 0424E
+call wait_vsync  ; 0424E
 pop ax  ; 04251
 pop word [0xd6bc]  ; 04252
 ret  ; 04256
@@ -7329,8 +7329,8 @@ loc_04271:
 clc  ; 04271
 ret  ; 04272
 
-; ---- function sub_04273 ----
-sub_04273:
+; ---- function video_set_mode_4 ----
+video_set_mode_4:
 mov dx,0x3bf  ; 04273
 mov al,0x0  ; 04276
 out dx,al  ; 04278
@@ -7390,7 +7390,7 @@ mov [si],bl  ; 042E4
 pop ds  ; 042E6
 mov dx,0x3ba  ; 042E7
 mov bl,0x80  ; 042EA
-call 0x445e  ; 042EC
+call sub_0425E  ; 042EC
 jnc short loc_042F3  ; 042EF jnc 0x42f3
 stc  ; 042F1
 ret  ; 042F2
@@ -7414,9 +7414,9 @@ db 0x05, 0x5A, 0x00  ; 0431F add ax,0x5a
 add dx,0x5a  ; 04322
 add bx,0x8  ; 04325
 loop 0x430e  ; 04328
-call 0x4596  ; 0432A
+call sub_04396  ; 0432A
 lea si,[0xdf4d]  ; 0432D
-call 0x453e  ; 04331
+call sub_0433E  ; 04331
 mov dx,0x3b8  ; 04334
 mov al,0x8a  ; 04337
 out dx,al  ; 04339
@@ -7440,29 +7440,29 @@ dec dx  ; 0434E
 loop 0x4346  ; 0434F
 ret  ; 04351
 
-; ---- function sub_04352 ----
-sub_04352:
+; ---- function check_graphics_card ----
+check_graphics_card:
 int 0x11  ; 04352
 mov [0xdf4a],al  ; 04354
 mov ah,0xf  ; 04357
 int 0x10  ; 04359
 mov [0xdf4b],al  ; 0435B
-call 0x4473  ; 0435E
+call video_set_mode_4  ; 0435E
 jnc short loc_04368  ; 04361 jnc 0x4368
-call 0x44d1  ; 04363
+call sub_042D1  ; 04363
 jc short loc_0436D  ; 04366 jc 0x436d
 loc_04368:
 db 0x32, 0xE4  ; 04368 xor ah,ah
 add al,0x41  ; 0436A
 ret  ; 0436C
 loc_0436D:
-call 0x4573  ; 0436D
+call video_init  ; 0436D
 db 0x33, 0xC0  ; 04370 xor ax,ax
 ret  ; 04372
 
-; ---- function sub_04373 ----
-sub_04373:
-call 0x4596  ; 04373
+; ---- function video_init ----
+video_init:
+call sub_04396  ; 04373
 mov bl,[0xdf4a]  ; 04376
 push ds  ; 0437A
 mov ax,0x40  ; 0437B
@@ -7492,8 +7492,8 @@ pop es  ; 043A7
 pop di  ; 043A8
 ret  ; 043A9
 
-; ---- function sub_043AA ----
-sub_043AA:
+; ---- function apply_gravity ----
+apply_gravity:
 push bp  ; 043AA
 db 0x8B, 0xEC  ; 043AB mov bp,sp
 cmp byte [bp+0x4],0x2  ; 043AD
@@ -7560,8 +7560,8 @@ loc_0443F:
 pop bp  ; 0443F
 ret  ; 04440
 
-; ---- function sub_04441 ----
-sub_04441:
+; ---- function update_position ----
+update_position:
 push bp  ; 04441
 db 0x8B, 0xEC  ; 04442 mov bp,sp
 mov bx,[bp+0x6]  ; 04444
@@ -7621,9 +7621,9 @@ add word [0xd5b2],0x4  ; 044CC
 pop bp  ; 044D1
 ret  ; 044D2
 
-; ---- function sub_044D3 ----
-sub_044D3:
-call 0x4956  ; 044D3
+; ---- function check_joystick ----
+check_joystick:
+call sub_04756  ; 044D3
 cmp word [bp+0x4],0x0  ; 044D6
 jz short loc_044DD  ; 044DA jz 0x44dd
 ret  ; 044DC
@@ -7756,8 +7756,8 @@ loc_04616:
 db 0x33, 0xC0  ; 04616 xor ax,ax
 ret  ; 04618
 
-; ---- function sub_04619 ----
-sub_04619:
+; ---- function init_controls ----
+init_controls:
 push di  ; 04619
 push si  ; 0461A
 mov byte [0xe196],0x0  ; 0461B
@@ -7775,10 +7775,10 @@ jnz short loc_0464C  ; 04633 jnz 0x464c
 mov byte [0xe196],0x1  ; 04635
 mov ah,0x1  ; 0463A
 lea di,[0xe197]  ; 0463C
-call 0x48fc  ; 04640
+call sub_046FC  ; 04640
 mov ah,0x2  ; 04643
 lea di,[0xe19b]  ; 04645
-call 0x48fc  ; 04649
+call sub_046FC  ; 04649
 loc_0464C:
 push bp  ; 0464C
 push ds  ; 0464D
@@ -7874,7 +7874,7 @@ ret  ; 046FB
 
 ; ---- function sub_046FC ----
 sub_046FC:
-call 0x49ee  ; 046FC
+call sub_047EE  ; 046FC
 push ax  ; 046FF
 db 0x8B, 0xD8  ; 04700 mov bx,ax
 shr bx,1  ; 04702
@@ -7919,12 +7919,12 @@ mov word [0xe1a1],0x0  ; 0475E
 mov word [0xe1a3],0x0  ; 04764
 cmp byte [0xe196],0x0  ; 0476A
 jz short loc_047D9  ; 0476F jz 0x47d9
-call 0x490d  ; 04771
+call sub_0470D  ; 04771
 cmp word [bp+0x4],0x0  ; 04774
 jnz short loc_047E4  ; 04778 jnz 0x47e4
 mov dx,0x201  ; 0477A
 mov ah,0x1  ; 0477D
-call 0x49ee  ; 0477F
+call sub_047EE  ; 0477F
 db 0x3D, 0x00, 0x00  ; 04782 cmp ax,0x0
 jz short loc_047AB  ; 04785 jz 0x47ab
 cmp ax,[0xe197]  ; 04787
@@ -7939,7 +7939,7 @@ db 0x81, 0x0E, 0x9F, 0xE1, 0x02, 0x00  ; 047A0 or word [0xe19f],0x2
 mov byte [0xe1a2],0x1  ; 047A6
 loc_047AB:
 mov ah,0x2  ; 047AB
-call 0x49ee  ; 047AD
+call sub_047EE  ; 047AD
 db 0x3D, 0x00, 0x00  ; 047B0 cmp ax,0x0
 jz short loc_047D9  ; 047B3 jz 0x47d9
 cmp ax,[0xe19b]  ; 047B5
@@ -7971,7 +7971,7 @@ sub_047EE:
 mov si,0x0  ; 047EE
 mov bx,0x4  ; 047F1
 loc_047F4:
-call 0x4a06  ; 047F4
+call sub_04806  ; 047F4
 db 0x03, 0xF1  ; 047F7 add si,cx
 dec bx  ; 047F9
 jnz short loc_047F4  ; 047FA jnz 0x47f4
@@ -7999,7 +7999,7 @@ push ds  ; 04816
 push es  ; 04817
 mov ax,0x6ca  ; 04818
 mov ds,ax  ; 0481B
-call 0x41fd  ; 0481D
+call check_disk_prompt  ; 0481D
 mov al,0x1  ; 04820
 pop es  ; 04822
 pop ds  ; 04823
@@ -8011,8 +8011,8 @@ pop cx  ; 04828
 pop bx  ; 04829
 iret  ; 0482A
 
-; ---- function sub_0482B ----
-sub_0482B:
+; ---- function install_handlers ----
+install_handlers:
 push ds  ; 0482B
 mov ax,0x0  ; 0482C
 mov ds,ax  ; 0482F
@@ -8022,8 +8022,8 @@ int 0x21  ; 04838
 pop ds  ; 0483A
 ret  ; 0483B
 
-; ---- function sub_0483C ----
-sub_0483C:
+; ---- function restore_int_vectors ----
+restore_int_vectors:
 push bp  ; 0483C
 sub sp,0x6  ; 0483D
 db 0x8B, 0xEC  ; 04840 mov bp,sp
@@ -8052,14 +8052,14 @@ loc_04870:
 push word [bp+0x2]  ; 04870
 push word [bp+0xc]  ; 04873
 push word [bp+0xa]  ; 04876
-call 0x4a83  ; 04879
+call save_vectors  ; 04879
 db 0x8B, 0xE5  ; 0487C mov sp,bp
 add sp,0x6  ; 0487E
 pop bp  ; 04881
 ret  ; 04882
 
-; ---- function sub_04883 ----
-sub_04883:
+; ---- function save_vectors ----
+save_vectors:
 push bp  ; 04883
 sub sp,0xe  ; 04884
 db 0x8B, 0xEC  ; 04887 mov bp,sp
@@ -8068,7 +8068,7 @@ db 0x82  ; 0488C
 db 0x7C, 0x08  ; 0488D jl 0x4897
 add [si+0x6],dh  ; 0488F
 push si  ; 04892
-call 0x4c37  ; 04893
+call collision_check  ; 04893
 db 0x8B, 0xE5  ; 04896 mov sp,bp
 mov ax,[0xe5ca]  ; 04898
 mov si,[bp+0x14]  ; 0489B
@@ -8124,7 +8124,7 @@ mov ax,0x1a4  ; 04907
 push ax  ; 0490A
 push bx  ; 0490B
 push word [bp+0x12]  ; 0490C
-call 0x4fb9  ; 0490F
+call file_manager  ; 0490F
 db 0x8B, 0xE5  ; 04912 mov sp,bp
 mov [bp+0x6],ax  ; 04914
 inc ax  ; 04917
@@ -8141,7 +8141,7 @@ push ax  ; 04927
 db 0x33, 0xDB  ; 04928 xor bx,bx
 push bx  ; 0492A
 push word [bp+0x6]  ; 0492B
-call 0x5701  ; 0492E
+call parse_resource_data  ; 0492E
 db 0x8B, 0xE5  ; 04931 mov sp,bp
 db 0x82  ; 04933
 db 0x7E, 0x0C  ; 04934 jng 0x4942
@@ -8163,7 +8163,7 @@ mov bx,[bp+0x8]  ; 04954
 db 0x0B, 0xD8  ; 04957 or bx,ax
 push bx  ; 04959
 push word [bp+0x12]  ; 0495A
-call 0x4fb9  ; 0495D
+call file_manager  ; 0495D
 db 0x8B, 0xE5  ; 04960 mov sp,bp
 mov [bp+0x6],ax  ; 04962
 inc ax  ; 04965
@@ -8198,7 +8198,7 @@ mov ax,0x1a4  ; 0499D
 push ax  ; 049A0
 push bx  ; 049A1
 push word [bp+0x12]  ; 049A2
-call 0x4fb9  ; 049A5
+call file_manager  ; 049A5
 db 0x8B, 0xE5  ; 049A8 mov sp,bp
 mov [bp+0x6],ax  ; 049AA
 inc ax  ; 049AD
@@ -8265,8 +8265,8 @@ add sp,0xe  ; 04A32
 pop bp  ; 04A35
 ret  ; 04A36
 
-; ---- function sub_04A37 ----
-sub_04A37:
+; ---- function collision_check ----
+collision_check:
 push bp  ; 04A37
 sub sp,0x4  ; 04A38
 db 0x8B, 0xEC  ; 04A3B mov bp,sp
@@ -8278,7 +8278,7 @@ jz short loc_04A54  ; 04A48 jz 0x4a54
 push si  ; 04A4A
 mov ax,0xffff  ; 04A4B
 push ax  ; 04A4E
-call 0x664e  ; 04A4F
+call sub_0644E  ; 04A4F
 db 0x8B, 0xE5  ; 04A52 mov sp,bp
 loc_04A54:
 mov si,[bp+0x8]  ; 04A54
@@ -8290,7 +8290,7 @@ cmp word [si+0xa],0x0  ; 04A61
 jz short loc_04A72  ; 04A65 jz 0x4a72
 push word [si+0xa]  ; 04A67
 push word [si+0x6]  ; 04A6A
-call 0x6b54  ; 04A6D
+call sub_06954  ; 04A6D
 db 0x8B, 0xE5  ; 04A70 mov sp,bp
 loc_04A72:
 db 0x33, 0xC0  ; 04A72 xor ax,ax
@@ -8301,7 +8301,7 @@ mov byte [si+0x8],0x0  ; 04A7D
 mov al,[si+0x9]  ; 04A81
 xor ah,ah  ; 04A84
 push ax  ; 04A86
-call 0x57f9  ; 04A87
+call load_resource  ; 04A87
 db 0x8B, 0xE5  ; 04A8A mov sp,bp
 add sp,0x4  ; 04A8C
 pop bp  ; 04A8F
@@ -8324,7 +8324,7 @@ jmp short loc_04ABE  ; 04AB3 jmp 0x4abe
 loc_04AB5:
 mov ax,0xe1b0  ; 04AB5
 push ax  ; 04AB8
-call 0x6542  ; 04AB9
+call sub_06342  ; 04AB9
 db 0x8B, 0xE5  ; 04ABC mov sp,bp
 loc_04ABE:
 db 0x3D, 0xFF, 0xFF  ; 04ABE cmp ax,0xffff
@@ -8362,8 +8362,8 @@ add sp,0x8  ; 04B05
 pop bp  ; 04B08
 ret  ; 04B09
 
-; ---- function sub_04B0A ----
-sub_04B0A:
+; ---- function bounds_check ----
+bounds_check:
 push bp  ; 04B0A
 sub sp,0x8  ; 04B0B
 db 0x8B, 0xEC  ; 04B0E mov bp,sp
@@ -8388,7 +8388,7 @@ xor bh,bh  ; 04B36
 jmp short loc_04B44  ; 04B38 jmp 0x4b44
 loc_04B3A:
 push word [bp+0x10]  ; 04B3A
-call 0x6542  ; 04B3D
+call sub_06342  ; 04B3D
 db 0x8B, 0xE5  ; 04B40 mov sp,bp
 db 0x8B, 0xD8  ; 04B42 mov bx,ax
 loc_04B44:
@@ -8421,8 +8421,8 @@ add sp,0x8  ; 04B7A
 pop bp  ; 04B7D
 ret  ; 04B7E
 
-; ---- function sub_04B7F ----
-sub_04B7F:
+; ---- function show_insert_disk ----
+show_insert_disk:
 push bp  ; 04B7F
 sub sp,0x4  ; 04B80
 db 0x8B, 0xEC  ; 04B83 mov bp,sp
@@ -8435,7 +8435,7 @@ mov bx,0xe  ; 04B92
 imul bx  ; 04B95
 add ax,0xe1b0  ; 04B97
 push ax  ; 04B9A
-call 0x4c37  ; 04B9B
+call collision_check  ; 04B9B
 db 0x8B, 0xE5  ; 04B9E mov sp,bp
 inc word [bp+0x2]  ; 04BA0
 jmp short loc_04B8A  ; 04BA3 jmp 0x4b8a
@@ -8446,14 +8446,14 @@ mov ax,[bp+0x2]  ; 04BAA
 cmp ax,[0xe5cc]  ; 04BAD
 jnl short loc_04BBE  ; 04BB1 jnl 0x4bbe
 push ax  ; 04BB3
-call 0x57f9  ; 04BB4
+call load_resource  ; 04BB4
 db 0x8B, 0xE5  ; 04BB7 mov sp,bp
 inc word [bp+0x2]  ; 04BB9
 jmp short loc_04BAA  ; 04BBC jmp 0x4baa
 loc_04BBE:
 push word [bp+0xa]  ; 04BBE
 push word [bp+0x8]  ; 04BC1
-call 0x5fab  ; 04BC4
+call crt_init_io  ; 04BC4
 db 0x8B, 0xE5  ; 04BC7 mov sp,bp
 add sp,0x4  ; 04BC9
 pop bp  ; 04BCC
@@ -8468,7 +8468,7 @@ mov ax,[bp+0x12]  ; 04BD4
 mov bx,[bp+0x10]  ; 04BD7
 mov cx,[0x67]  ; 04BDA
 mov dx,[0x65]  ; 04BDE
-call 0x6d3a  ; 04BE2
+call sub_06B3A  ; 04BE2
 jng short loc_04C50  ; 04BE5 jng 0x4c50
 mov al,[0xf]  ; 04BE7
 xor ah,ah  ; 04BEA
@@ -8502,7 +8502,7 @@ rcr bx,1  ; 04C26
 loop 0x4c24  ; 04C28
 push bx  ; 04C2A
 mov [bp+0x6],bx  ; 04C2B
-call 0x5e57  ; 04C2E
+call crt_realloc_up  ; 04C2E
 db 0x8B, 0xE5  ; 04C31 mov sp,bp
 test ax,ax  ; 04C33
 jz short loc_04C3E  ; 04C35 jz 0x4c3e
@@ -8536,7 +8536,7 @@ mov ax,[bp+0xc]  ; 04C79
 db 0x33, 0xDB  ; 04C7C xor bx,bx
 push bx  ; 04C7E
 push ax  ; 04C7F
-call 0x4dce  ; 04C80
+call sub_04BCE  ; 04C80
 db 0x8B, 0xE5  ; 04C83 mov sp,bp
 mov [bp+0x6],ax  ; 04C85
 test ax,ax  ; 04C88
@@ -8550,8 +8550,8 @@ add sp,0x8  ; 04C94
 pop bp  ; 04C97
 ret  ; 04C98
 
-; ---- function sub_04C99 ----
-sub_04C99:
+; ---- function resource_manager ----
+resource_manager:
 push bp  ; 04C99
 sub sp,0xe  ; 04C9A
 db 0x8B, 0xEC  ; 04C9D mov bp,sp
@@ -8583,7 +8583,7 @@ mov [bp+0x0],cx  ; 04CDC
 mov cx,0x1  ; 04CDF
 mov [bp+0x2],dx  ; 04CE2
 db 0x33, 0xD2  ; 04CE5 xor dx,dx
-call 0x6d3a  ; 04CE7
+call sub_06B3A  ; 04CE7
 jng short loc_04D56  ; 04CEA jng 0x4d56
 sub dx,[bp+0x0]  ; 04CEC
 sbb cx,[bp+0x2]  ; 04CEF
@@ -8614,7 +8614,7 @@ rcr bx,1  ; 04D2C
 loop 0x4d2a  ; 04D2E
 push bx  ; 04D30
 mov [bp+0x8],bx  ; 04D31
-call 0x5e12  ; 04D34
+call crt_realloc_down  ; 04D34
 db 0x8B, 0xE5  ; 04D37 mov sp,bp
 test ax,ax  ; 04D39
 jz short loc_04D45  ; 04D3B jz 0x4d45
@@ -8642,8 +8642,8 @@ add sp,0xe  ; 04D72
 pop bp  ; 04D75
 ret  ; 04D76
 
-; ---- function sub_04D77 ----
-sub_04D77:
+; ---- function build_filename ----
+build_filename:
 push bp  ; 04D77
 sub sp,0x2  ; 04D78
 db 0x8B, 0xEC  ; 04D7B mov bp,sp
@@ -8674,8 +8674,8 @@ add sp,0x2  ; 04DB4
 pop bp  ; 04DB7
 ret  ; 04DB8
 
-; ---- function sub_04DB9 ----
-sub_04DB9:
+; ---- function file_manager ----
+file_manager:
 push bp  ; 04DB9
 sub sp,0xc  ; 04DBA
 db 0x8B, 0xEC  ; 04DBD mov bp,sp
@@ -8807,7 +8807,7 @@ add ax,0xe2c8  ; 04ED3
 inc ax  ; 04ED6
 push ax  ; 04ED7
 push word [bp+0x10]  ; 04ED8
-call 0x6cf4  ; 04EDB
+call crt_str_util  ; 04EDB
 db 0x8B, 0xE5  ; 04EDE mov sp,bp
 test ax,ax  ; 04EE0
 jnz short loc_04F00  ; 04EE2 jnz 0x4f00
@@ -8838,7 +8838,7 @@ mov ax,[bp+0x12]  ; 04F19
 and ax,0x200  ; 04F1C
 jz short loc_04F29  ; 04F1F jz 0x4f29
 push word [bp+0x10]  ; 04F21
-call 0x5f48  ; 04F24
+call dos_delete_file  ; 04F24
 db 0x8B, 0xE5  ; 04F27 mov sp,bp
 loc_04F29:
 mov ax,[bp+0x12]  ; 04F29
@@ -8852,7 +8852,7 @@ db 0x25, 0x03, 0x00  ; 04F39 and ax,0x3
 loc_04F3C:
 push ax  ; 04F3C
 push word [bp+0x10]  ; 04F3D
-call 0x5eb5  ; 04F40
+call dos_open_file  ; 04F40
 db 0x8B, 0xE5  ; 04F43 mov sp,bp
 mov si,[bp+0xa]  ; 04F45
 mov [si+0x2],ax  ; 04F48
@@ -8864,7 +8864,7 @@ jz short loc_04F6B  ; 04F58 jz 0x4f6b
 db 0x33, 0xC0  ; 04F5A xor ax,ax
 push ax  ; 04F5C
 push word [bp+0x10]  ; 04F5D
-call 0x5e9b  ; 04F60
+call dos_create_file  ; 04F60
 db 0x8B, 0xE5  ; 04F63 mov sp,bp
 mov si,[bp+0xa]  ; 04F65
 mov [si+0x2],ax  ; 04F68
@@ -8885,7 +8885,7 @@ cmp ax,0x500  ; 04F8C
 jnz short loc_04FB0  ; 04F8F jnz 0x4fb0
 mov si,[bp+0xa]  ; 04F91
 push word [si+0x2]  ; 04F94
-call 0x5ecf  ; 04F97
+call dos_close_file  ; 04F97
 db 0x8B, 0xE5  ; 04F9A mov sp,bp
 mov word [0xe4be],0x11  ; 04F9C
 mov si,[bp+0xa]  ; 04FA2
@@ -8910,14 +8910,14 @@ and bx,0x7fff  ; 04FCA
 push bx  ; 04FCE
 push ax  ; 04FCF
 push word [bp+0xa]  ; 04FD0
-call 0x4fb9  ; 04FD3
+call file_manager  ; 04FD3
 db 0x8B, 0xE5  ; 04FD6 mov sp,bp
 add sp,0x6  ; 04FD8
 pop bp  ; 04FDB
 ret  ; 04FDC
 
-; ---- function sub_04FDD ----
-sub_04FDD:
+; ---- function load_file ----
+load_file:
 push bp  ; 04FDD
 sub sp,0x16  ; 04FDE
 db 0x8B, 0xEC  ; 04FE1 mov bp,sp
@@ -8925,7 +8925,7 @@ mov ax,[bp+0x1e]  ; 04FE3
 test ax,ax  ; 04FE6
 js short loc_04FF9  ; 04FE8 js 0x4ff9
 push word [bp+0x1a]  ; 04FEA
-call 0x4f77  ; 04FED
+call build_filename  ; 04FED
 db 0x8B, 0xE5  ; 04FF0 mov sp,bp
 test ax,ax  ; 04FF2
 mov [bp+0x12],ax  ; 04FF4
@@ -8956,7 +8956,7 @@ loc_0502A:
 mov bx,0xe3b8  ; 0502A
 push bx  ; 0502D
 mov [0xe3b8],al  ; 0502E
-call 0x6925  ; 05031
+call dos_read_line  ; 05031
 db 0x8B, 0xE5  ; 05034 mov sp,bp
 mov word [bp+0x6],0x0  ; 05036
 mov word [bp+0x8],0x2  ; 0503B
@@ -8997,7 +8997,7 @@ jmp short loc_05040  ; 05090 jmp 0x5040
 loc_05092:
 mov ax,0xa  ; 05092
 push ax  ; 05095
-call 0x5fe3  ; 05096
+call read_data_block  ; 05096
 db 0x8B, 0xE5  ; 05099 mov sp,bp
 mov ax,[bp+0x6]  ; 0509B
 add sp,0x16  ; 0509E
@@ -9156,7 +9156,7 @@ push word [bp+0x1e]  ; 051F5
 push word [bp+0x1c]  ; 051F8
 mov si,[bp+0x12]  ; 051FB
 push word [si+0x2]  ; 051FE
-call 0x5ee6  ; 05201
+call dos_read_file  ; 05201
 db 0x8B, 0xE5  ; 05204 mov sp,bp
 mov [bp+0x6],ax  ; 05206
 cmp word [0x80],0x0  ; 05209
@@ -9206,7 +9206,7 @@ push cx  ; 05266
 push bx  ; 05267
 push ax  ; 05268
 push word [bp+0x1a]  ; 05269
-call 0x5701  ; 0526C
+call parse_resource_data  ; 0526C
 db 0x8B, 0xE5  ; 0526F mov sp,bp
 mov ax,[bp+0xa]  ; 05271
 add sp,0x16  ; 05274
@@ -9266,7 +9266,7 @@ mov ax,[bp+0x1c]  ; 052DE
 test ax,ax  ; 052E1
 js short loc_052F4  ; 052E3 js 0x52f4
 push word [bp+0x18]  ; 052E5
-call 0x4f77  ; 052E8
+call build_filename  ; 052E8
 db 0x8B, 0xE5  ; 052EB mov sp,bp
 test ax,ax  ; 052ED
 mov [bp+0x10],ax  ; 052EF
@@ -9338,7 +9338,7 @@ push ax  ; 05382
 db 0x33, 0xDB  ; 05383 xor bx,bx
 push bx  ; 05385
 push word [bp+0x18]  ; 05386
-call 0x5701  ; 05389
+call parse_resource_data  ; 05389
 db 0x8B, 0xE5  ; 0538C mov sp,bp
 loc_0538E:
 mov al,[0xf]  ; 0538E
@@ -9353,7 +9353,7 @@ jz short loc_053D2  ; 053A2 jz 0x53d2
 push word [bp+0x1c]  ; 053A4
 push word [bp+0x1a]  ; 053A7
 push word [si+0x2]  ; 053AA
-call 0x5f05  ; 053AD
+call dos_write_file  ; 053AD
 db 0x8B, 0xE5  ; 053B0 mov sp,bp
 mov [bp+0x8],ax  ; 053B2
 cmp word [0x80],0x0  ; 053B5
@@ -9415,7 +9415,7 @@ mov ax,0xe3b8  ; 0543C
 push ax  ; 0543F
 mov si,[bp+0x10]  ; 05440
 push word [si+0x2]  ; 05443
-call 0x5f05  ; 05446
+call dos_write_file  ; 05446
 db 0x8B, 0xE5  ; 05449 mov sp,bp
 cmp ax,[bp+0xa]  ; 0544B
 mov [bp+0xe],ax  ; 0544E
@@ -9447,7 +9447,7 @@ mov ax,0xe3b8  ; 05490
 push ax  ; 05493
 mov si,[bp+0x10]  ; 05494
 push word [si+0x2]  ; 05497
-call 0x5f05  ; 0549A
+call dos_write_file  ; 0549A
 db 0x8B, 0xE5  ; 0549D mov sp,bp
 cmp ax,[bp+0xa]  ; 0549F
 mov [bp+0xe],ax  ; 054A2
@@ -9493,13 +9493,13 @@ jmp word near [cs:si+0x54e7]  ; 054FA
 loc_054FF:
 jmp short loc_054D9  ; 054FF jmp 0x54d9
 
-; ---- function sub_05501 ----
-sub_05501:
+; ---- function parse_resource_data ----
+parse_resource_data:
 push bp  ; 05501
 sub sp,0x12  ; 05502
 db 0x8B, 0xEC  ; 05505 mov bp,sp
 push word [bp+0x16]  ; 05507
-call 0x4f77  ; 0550A
+call build_filename  ; 0550A
 db 0x8B, 0xE5  ; 0550D mov sp,bp
 test ax,ax  ; 0550F
 mov [bp+0xe],ax  ; 05511
@@ -9531,7 +9531,7 @@ push word [bp+0x1a]  ; 05549
 push word [bp+0x18]  ; 0554C
 mov si,[bp+0xe]  ; 0554F
 push word [si+0x2]  ; 05552
-call 0x5f24  ; 05555
+call dos_seek_file  ; 05555
 db 0x8B, 0xE5  ; 05558 mov sp,bp
 mov [bp+0x7],ax  ; 0555A
 mov [bp+0x5],bx  ; 0555D
@@ -9569,7 +9569,7 @@ push bx  ; 055AD
 push ax  ; 055AE
 push word [bp+0x9]  ; 055AF
 push word [bp+0x16]  ; 055B2
-call 0x5701  ; 055B5
+call parse_resource_data  ; 055B5
 db 0x8B, 0xE5  ; 055B8 mov sp,bp
 db 0x0B, 0xC3  ; 055BA or ax,bx
 jz short loc_055DC  ; 055BC jz 0x55dc
@@ -9578,7 +9578,7 @@ push ax  ; 055C1
 lea ax,[bp+0x4]  ; 055C2
 push ax  ; 055C5
 push word [bp+0x16]  ; 055C6
-call 0x51dd  ; 055C9
+call load_file  ; 055C9
 db 0x8B, 0xE5  ; 055CC mov sp,bp
 test ax,ax  ; 055CE
 jnz short loc_055DC  ; 055D0 jnz 0x55dc
@@ -9601,13 +9601,13 @@ add sp,0x12  ; 055F4
 pop bp  ; 055F7
 ret  ; 055F8
 
-; ---- function sub_055F9 ----
-sub_055F9:
+; ---- function load_resource ----
+load_resource:
 push bp  ; 055F9
 sub sp,0x8  ; 055FA
 db 0x8B, 0xEC  ; 055FD mov bp,sp
 push word [bp+0xc]  ; 055FF
-call 0x4f77  ; 05602
+call build_filename  ; 05602
 db 0x8B, 0xE5  ; 05605 mov sp,bp
 test ax,ax  ; 05607
 mov [bp+0x4],ax  ; 05609
@@ -9629,7 +9629,7 @@ xor ah,ah  ; 0562A
 db 0x3D, 0x01, 0x00  ; 0562C cmp ax,0x1
 jng short loc_0564B  ; 0562F jng 0x564b
 push word [si+0x2]  ; 05631
-call 0x5ecf  ; 05634
+call dos_close_file  ; 05634
 db 0x8B, 0xE5  ; 05637 mov sp,bp
 cmp word [0x80],0x0  ; 05639
 jz short loc_0564B  ; 0563E jz 0x564b
@@ -9653,7 +9653,7 @@ xor ah,ah  ; 05662
 db 0x3D, 0x01, 0x00  ; 05664 cmp ax,0x1
 jng short loc_0568D  ; 05667 jng 0x568d
 push word [bp+0x2c]  ; 05669
-call 0x5f48  ; 0566C
+call dos_delete_file  ; 0566C
 db 0x8B, 0xE5  ; 0566F mov sp,bp
 cmp word [0x80],0x0  ; 05671
 jz short loc_05686  ; 05676 jz 0x5686
@@ -9675,7 +9675,7 @@ push bp  ; 05692
 sub sp,0x2  ; 05693
 db 0x8B, 0xEC  ; 05696 mov bp,sp
 push word [bp+0x6]  ; 05698
-call 0x5859  ; 0569B
+call sub_05659  ; 0569B
 db 0x8B, 0xE5  ; 0569E mov sp,bp
 add sp,0x2  ; 056A0
 pop bp  ; 056A3
@@ -9689,7 +9689,7 @@ db 0x3D, 0x01, 0x00  ; 056B0 cmp ax,0x1
 jng short loc_056D9  ; 056B3 jng 0x56d9
 push word [bp+0x54]  ; 056B5
 push word [bp+0x52]  ; 056B8
-call 0x5f8d  ; 056BB
+call dos_rename_file  ; 056BB
 db 0x8B, 0xE5  ; 056BE mov sp,bp
 test ax,ax  ; 056C0
 jz short loc_056D2  ; 056C2 jz 0x56d2
@@ -9708,8 +9708,8 @@ add sp,0x4e  ; 056D9
 pop bp  ; 056DC
 ret  ; 056DD
 
-; ---- function sub_056DE ----
-sub_056DE:
+; ---- function load_resource_2 ----
+load_resource_2:
 push bp  ; 056DE
 sub sp,0x8  ; 056DF
 db 0x8B, 0xEC  ; 056E2 mov bp,sp
@@ -9830,7 +9830,7 @@ push ax  ; 057E8
 db 0x8B, 0x06, 0x3C, 0xE4  ; 057E9 mov ax,[0xe43c]
 push ax  ; 057ED
 push word [bp+0x16]  ; 057EE
-call 0x6033  ; 057F1
+call sub_05E33  ; 057F1
 db 0x8B, 0xE5  ; 057F4 mov sp,bp
 test ax,ax  ; 057F6
 mov [bp+0xa],ax  ; 057F8
@@ -9908,8 +9908,8 @@ add sp,0x6  ; 05895
 pop bp  ; 05898
 ret  ; 05899
 
-; ---- function sub_0589A ----
-sub_0589A:
+; ---- function print_error ----
+print_error:
 push bp  ; 0589A
 sub sp,0x6  ; 0589B
 db 0x8B, 0xEC  ; 0589E mov bp,sp
@@ -9935,7 +9935,7 @@ loc_058CC:
 mov ax,0xe1be  ; 058CC
 push ax  ; 058CF
 push word [bp+0x4]  ; 058D0
-call 0x664e  ; 058D3
+call sub_0644E  ; 058D3
 db 0x8B, 0xE5  ; 058D6 mov sp,bp
 jmp short loc_058A0  ; 058D8 jmp 0x58a0
 loc_058DA:
@@ -9955,15 +9955,15 @@ mov ax,0xe1be  ; 058F5
 push ax  ; 058F8
 mov ax,0xa  ; 058F9
 push ax  ; 058FC
-call 0x664e  ; 058FD
+call sub_0644E  ; 058FD
 db 0x8B, 0xE5  ; 05900 mov sp,bp
 loc_05902:
 add sp,0x6  ; 05902
 pop bp  ; 05905
 ret  ; 05906
 
-; ---- function sub_05907 ----
-sub_05907:
+; ---- function init_file_system ----
+init_file_system:
 push bp  ; 05907
 sub sp,0x8  ; 05908
 db 0x8B, 0xEC  ; 0590B mov bp,sp
@@ -9990,7 +9990,7 @@ jmp short loc_05946  ; 05939 jmp 0x5946
 loc_0593B:
 push word [bp+0xe]  ; 0593B
 push word [bp+0x4]  ; 0593E
-call 0x664e  ; 05941
+call sub_0644E  ; 05941
 db 0x8B, 0xE5  ; 05944 mov sp,bp
 loc_05946:
 mov [bp+0x6],ax  ; 05946
@@ -10001,8 +10001,8 @@ add sp,0x8  ; 0594E
 pop bp  ; 05951
 ret  ; 05952
 
-; ---- function sub_05953 ----
-sub_05953:
+; ---- function main ----
+main:
 push bp  ; 05953
 sub sp,0xe  ; 05954
 db 0x8B, 0xEC  ; 05957 mov bp,sp
@@ -10072,7 +10072,7 @@ mov ax,0xe480  ; 059E5
 push ax  ; 059E8
 mov ax,0x19  ; 059E9
 push ax  ; 059EC
-call 0x4a83  ; 059ED
+call save_vectors  ; 059ED
 db 0x8B, 0xE5  ; 059F0 mov sp,bp
 mov bl,[0x39]  ; 059F2
 xor bh,bh  ; 059F6
@@ -10085,7 +10085,7 @@ mov ax,0xe482  ; 05A04
 push ax  ; 05A07
 mov ax,0x39  ; 05A08
 push ax  ; 05A0B
-call 0x4a83  ; 05A0C
+call save_vectors  ; 05A0C
 db 0x8B, 0xE5  ; 05A0F mov sp,bp
 mov [bp+0xa],ax  ; 05A11
 jmp short loc_05A2A  ; 05A14 jmp 0x5a2a
@@ -10096,7 +10096,7 @@ mov ax,0xe484  ; 05A1A
 push ax  ; 05A1D
 mov ax,0x3a  ; 05A1E
 push ax  ; 05A21
-call 0x4a83  ; 05A22
+call save_vectors  ; 05A22
 db 0x8B, 0xE5  ; 05A25 mov sp,bp
 mov [bp+0xa],ax  ; 05A27
 loc_05A2A:
@@ -10106,14 +10106,14 @@ mov ax,0xe484  ; 05A2E
 push ax  ; 05A31
 mov ax,0xe486  ; 05A32
 push ax  ; 05A35
-call 0x4a83  ; 05A36
+call save_vectors  ; 05A36
 db 0x8B, 0xE5  ; 05A39 mov sp,bp
 test ax,ax  ; 05A3B
 mov [bp+0xc],ax  ; 05A3D
 jnz short loc_05A4B  ; 05A40 jnz 0x5a4b
 mov ax,0x1  ; 05A42
 push ax  ; 05A45
-call 0x5fab  ; 05A46
+call crt_init_io  ; 05A46
 db 0x8B, 0xE5  ; 05A49 mov sp,bp
 loc_05A4B:
 cmp word [bp+0x8],0x0  ; 05A4B
@@ -10121,19 +10121,19 @@ jnz short loc_05A66  ; 05A4F jnz 0x5a66
 push word [bp+0xc]  ; 05A51
 mov ax,0xe487  ; 05A54
 push ax  ; 05A57
-call 0x5b07  ; 05A58
+call init_file_system  ; 05A58
 db 0x8B, 0xE5  ; 05A5B mov sp,bp
 mov ax,0x1  ; 05A5D
 push ax  ; 05A60
-call 0x4d7f  ; 05A61
+call show_insert_disk  ; 05A61
 db 0x8B, 0xE5  ; 05A64 mov sp,bp
 loc_05A66:
 push word [0xe5c8]  ; 05A66
-call 0x6a10  ; 05A6A
+call string_copy  ; 05A6A
 db 0x8B, 0xE5  ; 05A6D mov sp,bp
 push ax  ; 05A6F
 push word [bp+0x8]  ; 05A70
-call 0x68df  ; 05A73
+call format_string  ; 05A73
 db 0x8B, 0xE5  ; 05A76 mov sp,bp
 mov si,[bp+0x8]  ; 05A78
 mov al,[si+0x8]  ; 05A7B
@@ -10147,11 +10147,11 @@ loc_05A8F:
 push word [bp+0xc]  ; 05A8F
 mov ax,0xe49e  ; 05A92
 push ax  ; 05A95
-call 0x5b07  ; 05A96
+call init_file_system  ; 05A96
 db 0x8B, 0xE5  ; 05A99 mov sp,bp
 mov ax,0x1  ; 05A9B
 push ax  ; 05A9E
-call 0x4d7f  ; 05A9F
+call show_insert_disk  ; 05A9F
 db 0x8B, 0xE5  ; 05AA2 mov sp,bp
 jmp short loc_05B14  ; 05AA4 jmp 0x5b14
 mov byte [0xe1b9],0x0  ; 05AA6
@@ -10182,7 +10182,7 @@ push cx  ; 05AF3
 mov [0xe5ce],al  ; 05AF4
 mov [0xe622],bl  ; 05AF7
 mov [0xe5f8],bl  ; 05AFB
-call 0x5f7e  ; 05AFF
+call dos_ioctl  ; 05AFF
 db 0x8B, 0xE5  ; 05B02 mov sp,bp
 and ax,0x80  ; 05B04
 jz short loc_05B14  ; 05B07 jz 0x5b14
@@ -10194,11 +10194,11 @@ loc_05B14:
 mov ax,0xe440  ; 05B14
 push ax  ; 05B17
 push word [0xe43e]  ; 05B18
-call 0x455  ; 05B1C
+call game_init  ; 05B1C
 db 0x8B, 0xE5  ; 05B1F mov sp,bp
 db 0x33, 0xC0  ; 05B21 xor ax,ax
 push ax  ; 05B23
-call 0x4d7f  ; 05B24
+call show_insert_disk  ; 05B24
 db 0x8B, 0xE5  ; 05B27 mov sp,bp
 add sp,0xe  ; 05B29
 pop bp  ; 05B2C
@@ -10263,13 +10263,13 @@ add sp,0x8  ; 05B97
 pop bp  ; 05B9A
 ret  ; 05B9B
 
-; ---- function sub_05B9C ----
-sub_05B9C:
+; ---- function load_resource_3 ----
+load_resource_3:
 push bp  ; 05B9C
 sub sp,0x8  ; 05B9D
 db 0x8B, 0xEC  ; 05BA0 mov bp,sp
 push word [bp+0xc]  ; 05BA2
-call 0x68b9  ; 05BA5
+call sub_066B9  ; 05BA5
 db 0x8B, 0xE5  ; 05BA8 mov sp,bp
 mov bx,[bp+0xc]  ; 05BAA
 db 0x03, 0xD8  ; 05BAD add bx,ax
@@ -10291,7 +10291,7 @@ push bp  ; 05BCE
 sub sp,0x6  ; 05BCF
 db 0x8B, 0xEC  ; 05BD2 mov bp,sp
 push word [bp+0xa]  ; 05BD4
-call 0x68b9  ; 05BD7
+call sub_066B9  ; 05BD7
 db 0x8B, 0xE5  ; 05BDA mov sp,bp
 mov bx,[bp+0xa]  ; 05BDC
 db 0x03, 0xD8  ; 05BDF add bx,ax
@@ -10318,8 +10318,8 @@ add sp,0x6  ; 05C0D
 pop bp  ; 05C10
 ret  ; 05C11
 
-; ---- function sub_05C12 ----
-sub_05C12:
+; ---- function crt_realloc_down ----
+crt_realloc_down:
 push bp  ; 05C12
 db 0x8B, 0xEC  ; 05C13 mov bp,sp
 push es  ; 05C15
@@ -10353,8 +10353,8 @@ pop es  ; 05C54
 pop bp  ; 05C55
 ret  ; 05C56
 
-; ---- function sub_05C57 ----
-sub_05C57:
+; ---- function crt_realloc_up ----
+crt_realloc_up:
 push bp  ; 05C57
 db 0x8B, 0xEC  ; 05C58 mov bp,sp
 push es  ; 05C5A
@@ -10388,8 +10388,8 @@ pop es  ; 05C98
 pop bp  ; 05C99
 ret  ; 05C9A
 
-; ---- function sub_05C9B ----
-sub_05C9B:
+; ---- function dos_create_file ----
+dos_create_file:
 push bp  ; 05C9B
 db 0x8B, 0xEC  ; 05C9C mov bp,sp
 mov word [0x80],0x0  ; 05C9E
@@ -10403,8 +10403,8 @@ loc_05CB3:
 pop bp  ; 05CB3
 ret  ; 05CB4
 
-; ---- function sub_05CB5 ----
-sub_05CB5:
+; ---- function dos_open_file ----
+dos_open_file:
 push bp  ; 05CB5
 db 0x8B, 0xEC  ; 05CB6 mov bp,sp
 mov word [0x80],0x0  ; 05CB8
@@ -10418,8 +10418,8 @@ loc_05CCD:
 pop bp  ; 05CCD
 ret  ; 05CCE
 
-; ---- function sub_05CCF ----
-sub_05CCF:
+; ---- function dos_close_file ----
+dos_close_file:
 push bp  ; 05CCF
 db 0x8B, 0xEC  ; 05CD0 mov bp,sp
 mov word [0x80],0x0  ; 05CD2
@@ -10432,8 +10432,8 @@ loc_05CE4:
 pop bp  ; 05CE4
 ret  ; 05CE5
 
-; ---- function sub_05CE6 ----
-sub_05CE6:
+; ---- function dos_read_file ----
+dos_read_file:
 push bp  ; 05CE6
 db 0x8B, 0xEC  ; 05CE7 mov bp,sp
 mov word [0x80],0x0  ; 05CE9
@@ -10449,8 +10449,8 @@ loc_05D03:
 pop bp  ; 05D03
 ret  ; 05D04
 
-; ---- function sub_05D05 ----
-sub_05D05:
+; ---- function dos_write_file ----
+dos_write_file:
 push bp  ; 05D05
 db 0x8B, 0xEC  ; 05D06 mov bp,sp
 mov word [0x80],0x0  ; 05D08
@@ -10466,8 +10466,8 @@ loc_05D22:
 pop bp  ; 05D22
 ret  ; 05D23
 
-; ---- function sub_05D24 ----
-sub_05D24:
+; ---- function dos_seek_file ----
+dos_seek_file:
 push bp  ; 05D24
 db 0x8B, 0xEC  ; 05D25 mov bp,sp
 mov word [0x80],0x0  ; 05D27
@@ -10485,8 +10485,8 @@ db 0x8B, 0xC2  ; 05D44 mov ax,dx
 pop bp  ; 05D46
 ret  ; 05D47
 
-; ---- function sub_05D48 ----
-sub_05D48:
+; ---- function dos_delete_file ----
+dos_delete_file:
 push bp  ; 05D48
 db 0x8B, 0xEC  ; 05D49 mov bp,sp
 mov word [0x80],0x0  ; 05D4B
@@ -10513,8 +10513,8 @@ db 0x8B, 0xC1  ; 05D7A mov ax,cx
 pop bp  ; 05D7C
 ret  ; 05D7D
 
-; ---- function sub_05D7E ----
-sub_05D7E:
+; ---- function dos_ioctl ----
+dos_ioctl:
 push bp  ; 05D7E
 db 0x8B, 0xEC  ; 05D7F mov bp,sp
 mov bx,[bp+0x4]  ; 05D81
@@ -10524,8 +10524,8 @@ db 0x8B, 0xC2  ; 05D89 mov ax,dx
 pop bp  ; 05D8B
 ret  ; 05D8C
 
-; ---- function sub_05D8D ----
-sub_05D8D:
+; ---- function dos_rename_file ----
+dos_rename_file:
 push bp  ; 05D8D
 db 0x8B, 0xEC  ; 05D8E mov bp,sp
 mov word [0x80],0x0  ; 05D90
@@ -10542,13 +10542,13 @@ db 0x33, 0xC0  ; 05DA7 xor ax,ax
 pop bp  ; 05DA9
 ret  ; 05DAA
 
-; ---- function sub_05DAB ----
-sub_05DAB:
+; ---- function crt_init_io ----
+crt_init_io:
 push bp  ; 05DAB
 db 0x8B, 0xEC  ; 05DAC mov bp,sp
 push word [bp+0x6]  ; 05DAE
 push word [bp+0x4]  ; 05DB1
-call 0x43c  ; 05DB4
+call crt_exit  ; 05DB4
 db 0x8B, 0xE5  ; 05DB7 mov sp,bp
 pop bp  ; 05DB9
 ret  ; 05DBA
@@ -10557,7 +10557,7 @@ sub sp,0x2  ; 05DBC
 db 0x8B, 0xEC  ; 05DBF mov bp,sp
 mov ax,0x8  ; 05DC1
 push ax  ; 05DC4
-call 0x6d84  ; 05DC5
+call dos_int21  ; 05DC5
 db 0x8B, 0xE5  ; 05DC8 mov sp,bp
 add sp,0x2  ; 05DCA
 pop bp  ; 05DCD
@@ -10567,20 +10567,20 @@ sub sp,0x2  ; 05DD0
 db 0x8B, 0xEC  ; 05DD3 mov bp,sp
 mov ax,0x1  ; 05DD5
 push ax  ; 05DD8
-call 0x6d84  ; 05DD9
+call dos_int21  ; 05DD9
 db 0x8B, 0xE5  ; 05DDC mov sp,bp
 add sp,0x2  ; 05DDE
 pop bp  ; 05DE1
 ret  ; 05DE2
 
-; ---- function sub_05DE3 ----
-sub_05DE3:
+; ---- function read_data_block ----
+read_data_block:
 push bp  ; 05DE3
 db 0x8B, 0xEC  ; 05DE4 mov bp,sp
 push word [bp+0x4]  ; 05DE6
 mov ax,0x2  ; 05DE9
 push ax  ; 05DEC
-call 0x6d84  ; 05DED
+call dos_int21  ; 05DED
 db 0x8B, 0xE5  ; 05DF0 mov sp,bp
 mov ax,[bp+0x4]  ; 05DF2
 pop bp  ; 05DF5
@@ -10590,7 +10590,7 @@ sub sp,0x2  ; 05DF8
 db 0x8B, 0xEC  ; 05DFB mov bp,sp
 mov ax,0x3  ; 05DFD
 push ax  ; 05E00
-call 0x6d84  ; 05E01
+call dos_int21  ; 05E01
 db 0x8B, 0xE5  ; 05E04 mov sp,bp
 add sp,0x2  ; 05E06
 pop bp  ; 05E09
@@ -10600,7 +10600,7 @@ db 0x8B, 0xEC  ; 05E0C mov bp,sp
 push word [bp+0x4]  ; 05E0E
 mov ax,0x4  ; 05E11
 push ax  ; 05E14
-call 0x6d84  ; 05E15
+call dos_int21  ; 05E15
 db 0x8B, 0xE5  ; 05E18 mov sp,bp
 mov ax,[bp+0x4]  ; 05E1A
 pop bp  ; 05E1D
@@ -10610,7 +10610,7 @@ db 0x8B, 0xEC  ; 05E20 mov bp,sp
 push word [bp+0x4]  ; 05E22
 mov ax,0x5  ; 05E25
 push ax  ; 05E28
-call 0x6d84  ; 05E29
+call dos_int21  ; 05E29
 db 0x8B, 0xE5  ; 05E2C mov sp,bp
 mov ax,[bp+0x4]  ; 05E2E
 pop bp  ; 05E31
@@ -10738,7 +10738,7 @@ mov ax,[bp+0x14]  ; 05F3C
 mov bx,[bp+0x12]  ; 05F3F
 db 0x33, 0xC9  ; 05F42 xor cx,cx
 mov dx,0xa  ; 05F44
-call 0x6d57  ; 05F47
+call sub_06B57  ; 05F47
 mov cx,[bp+0x8]  ; 05F4A
 db 0x81, 0xE1, 0x0F, 0x00  ; 05F4D and cx,0xf
 db 0x33, 0xD2  ; 05F51 xor dx,dx
@@ -11214,7 +11214,7 @@ xor ah,ah  ; 06369
 db 0x25, 0x04, 0x00  ; 0636B and ax,0x4
 jnz short loc_06382  ; 0636E jnz 0x6382
 push si  ; 06370
-call 0x6855  ; 06371
+call sub_06655  ; 06371
 db 0x8B, 0xE5  ; 06374 mov sp,bp
 test ax,ax  ; 06376
 jz short loc_06382  ; 06378 jz 0x6382
@@ -11255,7 +11255,7 @@ xor ah,ah  ; 063C5
 push word [bp+0x6]  ; 063C7
 push word [si+0x6]  ; 063CA
 push ax  ; 063CD
-call 0x51dd  ; 063CE
+call load_file  ; 063CE
 db 0x8B, 0xE5  ; 063D1 mov sp,bp
 test ax,ax  ; 063D3
 mov [bp+0x4],ax  ; 063D5
@@ -11306,7 +11306,7 @@ xor bh,bh  ; 06439
 jmp short loc_06447  ; 0643B jmp 0x6447
 loc_0643D:
 push word [bp+0xc]  ; 0643D
-call 0x6542  ; 06440
+call sub_06342  ; 06440
 db 0x8B, 0xE5  ; 06443 mov sp,bp
 db 0x8B, 0xD8  ; 06445 mov bx,ax
 loc_06447:
@@ -11347,7 +11347,7 @@ pop bp  ; 0648E
 ret  ; 0648F
 loc_06490:
 push word [bp+0x12]  ; 06490
-call 0x6855  ; 06493
+call sub_06655  ; 06493
 db 0x8B, 0xE5  ; 06496 mov sp,bp
 test ax,ax  ; 06498
 jz short loc_064A4  ; 0649A jz 0x64a4
@@ -11377,7 +11377,7 @@ jmp short loc_064DC  ; 064CD jmp 0x64dc
 loc_064CF:
 push word [bp+0x12]  ; 064CF
 push word [bp+0x10]  ; 064D2
-call 0x664e  ; 064D5
+call sub_0644E  ; 064D5
 db 0x8B, 0xE5  ; 064D8 mov sp,bp
 db 0x8B, 0xD8  ; 064DA mov bx,ax
 loc_064DC:
@@ -11408,7 +11408,7 @@ lea cx,[bp+0x4]  ; 06510
 push cx  ; 06513
 push bx  ; 06514
 mov [bp+0x4],al  ; 06515
-call 0x54d8  ; 06518
+call sub_052D8  ; 06518
 db 0x8B, 0xE5  ; 0651B mov sp,bp
 mov word [bp+0x10],0xffff  ; 0651D
 mov [bp+0x5],ax  ; 06522
@@ -11448,7 +11448,7 @@ jmp short loc_0657E  ; 0656F jmp 0x657e
 loc_06571:
 push word [bp+0x12]  ; 06571
 push word [bp+0x10]  ; 06574
-call 0x664e  ; 06577
+call sub_0644E  ; 06577
 db 0x8B, 0xE5  ; 0657A mov sp,bp
 db 0x8B, 0xD8  ; 0657C mov bx,ax
 loc_0657E:
@@ -11476,7 +11476,7 @@ xor ah,ah  ; 065AE
 push word [bp+0x9]  ; 065B0
 push word [si+0x6]  ; 065B3
 push ax  ; 065B6
-call 0x54d8  ; 065B7
+call sub_052D8  ; 065B7
 db 0x8B, 0xE5  ; 065BA mov sp,bp
 mov [bp+0x5],ax  ; 065BC
 jmp short loc_065C9  ; 065BF jmp 0x65c9
@@ -11524,7 +11524,7 @@ jmp short loc_0662B  ; 0661E jmp 0x662b
 loc_06620:
 push word [bp+0x12]  ; 06620
 push word [bp+0x10]  ; 06623
-call 0x664e  ; 06626
+call sub_0644E  ; 06626
 db 0x8B, 0xE5  ; 06629 mov sp,bp
 loc_0662B:
 mov si,[bp+0x12]  ; 0662B
@@ -11567,7 +11567,7 @@ pop bp  ; 06673
 ret  ; 06674
 loc_06675:
 push word [0xe5c8]  ; 06675
-call 0x6a10  ; 06679
+call string_copy  ; 06679
 db 0x8B, 0xE5  ; 0667C mov sp,bp
 mov si,[bp+0x6]  ; 0667E
 mov [si],ax  ; 06681
@@ -11615,13 +11615,13 @@ add sp,0x4  ; 066DA
 pop bp  ; 066DD
 ret  ; 066DE
 
-; ---- function sub_066DF ----
-sub_066DF:
+; ---- function format_string ----
+format_string:
 push bp  ; 066DF
 sub sp,0x2  ; 066E0
 db 0x8B, 0xEC  ; 066E3 mov bp,sp
 push word [bp+0x6]  ; 066E5
-call 0x6d96  ; 066E8
+call sub_06B96  ; 066E8
 db 0x8B, 0xE5  ; 066EB mov sp,bp
 cmp word [bp+0x8],0x0  ; 066ED
 jnz short loc_066FA  ; 066F1 jnz 0x66fa
@@ -11648,8 +11648,8 @@ add sp,0x2  ; 06720
 pop bp  ; 06723
 ret  ; 06724
 
-; ---- function sub_06725 ----
-sub_06725:
+; ---- function dos_read_line ----
+dos_read_line:
 push bp  ; 06725
 db 0x8B, 0xEC  ; 06726 mov bp,sp
 mov dx,[bp+0x4]  ; 06728
@@ -11688,7 +11688,7 @@ sub sp,0x2  ; 06767
 db 0x8B, 0xEC  ; 0676A mov bp,sp
 db 0x33, 0xC0  ; 0676C xor ax,ax
 push ax  ; 0676E
-call 0x6979  ; 0676F
+call sub_06779  ; 0676F
 db 0x8B, 0xE5  ; 06772 mov sp,bp
 add sp,0x2  ; 06774
 pop bp  ; 06777
@@ -11714,7 +11714,7 @@ db 0x33, 0xC0  ; 0679F xor ax,ax
 push ax  ; 067A1
 mov bx,0x400  ; 067A2
 push bx  ; 067A5
-call 0x4dce  ; 067A6
+call sub_04BCE  ; 067A6
 db 0x8B, 0xE5  ; 067A9 mov sp,bp
 test ax,ax  ; 067AB
 mov [bp+0x2],ax  ; 067AD
@@ -11738,7 +11738,7 @@ db 0x33, 0xC0  ; 067D2 xor ax,ax
 push ax  ; 067D4
 mov bx,0x400  ; 067D5
 push bx  ; 067D8
-call 0x4dce  ; 067D9
+call sub_04BCE  ; 067D9
 db 0x8B, 0xE5  ; 067DC mov sp,bp
 test ax,ax  ; 067DE
 jz short loc_067EB  ; 067E0 jz 0x67eb
@@ -11746,7 +11746,7 @@ mov ax,[bp+0x4]  ; 067E2
 add [0xe4b8],ax  ; 067E5
 jmp short loc_067C7  ; 067E9 jmp 0x67c7
 loc_067EB:
-call 0x6931  ; 067EB
+call sub_06731  ; 067EB
 db 0x33, 0xC0  ; 067EE xor ax,ax
 add sp,0x6  ; 067F0
 pop bp  ; 067F3
@@ -11765,8 +11765,8 @@ add sp,0x8  ; 0680B
 pop bp  ; 0680E
 ret  ; 0680F
 
-; ---- function sub_06810 ----
-sub_06810:
+; ---- function string_copy ----
+string_copy:
 push bp  ; 06810
 sub sp,0x8  ; 06811
 db 0x8B, 0xEC  ; 06814 mov bp,sp
@@ -11776,7 +11776,7 @@ push bx  ; 0681B
 push ax  ; 0681C
 mov [bp+0x4],ax  ; 0681D
 mov [bp+0x6],bx  ; 06820
-call 0x6a2d  ; 06823
+call sub_0682D  ; 06823
 db 0x8B, 0xE5  ; 06826 mov sp,bp
 add sp,0x8  ; 06828
 pop bp  ; 0682B
@@ -11791,7 +11791,7 @@ mov ax,[bp+0x16]  ; 06833
 mov bx,[bp+0x14]  ; 06836
 db 0x33, 0xC9  ; 06839 xor cx,cx
 db 0x33, 0xD2  ; 0683B xor dx,dx
-call 0x6d3a  ; 0683D
+call sub_06B3A  ; 0683D
 jg short loc_06849  ; 06840 jg 0x6849
 db 0x33, 0xC0  ; 06842 xor ax,ax
 add sp,0x10  ; 06844
@@ -11809,7 +11809,7 @@ db 0x8B, 0xC3  ; 0685E mov ax,bx
 mov bx,[bp+0x0]  ; 06860
 db 0x33, 0xC9  ; 06863 xor cx,cx
 mov dx,0x4  ; 06865
-call 0x6df5  ; 06868
+call crt_long_multiply  ; 06868
 mov si,0xe4ba  ; 0686B
 mov cx,[si]  ; 0686E
 mov [bp+0xe],ax  ; 06870
@@ -11828,7 +11828,7 @@ mov [bp+0x2],bx  ; 0688F
 mov bx,[bp+0x0]  ; 06892
 mov cx,[bp+0xe]  ; 06895
 mov dx,[bp+0xc]  ; 06898
-call 0x6d3a  ; 0689B
+call sub_06B3A  ; 0689B
 jl short loc_068E1  ; 0689E jl 0x68e1
 db 0x3B, 0xC1  ; 068A0 cmp ax,cx
 jnz short loc_068A6  ; 068A2 jnz 0x68a6
@@ -11876,7 +11876,7 @@ rcl ax,1  ; 068FB
 loop 0x68f9  ; 068FD
 push ax  ; 068FF
 push bx  ; 06900
-call 0x4dce  ; 06901
+call sub_04BCE  ; 06901
 db 0x8B, 0xE5  ; 06904 mov sp,bp
 mov [bp+0xa],ax  ; 06906
 test ax,ax  ; 06909
@@ -11925,7 +11925,7 @@ push ax  ; 06960
 push word [bp+0xc]  ; 06961
 mov [bp+0x4],ax  ; 06964
 mov [bp+0x6],bx  ; 06967
-call 0x6b74  ; 0696A
+call sub_06974  ; 0696A
 db 0x8B, 0xE5  ; 0696D mov sp,bp
 add sp,0x8  ; 0696F
 pop bp  ; 06972
@@ -11940,7 +11940,7 @@ mov ax,[bp+0x1c]  ; 0697A
 mov bx,[bp+0x1a]  ; 0697D
 db 0x33, 0xC9  ; 06980 xor cx,cx
 db 0x33, 0xD2  ; 06982 xor dx,dx
-call 0x6d3a  ; 06984
+call sub_06B3A  ; 06984
 jg short loc_06991  ; 06987 jg 0x6991
 mov ax,0xffff  ; 06989
 add sp,0x14  ; 0698C
@@ -11958,7 +11958,7 @@ mov [bp+0xc],ax  ; 069A6
 db 0x8B, 0xC1  ; 069A9 mov ax,cx
 db 0x33, 0xC9  ; 069AB xor cx,cx
 mov dx,0x4  ; 069AD
-call 0x6df5  ; 069B0
+call crt_long_multiply  ; 069B0
 mov [bp+0x10],bx  ; 069B3
 shl bx,1  ; 069B6
 shl bx,1  ; 069B8
@@ -12099,8 +12099,8 @@ add sp,0x14  ; 06AEF
 pop bp  ; 06AF2
 ret  ; 06AF3
 
-; ---- function sub_06AF4 ----
-sub_06AF4:
+; ---- function crt_str_util ----
+crt_str_util:
 push bp  ; 06AF4
 sub sp,0x4  ; 06AF5
 db 0x8B, 0xEC  ; 06AF8 mov bp,sp
@@ -12192,8 +12192,8 @@ db 0x03, 0xDA  ; 06B7F add bx,dx
 xchg ax,bx  ; 06B81
 jmp short loc_06B6D  ; 06B82 jmp 0x6b6d
 
-; ---- function sub_06B84 ----
-sub_06B84:
+; ---- function dos_int21 ----
+dos_int21:
 push bp  ; 06B84
 db 0x8B, 0xEC  ; 06B85 mov bp,sp
 mov ah,[bp+0x4]  ; 06B87
@@ -12228,7 +12228,7 @@ db 0x25, 0x08, 0x00  ; 06BBE and ax,0x8
 jnz short loc_06BCE  ; 06BC1 jnz 0x6bce
 push word [si+0xa]  ; 06BC3
 push word [si+0x6]  ; 06BC6
-call 0x6b54  ; 06BC9
+call sub_06954  ; 06BC9
 db 0x8B, 0xE5  ; 06BCC mov sp,bp
 loc_06BCE:
 mov ax,[bp+0x6]  ; 06BCE
@@ -12247,8 +12247,8 @@ add sp,0x2  ; 06BF0
 pop bp  ; 06BF3
 ret  ; 06BF4
 
-; ---- function sub_06BF5 ----
-sub_06BF5:
+; ---- function crt_long_multiply ----
+crt_long_multiply:
 push bp  ; 06BF5
 sub sp,0x4  ; 06BF6
 db 0x8B, 0xEC  ; 06BF9 mov bp,sp

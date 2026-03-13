@@ -11,10 +11,13 @@ Convert KARATEKA.EXE into a NASM source file.
 import subprocess
 import re
 import os
+from function_names import FUNCTION_NAMES
 
-EXE_PATH = os.path.join(os.path.dirname(__file__), '..', 'disk', 'KARATEKA.EXE')
-DIS_PATH = os.path.join(os.path.dirname(__file__), '..', 'reference', 'karateka.dis')
-ASM_PATH = os.path.join(os.path.dirname(__file__), '..', 'src', 'karateka.asm')
+TOOLS_DIR = os.path.dirname(__file__)
+EXE_PATH = os.path.join(TOOLS_DIR, '..', 'disk', 'KARATEKA.EXE')
+DIS_PATH = os.path.join(TOOLS_DIR, '..', 'reference', 'karateka.dis')
+SRC_DIR = os.path.join(TOOLS_DIR, '..', 'src')
+ASM_PATH = os.path.join(SRC_DIR, 'karateka.asm')
 HEADER_SIZE = 512
 
 JCC_MAP = {
@@ -93,7 +96,7 @@ def adjust_jump_target(instr):
     return re.sub(r'\b(j[a-z]+\s+|call\s+)(0x[0-9a-fA-F]+)\s*$', replace_target, instr)
 
 
-def fix_instruction(instr, raw_bytes, offset):
+def fix_instruction(instr, raw_bytes, offset, call_targets_set=None):
     instr = re.sub(r'\bint byte (0x[0-9a-fA-F]+)\b', r'int \1', instr)
     instr = re.sub(r'\bint byte (\d+)\b', r'int \1', instr)
 
@@ -105,6 +108,16 @@ def fix_instruction(instr, raw_bytes, offset):
     if opcode in (0xD0, 0xD1):
         instr = re.sub(r',0x0$', ',1', instr)
 
+    # Near calls: replace with function name labels
+    if opcode == 0xE8 and len(raw_bytes) == 3 and call_targets_set:
+        m = re.search(r'call\s+(0x[0-9a-fA-F]+)', instr)
+        if m:
+            target = int(m.group(1), 16)
+            if target in call_targets_set:
+                instr = f'call {func_name(target)}'
+                return instr  # skip adjust_jump_target
+
+    # Near jumps: still use adjusted absolute addresses (labels would cause size optimization)
     if opcode in (0xE8, 0xE9) or (opcode == 0x0F and len(raw_bytes) >= 2 and 0x80 <= raw_bytes[1] <= 0x8F):
         instr = adjust_jump_target(instr)
 
@@ -158,6 +171,8 @@ def label_name(offset):
 
 
 def func_name(offset):
+    if offset in FUNCTION_NAMES:
+        return FUNCTION_NAMES[offset]
     return f"sub_{offset:05X}"
 
 
@@ -306,10 +321,12 @@ def main():
             db_count += 1
             continue
 
-        fixed = fix_instruction(instr, raw_bytes, offset)
+        fixed = fix_instruction(instr, raw_bytes, offset, call_targets)
 
         if fixed is not None:
-            if test_instruction(fixed, raw_bytes, offset):
+            # Label-based calls don't need test_instruction (label won't resolve in isolation)
+            is_label_call = fixed.startswith('call ') and not fixed.startswith('call 0x')
+            if is_label_call or test_instruction(fixed, raw_bytes, offset):
                 lines.append(f'{fixed}  ; {offset:05X}')
                 match_count += 1
                 continue
