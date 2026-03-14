@@ -299,8 +299,8 @@ mov ax,[bp+0x4]  ; 05E2E
 pop bp  ; 05E31
 ret  ; 05E32
 
-; ---- function sub_05E33 ----
-sub_05E33:
+; ---- function parse_number ----
+parse_number:
 push bp  ; 05E33
 sub sp,0x1e  ; 05E34
 db 0x8B, 0xEC  ; 05E37 mov bp,sp
@@ -421,7 +421,7 @@ mov ax,[bp+0x14]  ; 05F3C
 mov bx,[bp+0x12]  ; 05F3F
 db 0x33, 0xC9  ; 05F42 xor cx,cx
 mov dx,0xa  ; 05F44
-call sub_06B57  ; 05F47
+call crt_mul_long  ; 05F47
 mov cx,[bp+0x8]  ; 05F4A
 db 0x81, 0xE1, 0x0F, 0x00  ; 05F4D and cx,0xf
 db 0x33, 0xD2  ; 05F51 xor dx,dx
@@ -874,8 +874,8 @@ add sp,0x1e  ; 0633D
 pop bp  ; 06340
 ret  ; 06341
 
-; ---- function sub_06342 ----
-sub_06342:
+; ---- function crt_file_read_byte ----
+crt_file_read_byte:
 push bp  ; 06342
 sub sp,0x8  ; 06343
 db 0x8B, 0xEC  ; 06346 mov bp,sp
@@ -897,7 +897,7 @@ xor ah,ah  ; 06369
 db 0x25, 0x04, 0x00  ; 0636B and ax,0x4
 jnz short loc_06382  ; 0636E jnz 0x6382
 push si  ; 06370
-call sub_06655  ; 06371
+call crt_alloc_file_buffer  ; 06371
 db 0x8B, 0xE5  ; 06374 mov sp,bp
 test ax,ax  ; 06376
 jz short loc_06382  ; 06378 jz 0x6382
@@ -989,7 +989,7 @@ xor bh,bh  ; 06439
 jmp short loc_06447  ; 0643B jmp 0x6447
 loc_0643D:
 push word [bp+0xc]  ; 0643D
-call sub_06342  ; 06440
+call crt_file_read_byte  ; 06440
 db 0x8B, 0xE5  ; 06443 mov sp,bp
 db 0x8B, 0xD8  ; 06445 mov bx,ax
 loc_06447:
@@ -998,8 +998,8 @@ add sp,0x8  ; 06449
 pop bp  ; 0644C
 ret  ; 0644D
 
-; ---- function sub_0644E ----
-sub_0644E:
+; ---- function crt_file_write_byte ----
+crt_file_write_byte:
 push bp  ; 0644E
 sub sp,0xc  ; 0644F
 db 0x8B, 0xEC  ; 06452 mov bp,sp
@@ -1030,7 +1030,7 @@ pop bp  ; 0648E
 ret  ; 0648F
 loc_06490:
 push word [bp+0x12]  ; 06490
-call sub_06655  ; 06493
+call crt_alloc_file_buffer  ; 06493
 db 0x8B, 0xE5  ; 06496 mov sp,bp
 test ax,ax  ; 06498
 jz short loc_064A4  ; 0649A jz 0x64a4
@@ -1060,7 +1060,7 @@ jmp short loc_064DC  ; 064CD jmp 0x64dc
 loc_064CF:
 push word [bp+0x12]  ; 064CF
 push word [bp+0x10]  ; 064D2
-call sub_0644E  ; 064D5
+call crt_file_write_byte  ; 064D5
 db 0x8B, 0xE5  ; 064D8 mov sp,bp
 db 0x8B, 0xD8  ; 064DA mov bx,ax
 loc_064DC:
@@ -1091,7 +1091,7 @@ lea cx,[bp+0x4]  ; 06510
 push cx  ; 06513
 push bx  ; 06514
 mov [bp+0x4],al  ; 06515
-call sub_052D8  ; 06518
+call write_resource  ; 06518
 db 0x8B, 0xE5  ; 0651B mov sp,bp
 mov word [bp+0x10],0xffff  ; 0651D
 mov [bp+0x5],ax  ; 06522
@@ -1131,7 +1131,7 @@ jmp short loc_0657E  ; 0656F jmp 0x657e
 loc_06571:
 push word [bp+0x12]  ; 06571
 push word [bp+0x10]  ; 06574
-call sub_0644E  ; 06577
+call crt_file_write_byte  ; 06577
 db 0x8B, 0xE5  ; 0657A mov sp,bp
 db 0x8B, 0xD8  ; 0657C mov bx,ax
 loc_0657E:
@@ -1159,7 +1159,7 @@ xor ah,ah  ; 065AE
 push word [bp+0x9]  ; 065B0
 push word [si+0x6]  ; 065B3
 push ax  ; 065B6
-call sub_052D8  ; 065B7
+call write_resource  ; 065B7
 db 0x8B, 0xE5  ; 065BA mov sp,bp
 mov [bp+0x5],ax  ; 065BC
 jmp short loc_065C9  ; 065BF jmp 0x65c9
@@ -1207,7 +1207,7 @@ jmp short loc_0662B  ; 0661E jmp 0x662b
 loc_06620:
 push word [bp+0x12]  ; 06620
 push word [bp+0x10]  ; 06623
-call sub_0644E  ; 06626
+call crt_file_write_byte  ; 06626
 db 0x8B, 0xE5  ; 06629 mov sp,bp
 loc_0662B:
 mov si,[bp+0x12]  ; 0662B
@@ -1232,8 +1232,8 @@ add sp,0xc  ; 06650
 pop bp  ; 06653
 ret  ; 06654
 
-; ---- function sub_06655 ----
-sub_06655:
+; ---- function crt_alloc_file_buffer ----
+crt_alloc_file_buffer:
 push bp  ; 06655
 sub sp,0x2  ; 06656
 db 0x8B, 0xEC  ; 06659 mov bp,sp
@@ -1277,8 +1277,8 @@ add sp,0x2  ; 066B4
 pop bp  ; 066B7
 ret  ; 066B8
 
-; ---- function sub_066B9 ----
-sub_066B9:
+; ---- function strlen ----
+strlen:
 push bp  ; 066B9
 sub sp,0x4  ; 066BA
 db 0x8B, 0xEC  ; 066BD mov bp,sp
@@ -1304,7 +1304,7 @@ push bp  ; 066DF
 sub sp,0x2  ; 066E0
 db 0x8B, 0xEC  ; 066E3 mov bp,sp
 push word [bp+0x6]  ; 066E5
-call sub_06B96  ; 066E8
+call crt_file_reset_buffer  ; 066E8
 db 0x8B, 0xE5  ; 066EB mov sp,bp
 cmp word [bp+0x8],0x0  ; 066ED
 jnz short loc_066FA  ; 066F1 jnz 0x66fa
@@ -1341,8 +1341,8 @@ int 0x21  ; 0672D
 pop bp  ; 0672F
 ret  ; 06730
 
-; ---- function sub_06731 ----
-sub_06731:
+; ---- function heap_init_free_list ----
+heap_init_free_list:
 push bp  ; 06731
 sub sp,0x2  ; 06732
 db 0x8B, 0xEC  ; 06735 mov bp,sp
@@ -1371,14 +1371,14 @@ sub sp,0x2  ; 06767
 db 0x8B, 0xEC  ; 0676A mov bp,sp
 db 0x33, 0xC0  ; 0676C xor ax,ax
 push ax  ; 0676E
-call sub_06779  ; 0676F
+call heap_expand  ; 0676F
 db 0x8B, 0xE5  ; 06772 mov sp,bp
 add sp,0x2  ; 06774
 pop bp  ; 06777
 ret  ; 06778
 
-; ---- function sub_06779 ----
-sub_06779:
+; ---- function heap_expand ----
+heap_expand:
 push bp  ; 06779
 sub sp,0x6  ; 0677A
 db 0x8B, 0xEC  ; 0677D mov bp,sp
@@ -1397,7 +1397,7 @@ db 0x33, 0xC0  ; 0679F xor ax,ax
 push ax  ; 067A1
 mov bx,0x400  ; 067A2
 push bx  ; 067A5
-call sub_04BCE  ; 067A6
+call heap_alloc  ; 067A6
 db 0x8B, 0xE5  ; 067A9 mov sp,bp
 test ax,ax  ; 067AB
 mov [bp+0x2],ax  ; 067AD
@@ -1421,7 +1421,7 @@ db 0x33, 0xC0  ; 067D2 xor ax,ax
 push ax  ; 067D4
 mov bx,0x400  ; 067D5
 push bx  ; 067D8
-call sub_04BCE  ; 067D9
+call heap_alloc  ; 067D9
 db 0x8B, 0xE5  ; 067DC mov sp,bp
 test ax,ax  ; 067DE
 jz short loc_067EB  ; 067E0 jz 0x67eb
@@ -1429,7 +1429,7 @@ mov ax,[bp+0x4]  ; 067E2
 add [0xe4b8],ax  ; 067E5
 jmp short loc_067C7  ; 067E9 jmp 0x67c7
 loc_067EB:
-call sub_06731  ; 067EB
+call heap_init_free_list  ; 067EB
 db 0x33, 0xC0  ; 067EE xor ax,ax
 add sp,0x6  ; 067F0
 pop bp  ; 067F3
@@ -1459,14 +1459,14 @@ push bx  ; 0681B
 push ax  ; 0681C
 mov [bp+0x4],ax  ; 0681D
 mov [bp+0x6],bx  ; 06820
-call sub_0682D  ; 06823
+call crt_malloc  ; 06823
 db 0x8B, 0xE5  ; 06826 mov sp,bp
 add sp,0x8  ; 06828
 pop bp  ; 0682B
 ret  ; 0682C
 
-; ---- function sub_0682D ----
-sub_0682D:
+; ---- function crt_malloc ----
+crt_malloc:
 push bp  ; 0682D
 sub sp,0x10  ; 0682E
 db 0x8B, 0xEC  ; 06831 mov bp,sp
@@ -1474,7 +1474,7 @@ mov ax,[bp+0x16]  ; 06833
 mov bx,[bp+0x14]  ; 06836
 db 0x33, 0xC9  ; 06839 xor cx,cx
 db 0x33, 0xD2  ; 0683B xor dx,dx
-call sub_06B3A  ; 0683D
+call crt_cmp_long  ; 0683D
 jg short loc_06849  ; 06840 jg 0x6849
 db 0x33, 0xC0  ; 06842 xor ax,ax
 add sp,0x10  ; 06844
@@ -1511,7 +1511,7 @@ mov [bp+0x2],bx  ; 0688F
 mov bx,[bp+0x0]  ; 06892
 mov cx,[bp+0xe]  ; 06895
 mov dx,[bp+0xc]  ; 06898
-call sub_06B3A  ; 0689B
+call crt_cmp_long  ; 0689B
 jl short loc_068E1  ; 0689E jl 0x68e1
 db 0x3B, 0xC1  ; 068A0 cmp ax,cx
 jnz short loc_068A6  ; 068A2 jnz 0x68a6
@@ -1559,7 +1559,7 @@ rcl ax,1  ; 068FB
 loop 0x68f9  ; 068FD
 push ax  ; 068FF
 push bx  ; 06900
-call sub_04BCE  ; 06901
+call heap_alloc  ; 06901
 db 0x8B, 0xE5  ; 06904 mov sp,bp
 mov [bp+0xa],ax  ; 06906
 test ax,ax  ; 06909
@@ -1596,8 +1596,8 @@ add sp,0x10  ; 0694F
 pop bp  ; 06952
 ret  ; 06953
 
-; ---- function sub_06954 ----
-sub_06954:
+; ---- function crt_free_small ----
+crt_free_small:
 push bp  ; 06954
 sub sp,0x8  ; 06955
 db 0x8B, 0xEC  ; 06958 mov bp,sp
@@ -1608,14 +1608,14 @@ push ax  ; 06960
 push word [bp+0xc]  ; 06961
 mov [bp+0x4],ax  ; 06964
 mov [bp+0x6],bx  ; 06967
-call sub_06974  ; 0696A
+call crt_free  ; 0696A
 db 0x8B, 0xE5  ; 0696D mov sp,bp
 add sp,0x8  ; 0696F
 pop bp  ; 06972
 ret  ; 06973
 
-; ---- function sub_06974 ----
-sub_06974:
+; ---- function crt_free ----
+crt_free:
 push bp  ; 06974
 sub sp,0x14  ; 06975
 db 0x8B, 0xEC  ; 06978 mov bp,sp
@@ -1623,7 +1623,7 @@ mov ax,[bp+0x1c]  ; 0697A
 mov bx,[bp+0x1a]  ; 0697D
 db 0x33, 0xC9  ; 06980 xor cx,cx
 db 0x33, 0xD2  ; 06982 xor dx,dx
-call sub_06B3A  ; 06984
+call crt_cmp_long  ; 06984
 jg short loc_06991  ; 06987 jg 0x6991
 mov ax,0xffff  ; 06989
 add sp,0x14  ; 0698C
@@ -1821,8 +1821,8 @@ add sp,0x4  ; 06B35
 pop bp  ; 06B38
 ret  ; 06B39
 
-; ---- function sub_06B3A ----
-sub_06B3A:
+; ---- function crt_cmp_long ----
+crt_cmp_long:
 push ax  ; 06B3A
 db 0x33, 0xC1  ; 06B3B xor ax,cx
 pop ax  ; 06B3D
@@ -1843,8 +1843,8 @@ test ax,ax  ; 06B53
 pop ax  ; 06B55
 ret  ; 06B56
 
-; ---- function sub_06B57 ----
-sub_06B57:
+; ---- function crt_mul_long ----
+crt_mul_long:
 push si  ; 06B57
 push di  ; 06B58
 db 0x0B, 0xC0  ; 06B59 or ax,ax
@@ -1887,8 +1887,8 @@ mov ah,0x0  ; 06B92
 pop bp  ; 06B94
 ret  ; 06B95
 
-; ---- function sub_06B96 ----
-sub_06B96:
+; ---- function crt_file_reset_buffer ----
+crt_file_reset_buffer:
 push bp  ; 06B96
 sub sp,0x2  ; 06B97
 db 0x8B, 0xEC  ; 06B9A mov bp,sp
@@ -1911,7 +1911,7 @@ db 0x25, 0x08, 0x00  ; 06BBE and ax,0x8
 jnz short loc_06BCE  ; 06BC1 jnz 0x6bce
 push word [si+0xa]  ; 06BC3
 push word [si+0x6]  ; 06BC6
-call sub_06954  ; 06BC9
+call crt_free_small  ; 06BC9
 db 0x8B, 0xE5  ; 06BCC mov sp,bp
 loc_06BCE:
 mov ax,[bp+0x6]  ; 06BCE

@@ -357,7 +357,7 @@ push bp  ; 05B9C
 sub sp,0x8  ; 05B9D
 db 0x8B, 0xEC  ; 05BA0 mov bp,sp
 push word [bp+0xc]  ; 05BA2 - push dest
-call sub_066B9  ; 05BA5 - strlen(dest)
+call strlen  ; 05BA5 - strlen(dest)
 db 0x8B, 0xE5  ; 05BA8 mov sp,bp
 mov bx,[bp+0xc]  ; 05BAA
 db 0x03, 0xD8  ; 05BAD add bx,ax - bx = dest + strlen(dest) = end of dest
@@ -393,7 +393,7 @@ push bp  ; 05BCE
 sub sp,0x6  ; 05BCF
 db 0x8B, 0xEC  ; 05BD2 mov bp,sp
 push word [bp+0xa]  ; 05BD4 - push dest
-call sub_066B9  ; 05BD7 - strlen(dest)
+call strlen  ; 05BD7 - strlen(dest)
 db 0x8B, 0xE5  ; 05BDA mov sp,bp
 mov bx,[bp+0xa]  ; 05BDC
 db 0x03, 0xD8  ; 05BDF add bx,ax - bx = end of dest

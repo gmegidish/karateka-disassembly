@@ -20,10 +20,10 @@ jnz short loc_0464C  ; 04633 jnz 0x464c
 mov byte [0xe196],0x1  ; 04635
 mov ah,0x1  ; 0463A
 lea di,[0xe197]  ; 0463C
-call sub_046FC  ; 04640
+call calibrate_joystick_axis  ; 04640
 mov ah,0x2  ; 04643
 lea di,[0xe19b]  ; 04645
-call sub_046FC  ; 04649
+call calibrate_joystick_axis  ; 04649
 loc_0464C:
 push bp  ; 0464C
 push ds  ; 0464D
@@ -117,9 +117,9 @@ mov al,[0xe196]  ; 046F6
 mov ah,0x0  ; 046F9
 ret  ; 046FB
 
-; ---- function sub_046FC ----
-sub_046FC:
-call sub_047EE  ; 046FC
+; ---- function calibrate_joystick_axis ----
+calibrate_joystick_axis:
+call read_joystick_axis  ; 046FC
 push ax  ; 046FF
 db 0x8B, 0xD8  ; 04700 mov bx,ax
 shr bx,1  ; 04702
@@ -129,8 +129,8 @@ db 0x03, 0xC3  ; 04707 add ax,bx
 mov [di+0x2],ax  ; 04709
 ret  ; 0470C
 
-; ---- function sub_0470D ----
-sub_0470D:
+; ---- function read_joystick_buttons ----
+read_joystick_buttons:
 mov word [0xe19f],0x0  ; 0470D
 mov byte [0xe1a5],0x0  ; 04713
 mov byte [0xe1a6],0x0  ; 04718
@@ -155,8 +155,8 @@ loc_04752:
 mov ax,[0xe19f]  ; 04752
 ret  ; 04755
 
-; ---- function sub_04756 ----
-sub_04756:
+; ---- function read_joystick ----
+read_joystick:
 push di  ; 04756
 push si  ; 04757
 mov word [0xe19f],0x0  ; 04758
@@ -164,12 +164,12 @@ mov word [0xe1a1],0x0  ; 0475E
 mov word [0xe1a3],0x0  ; 04764
 cmp byte [0xe196],0x0  ; 0476A
 jz short loc_047D9  ; 0476F jz 0x47d9
-call sub_0470D  ; 04771
+call read_joystick_buttons  ; 04771
 cmp word [bp+0x4],0x0  ; 04774
 jnz short loc_047E4  ; 04778 jnz 0x47e4
 mov dx,0x201  ; 0477A
 mov ah,0x1  ; 0477D
-call sub_047EE  ; 0477F
+call read_joystick_axis  ; 0477F
 db 0x3D, 0x00, 0x00  ; 04782 cmp ax,0x0
 jz short loc_047AB  ; 04785 jz 0x47ab
 cmp ax,[0xe197]  ; 04787
@@ -184,7 +184,7 @@ db 0x81, 0x0E, 0x9F, 0xE1, 0x02, 0x00  ; 047A0 or word [0xe19f],0x2
 mov byte [0xe1a2],0x1  ; 047A6
 loc_047AB:
 mov ah,0x2  ; 047AB
-call sub_047EE  ; 047AD
+call read_joystick_axis  ; 047AD
 db 0x3D, 0x00, 0x00  ; 047B0 cmp ax,0x0
 jz short loc_047D9  ; 047B3 jz 0x47d9
 cmp ax,[0xe19b]  ; 047B5
@@ -211,12 +211,12 @@ jz short loc_047E1  ; 047E7 jz 0x47e1
 mov ax,0xd  ; 047E9
 jmp short loc_047E1  ; 047EC jmp 0x47e1
 
-; ---- function sub_047EE ----
-sub_047EE:
+; ---- function read_joystick_axis ----
+read_joystick_axis:
 mov si,0x0  ; 047EE
 mov bx,0x4  ; 047F1
 loc_047F4:
-call sub_04806  ; 047F4
+call time_joystick_pulse  ; 047F4
 db 0x03, 0xF1  ; 047F7 add si,cx
 dec bx  ; 047F9
 jnz short loc_047F4  ; 047FA jnz 0x47f4
@@ -226,8 +226,8 @@ mov ax,0x310  ; 04800
 db 0x2B, 0xC6  ; 04803 sub ax,si
 ret  ; 04805
 
-; ---- function sub_04806 ----
-sub_04806:
+; ---- function time_joystick_pulse ----
+time_joystick_pulse:
 mov cx,0x310  ; 04806
 out dx,al  ; 04809
 in al,dx  ; 0480A
@@ -523,7 +523,7 @@ jz short loc_04A54  ; 04A48 jz 0x4a54
 push si  ; 04A4A
 mov ax,0xffff  ; 04A4B
 push ax  ; 04A4E
-call sub_0644E  ; 04A4F
+call crt_file_write_byte  ; 04A4F
 db 0x8B, 0xE5  ; 04A52 mov sp,bp
 loc_04A54:
 mov si,[bp+0x8]  ; 04A54
@@ -535,7 +535,7 @@ cmp word [si+0xa],0x0  ; 04A61
 jz short loc_04A72  ; 04A65 jz 0x4a72
 push word [si+0xa]  ; 04A67
 push word [si+0x6]  ; 04A6A
-call sub_06954  ; 04A6D
+call crt_free_small  ; 04A6D
 db 0x8B, 0xE5  ; 04A70 mov sp,bp
 loc_04A72:
 db 0x33, 0xC0  ; 04A72 xor ax,ax
@@ -569,7 +569,7 @@ jmp short loc_04ABE  ; 04AB3 jmp 0x4abe
 loc_04AB5:
 mov ax,0xe1b0  ; 04AB5
 push ax  ; 04AB8
-call sub_06342  ; 04AB9
+call crt_file_read_byte  ; 04AB9
 db 0x8B, 0xE5  ; 04ABC mov sp,bp
 loc_04ABE:
 db 0x3D, 0xFF, 0xFF  ; 04ABE cmp ax,0xffff
@@ -633,7 +633,7 @@ xor bh,bh  ; 04B36
 jmp short loc_04B44  ; 04B38 jmp 0x4b44
 loc_04B3A:
 push word [bp+0x10]  ; 04B3A
-call sub_06342  ; 04B3D
+call crt_file_read_byte  ; 04B3D
 db 0x8B, 0xE5  ; 04B40 mov sp,bp
 db 0x8B, 0xD8  ; 04B42 mov bx,ax
 loc_04B44:
@@ -704,8 +704,8 @@ add sp,0x4  ; 04BC9
 pop bp  ; 04BCC
 ret  ; 04BCD
 
-; ---- function sub_04BCE ----
-sub_04BCE:
+; ---- function heap_alloc ----
+heap_alloc:
 push bp  ; 04BCE
 sub sp,0xc  ; 04BCF
 db 0x8B, 0xEC  ; 04BD2 mov bp,sp
@@ -713,7 +713,7 @@ mov ax,[bp+0x12]  ; 04BD4
 mov bx,[bp+0x10]  ; 04BD7
 mov cx,[0x67]  ; 04BDA
 mov dx,[0x65]  ; 04BDE
-call sub_06B3A  ; 04BE2
+call crt_cmp_long  ; 04BE2
 jng short loc_04C50  ; 04BE5 jng 0x4c50
 mov al,[0xf]  ; 04BE7
 xor ah,ah  ; 04BEA
@@ -781,7 +781,7 @@ mov ax,[bp+0xc]  ; 04C79
 db 0x33, 0xDB  ; 04C7C xor bx,bx
 push bx  ; 04C7E
 push ax  ; 04C7F
-call sub_04BCE  ; 04C80
+call heap_alloc  ; 04C80
 db 0x8B, 0xE5  ; 04C83 mov sp,bp
 mov [bp+0x6],ax  ; 04C85
 test ax,ax  ; 04C88
@@ -828,7 +828,7 @@ mov [bp+0x0],cx  ; 04CDC
 mov cx,0x1  ; 04CDF
 mov [bp+0x2],dx  ; 04CE2
 db 0x33, 0xD2  ; 04CE5 xor dx,dx
-call sub_06B3A  ; 04CE7
+call crt_cmp_long  ; 04CE7
 jng short loc_04D56  ; 04CEA jng 0x4d56
 sub dx,[bp+0x0]  ; 04CEC
 sbb cx,[bp+0x2]  ; 04CEF

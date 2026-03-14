@@ -514,7 +514,7 @@ pop bp  ; 0282B
 ret  ; 0282C
 loc_0282D:
 push word [bp+0x6]  ; 0282D
-call sub_02941  ; 02830
+call combat_pick_far_attack  ; 02830
 db 0x8B, 0xE5  ; 02833 mov sp,bp
 add sp,0xc  ; 02835
 pop bp  ; 02838
@@ -530,7 +530,7 @@ loc_02848:
 cmp word [bp+0x6],0x2c  ; 02848
 jng short loc_0285B  ; 0284C jng 0x285b
 push word [bp+0x6]  ; 0284E
-call sub_02941  ; 02851
+call combat_pick_far_attack  ; 02851
 db 0x8B, 0xE5  ; 02854 mov sp,bp
 add sp,0xc  ; 02856
 pop bp  ; 02859
@@ -614,7 +614,7 @@ pop bp  ; 02908
 ret  ; 02909
 loc_0290A:
 push word [bp+0x6]  ; 0290A
-call sub_02941  ; 0290D
+call combat_pick_far_attack  ; 0290D
 db 0x8B, 0xE5  ; 02910 mov sp,bp
 add sp,0xc  ; 02912
 pop bp  ; 02915
@@ -639,8 +639,8 @@ add sp,0xc  ; 0293C
 pop bp  ; 0293F
 ret  ; 02940
 
-; ---- function sub_02941 ----
-sub_02941:
+; ---- function combat_pick_far_attack ----
+combat_pick_far_attack:
 push bp  ; 02941
 sub sp,0x6  ; 02942
 jc short loc_0294D  ; 02945 jc 0x294d

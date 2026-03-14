@@ -133,7 +133,7 @@ push bx  ; 0138A
 mov ax,0xbc85  ; 0138B
 push ax  ; 0138E
 push dx  ; 0138F
-call sub_05741  ; 01390
+call scanf_format_parser  ; 01390
 db 0x8B, 0xE5  ; 01393 mov sp,bp
 jmp 0x1868  ; 01395
 mov si,[bp+0x1a]  ; 01398
@@ -156,7 +156,7 @@ push bx  ; 013BE
 mov ax,0xbc85  ; 013BF
 push ax  ; 013C2
 push dx  ; 013C3
-call sub_05741  ; 013C4
+call scanf_format_parser  ; 013C4
 db 0x8B, 0xE5  ; 013C7 mov sp,bp
 jmp 0x1868  ; 013C9
 mov si,[bp+0x1a]  ; 013CC
@@ -183,7 +183,7 @@ push bx  ; 013FA
 mov ax,0xbc88  ; 013FB
 push ax  ; 013FE
 push dx  ; 013FF
-call sub_05741  ; 01400
+call scanf_format_parser  ; 01400
 db 0x8B, 0xE5  ; 01403 mov sp,bp
 mov si,[bp+0x1a]  ; 01405
 mov ax,[si]  ; 01408
@@ -242,7 +242,7 @@ push cx  ; 01481
 mov ax,0xbc91  ; 01482
 push ax  ; 01485
 push dx  ; 01486
-call sub_05741  ; 01487
+call scanf_format_parser  ; 01487
 db 0x8B, 0xE5  ; 0148A mov sp,bp
 mov si,[bp+0x1a]  ; 0148C
 mov ax,[si]  ; 0148F
@@ -298,7 +298,7 @@ push bx  ; 01506
 mov ax,0xbc85  ; 01507
 push ax  ; 0150A
 push dx  ; 0150B
-call sub_05741  ; 0150C
+call scanf_format_parser  ; 0150C
 db 0x8B, 0xE5  ; 0150F mov sp,bp
 jmp 0x1868  ; 01511
 mov si,[bp+0x1a]  ; 01514
@@ -335,7 +335,7 @@ push bx  ; 0155E
 mov ax,0xbc85  ; 0155F
 push ax  ; 01562
 push dx  ; 01563
-call sub_05741  ; 01564
+call scanf_format_parser  ; 01564
 db 0x8B, 0xE5  ; 01567 mov sp,bp
 jmp 0x1868  ; 01569
 mov si,[bp+0x1a]  ; 0156C
@@ -371,7 +371,7 @@ push cx  ; 015B0
 mov ax,0xbc9d  ; 015B1
 push ax  ; 015B4
 push dx  ; 015B5
-call sub_05741  ; 015B6
+call scanf_format_parser  ; 015B6
 db 0x8B, 0xE5  ; 015B9 mov sp,bp
 jmp 0x1868  ; 015BB
 mov si,[bp+0x1a]  ; 015BE
@@ -389,7 +389,7 @@ push ax  ; 015D9
 mov ax,0xbc85  ; 015DA
 push ax  ; 015DD
 push bx  ; 015DE
-call sub_05741  ; 015DF
+call scanf_format_parser  ; 015DF
 db 0x8B, 0xE5  ; 015E2 mov sp,bp
 mov si,[bp+0x1a]  ; 015E4
 mov ax,[si]  ; 015E7
@@ -420,7 +420,7 @@ push bx  ; 01620
 mov ax,0xbc85  ; 01621
 push ax  ; 01624
 push dx  ; 01625
-call sub_05741  ; 01626
+call scanf_format_parser  ; 01626
 db 0x8B, 0xE5  ; 01629 mov sp,bp
 jmp short loc_01668  ; 0162B jmp 0x1668
 mov si,[bp+0x1a]  ; 0162D

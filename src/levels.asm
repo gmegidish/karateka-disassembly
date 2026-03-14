@@ -480,7 +480,7 @@ call cutscene_step  ; 0308A
 jmp short loc_03096  ; 0308D jmp 0x3096
 loc_0308F:
 mov bx,[0x116]  ; 0308F
-call sub_0317F  ; 03093
+call blit_transition_col_left  ; 03093
 loc_03096:
 mov ax,[0x114]  ; 03096
 sub ax,[0xd650]  ; 03099
@@ -501,7 +501,7 @@ call cutscene_step  ; 030BC
 jmp short loc_030F3  ; 030BF jmp 0x30f3
 loc_030C1:
 mov bx,[0x114]  ; 030C1
-call sub_03196  ; 030C5
+call blit_transition_col_right  ; 030C5
 jmp short loc_030F3  ; 030C8 jmp 0x30f3
 loc_030CA:
 lea di,[0x3cb7]  ; 030CA
@@ -512,7 +512,7 @@ mov bx,[0x116]  ; 030D5
 cmp bx,0x0  ; 030D9
 jz short loc_030E4  ; 030DC jz 0x30e4
 loc_030DE:
-call sub_0317F  ; 030DE
+call blit_transition_col_left  ; 030DE
 dec bx  ; 030E1
 jg short loc_030DE  ; 030E2 jg 0x30de
 loc_030E4:
@@ -520,7 +520,7 @@ mov bx,[0x114]  ; 030E4
 cmp bx,0x0  ; 030E8
 jz short loc_030F3  ; 030EB jz 0x30f3
 loc_030ED:
-call sub_03196  ; 030ED
+call blit_transition_col_right  ; 030ED
 dec bx  ; 030F0
 jg short loc_030ED  ; 030F1 jg 0x30ed
 loc_030F3:
@@ -568,8 +568,8 @@ add di,0x50  ; 03169
 loop 0x3165  ; 0316C
 ret  ; 0316E
 
-; ---- function sub_0316F ----
-sub_0316F:
+; ---- function blit_column_data ----
+blit_column_data:
 mov cx,0x7  ; 0316F
 mov ax,[si]  ; 03172
 mov [di],ax  ; 03174
@@ -578,8 +578,8 @@ add di,0x50  ; 03179
 loop 0x3172  ; 0317C
 ret  ; 0317E
 
-; ---- function sub_0317F ----
-sub_0317F:
+; ---- function blit_transition_col_left ----
+blit_transition_col_left:
 db 0x8B, 0xC3  ; 0317F mov ax,bx
 shl ax,1  ; 03181
 db 0x03, 0xC3  ; 03183 add ax,bx
@@ -587,18 +587,18 @@ db 0x2D, 0x02, 0x00  ; 03185 sub ax,0x2
 lea di,[0x3f87]  ; 03188
 db 0x03, 0xF8  ; 0318C add di,ax
 lea si,[0xd654]  ; 0318E
-call sub_0316F  ; 03192
+call blit_column_data  ; 03192
 ret  ; 03195
 
-; ---- function sub_03196 ----
-sub_03196:
+; ---- function blit_transition_col_right ----
+blit_transition_col_right:
 db 0x8B, 0xC3  ; 03196 mov ax,bx
 shl ax,1  ; 03198
 db 0x03, 0xC3  ; 0319A add ax,bx
 lea di,[0x3fd7]  ; 0319C
 db 0x2B, 0xF8  ; 031A0 sub di,ax
 lea si,[0xd662]  ; 031A2
-call sub_0316F  ; 031A6
+call blit_column_data  ; 031A6
 ret  ; 031A9
 
 ; ---- function cutscene_play ----

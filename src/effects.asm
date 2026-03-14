@@ -994,7 +994,7 @@ sub bx,0x2  ; 040CF
 jnl short loc_040C9  ; 040D2 jnl 0x40c9
 ret  ; 040D4
 
-; ---- function sub_040D5 ----
+; ---- function rand_next ----
 ; Timer-based random seed generator. Reads the timer value, applies
 ; a linear transformation (val * 0xE5D + 3) / 0x8000, stores the
 ; remainder back as the new seed.
@@ -1007,8 +1007,8 @@ ret  ; 040D4
 ; Returns: AX = pseudo-random value (remainder of division)
 ;
 ; The unlabeled function at 0x4111 saves the current timer value
-; by calling sub_04123(1, &local).
-sub_040D5:
+; by calling rand_seed_io(1, &local).
+rand_next:
 push bp  ; 040D5
 sub sp,0x4  ; 040D6
 db 0x8B, 0xEC  ; 040D9 mov bp,sp
@@ -1016,7 +1016,7 @@ lea ax,[bp+0x2]  ; 040DB
 push ax  ; 040DE
 db 0x33, 0xC0  ; 040DF xor ax,ax
 push ax  ; 040E1
-call sub_04123  ; 040E2
+call rand_seed_io  ; 040E2
 db 0x8B, 0xE5  ; 040E5 mov sp,bp
 mov ax,[bp+0x2]  ; 040E7
 mov bx,0xe5d  ; 040EA
@@ -1030,30 +1030,31 @@ push ax  ; 040FC
 mov ax,0x1  ; 040FD
 push ax  ; 04100
 mov [bp+0x2],dx  ; 04101
-call sub_04123  ; 04104
+call rand_seed_io  ; 04104
 db 0x8B, 0xE5  ; 04107 mov sp,bp
 mov ax,[bp+0x2]  ; 04109
 add sp,0x4  ; 0410C
 pop bp  ; 0410F
 ret  ; 04110
+set_rand_seed:
 push bp  ; 04111
 db 0x8B, 0xEC  ; 04112 mov bp,sp
 lea ax,[bp+0x4]  ; 04114
 push ax  ; 04117
 mov ax,0x1  ; 04118
 push ax  ; 0411B
-call sub_04123  ; 0411C
+call rand_seed_io  ; 0411C
 db 0x8B, 0xE5  ; 0411F mov sp,bp
 pop bp  ; 04121
 ret  ; 04122
 
-; ---- function sub_04123 ----
+; ---- function rand_seed_io ----
 ; Gets or sets the timer seed value at [0xdf40].
 ;
 ; Parameters (on stack):
 ;   [bp+0x6] = direction: 0 = get (read [0xdf40] into *ptr), 1 = set (write *ptr to [0xdf40])
 ;   [bp+0x8] = pointer to word value
-sub_04123:
+rand_seed_io:
 push bp  ; 04123
 sub sp,0x2  ; 04124
 db 0x8B, 0xEC  ; 04127 mov bp,sp

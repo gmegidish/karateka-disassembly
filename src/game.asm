@@ -13,7 +13,7 @@ jmp 0x420  ; 00261
 loc_00264:
 db 0x8B, 0xEC  ; 00264 mov bp,sp
 mov word [bp+0x2],0x0  ; 00266
-call sub_04257  ; 0026B
+call noop_stub  ; 0026B
 call check_graphics_card  ; 0026E
 test ax,ax  ; 00271
 jnz short loc_00281  ; 00273 jnz 0x281

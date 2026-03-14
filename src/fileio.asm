@@ -342,8 +342,8 @@ jmp word near [cs:si+0x52be]  ; 052D1
 loc_052D6:
 jmp short loc_052B0  ; 052D6 jmp 0x52b0
 
-; ---- function sub_052D8 ----
-sub_052D8:
+; ---- function write_resource ----
+write_resource:
 push bp  ; 052D8
 sub sp,0x14  ; 052D9
 db 0x8B, 0xEC  ; 052DC mov bp,sp
@@ -728,8 +728,8 @@ add sp,0x8  ; 05654
 pop bp  ; 05657
 ret  ; 05658
 
-; ---- function sub_05659 ----
-sub_05659:
+; ---- function delete_resource_file ----
+delete_resource_file:
 push bp  ; 05659
 sub sp,0x28  ; 0565A
 db 0x8B, 0xEC  ; 0565D mov bp,sp
@@ -760,7 +760,7 @@ push bp  ; 05692
 sub sp,0x2  ; 05693
 db 0x8B, 0xEC  ; 05696 mov bp,sp
 push word [bp+0x6]  ; 05698
-call sub_05659  ; 0569B
+call delete_resource_file  ; 0569B
 db 0x8B, 0xE5  ; 0569E mov sp,bp
 add sp,0x2  ; 056A0
 pop bp  ; 056A3
@@ -841,8 +841,8 @@ add sp,0x6  ; 0573C
 pop bp  ; 0573F
 ret  ; 05740
 
-; ---- function sub_05741 ----
-sub_05741:
+; ---- function scanf_format_parser ----
+scanf_format_parser:
 push bp  ; 05741
 sub sp,0x10  ; 05742
 db 0x8B, 0xEC  ; 05745 mov bp,sp
@@ -915,7 +915,7 @@ push ax  ; 057E8
 db 0x8B, 0x06, 0x3C, 0xE4  ; 057E9 mov ax,[0xe43c]
 push ax  ; 057ED
 push word [bp+0x16]  ; 057EE
-call sub_05E33  ; 057F1
+call parse_number  ; 057F1
 db 0x8B, 0xE5  ; 057F4 mov sp,bp
 test ax,ax  ; 057F6
 mov [bp+0xa],ax  ; 057F8
@@ -1020,7 +1020,7 @@ loc_058CC:
 mov ax,0xe1be  ; 058CC
 push ax  ; 058CF
 push word [bp+0x4]  ; 058D0
-call sub_0644E  ; 058D3
+call crt_file_write_byte  ; 058D3
 db 0x8B, 0xE5  ; 058D6 mov sp,bp
 jmp short loc_058A0  ; 058D8 jmp 0x58a0
 loc_058DA:
@@ -1040,7 +1040,7 @@ mov ax,0xe1be  ; 058F5
 push ax  ; 058F8
 mov ax,0xa  ; 058F9
 push ax  ; 058FC
-call sub_0644E  ; 058FD
+call crt_file_write_byte  ; 058FD
 db 0x8B, 0xE5  ; 05900 mov sp,bp
 loc_05902:
 add sp,0x6  ; 05902
@@ -1075,7 +1075,7 @@ jmp short loc_05946  ; 05939 jmp 0x5946
 loc_0593B:
 push word [bp+0xe]  ; 0593B
 push word [bp+0x4]  ; 0593E
-call sub_0644E  ; 05941
+call crt_file_write_byte  ; 05941
 db 0x8B, 0xE5  ; 05944 mov sp,bp
 loc_05946:
 mov [bp+0x6],ax  ; 05946

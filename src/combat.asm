@@ -245,17 +245,17 @@ call poll_keyboard  ; 01D2A
 db 0x8B, 0xE5  ; 01D2D mov sp,bp
 test ax,ax  ; 01D2F
 jz short loc_01D82  ; 01D31 jz 0x1d82
-call sub_01D8A  ; 01D33
+call get_pending_key  ; 01D33
 push ax  ; 01D36
 mov [bp+0x4],ax  ; 01D37
-call sub_01DD5  ; 01D3A
+call key_to_move  ; 01D3A
 db 0x8B, 0xE5  ; 01D3D mov sp,bp
 mov [bp+0x2],ax  ; 01D3F
 inc ax  ; 01D42
 jz short loc_01D61  ; 01D43 jz 0x1d61
 push word [bp+0x4]  ; 01D45
 push word [bp+0x2]  ; 01D48
-call sub_01F4E  ; 01D4B
+call combat_resolve_move  ; 01D4B
 db 0x8B, 0xE5  ; 01D4E mov sp,bp
 mov [bp+0x2],ax  ; 01D50
 inc ax  ; 01D53
@@ -282,8 +282,8 @@ add sp,0x6  ; 01D85
 pop bp  ; 01D88
 ret  ; 01D89
 
-; ---- function sub_01D8A ----
-sub_01D8A:
+; ---- function get_pending_key ----
+get_pending_key:
 push bp  ; 01D8A
 sub sp,0x4  ; 01D8B
 jc short loc_01D96  ; 01D8E jc 0x1d96
@@ -321,8 +321,8 @@ add sp,0x4  ; 01DD0
 pop bp  ; 01DD3
 ret  ; 01DD4
 
-; ---- function sub_01DD5 ----
-sub_01DD5:
+; ---- function key_to_move ----
+key_to_move:
 push bp  ; 01DD5
 sub sp,0x6  ; 01DD6
 jc short loc_01DE1  ; 01DD9 jc 0x1de1
@@ -489,8 +489,8 @@ add sp,0x6  ; 01F49
 pop bp  ; 01F4C
 ret  ; 01F4D
 
-; ---- function sub_01F4E ----
-sub_01F4E:
+; ---- function combat_resolve_move ----
+combat_resolve_move:
 push bp  ; 01F4E
 sub sp,0x2  ; 01F4F
 jc short loc_01F5A  ; 01F52 jc 0x1f5a

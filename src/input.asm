@@ -154,14 +154,14 @@ pop ax  ; 04251
 pop word [0xd6bc]  ; 04252
 ret  ; 04256
 
-; ---- function sub_04257 ----
-sub_04257:
+; ---- function noop_stub ----
+noop_stub:
 ret  ; 04257
 add [si-0x32f2],dh  ; 04258
 and bx,ax  ; 0425C
 
-; ---- function sub_0425E ----
-sub_0425E:
+; ---- function detect_hercules_vsync ----
+detect_hercules_vsync:
 in al,dx  ; 0425E
 db 0x22, 0xC3  ; 0425F and al,bl
 xchg ah,al  ; 04261
@@ -224,8 +224,8 @@ loop 0x42c4  ; 042CD
 clc  ; 042CF
 ret  ; 042D0
 
-; ---- function sub_042D1 ----
-sub_042D1:
+; ---- function init_hercules_mode ----
+init_hercules_mode:
 mov dx,0x3bf  ; 042D1
 mov al,0x3  ; 042D4
 out dx,al  ; 042D6
@@ -238,7 +238,7 @@ mov [si],bl  ; 042E4
 pop ds  ; 042E6
 mov dx,0x3ba  ; 042E7
 mov bl,0x80  ; 042EA
-call sub_0425E  ; 042EC
+call detect_hercules_vsync  ; 042EC
 jnc short loc_042F3  ; 042EF jnc 0x42f3
 stc  ; 042F1
 ret  ; 042F2
@@ -262,9 +262,9 @@ db 0x05, 0x5A, 0x00  ; 0431F add ax,0x5a
 add dx,0x5a  ; 04322
 add bx,0x8  ; 04325
 loop 0x430e  ; 04328
-call sub_04396  ; 0432A
+call clear_video_buffer  ; 0432A
 lea si,[0xdf4d]  ; 0432D
-call sub_0433E  ; 04331
+call program_crtc_registers  ; 04331
 mov dx,0x3b8  ; 04334
 mov al,0x8a  ; 04337
 out dx,al  ; 04339
@@ -273,8 +273,8 @@ pop si  ; 0433B
 clc  ; 0433C
 ret  ; 0433D
 
-; ---- function sub_0433E ----
-sub_0433E:
+; ---- function program_crtc_registers ----
+program_crtc_registers:
 mov dx,0x3b4  ; 0433E
 mov cx,0xc  ; 04341
 db 0x32, 0xE4  ; 04344 xor ah,ah
@@ -297,7 +297,7 @@ int 0x10  ; 04359
 mov [0xdf4b],al  ; 0435B
 call video_set_mode_4  ; 0435E
 jnc short loc_04368  ; 04361 jnc 0x4368
-call sub_042D1  ; 04363
+call init_hercules_mode  ; 04363
 jc short loc_0436D  ; 04366 jc 0x436d
 loc_04368:
 db 0x32, 0xE4  ; 04368 xor ah,ah
@@ -310,7 +310,7 @@ ret  ; 04372
 
 ; ---- function video_init ----
 video_init:
-call sub_04396  ; 04373
+call clear_video_buffer  ; 04373
 mov bl,[0xdf4a]  ; 04376
 push ds  ; 0437A
 mov ax,0x40  ; 0437B
@@ -326,8 +326,8 @@ mov ah,0xe  ; 04391
 int 0x21  ; 04393
 ret  ; 04395
 
-; ---- function sub_04396 ----
-sub_04396:
+; ---- function clear_video_buffer ----
+clear_video_buffer:
 push di  ; 04396
 push es  ; 04397
 mov es,word [0xdf48]  ; 04398
@@ -471,7 +471,7 @@ ret  ; 044D2
 
 ; ---- function check_joystick ----
 check_joystick:
-call sub_04756  ; 044D3
+call read_joystick  ; 044D3
 cmp word [bp+0x4],0x0  ; 044D6
 jz short loc_044DD  ; 044DA jz 0x44dd
 ret  ; 044DC

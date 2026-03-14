@@ -42,7 +42,7 @@ ret  ; 00628
 calc_screen_offset:
 push bp  ; 00629
 db 0x8B, 0xEC  ; 0062A mov bp,sp
-call sub_040D5  ; 0062C
+call rand_next  ; 0062C
 shl ax,1  ; 0062F
 mov [0x421a],ax  ; 00631
 mov ax,[bp+0x4]  ; 00634
