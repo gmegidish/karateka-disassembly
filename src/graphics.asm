@@ -565,7 +565,7 @@ mov ax,0x32d  ; 0104C
 push ax  ; 0104F
 lea ax,[bp+0x16]  ; 01050
 push ax  ; 01053
-call load_resource_3  ; 01054
+call strcat  ; 01054
 db 0x8B, 0xE5  ; 01057 mov sp,bp
 mov ax,0x8000  ; 01059
 push ax  ; 0105C
@@ -641,7 +641,7 @@ mov ax,0x332  ; 0110F
 push ax  ; 01112
 lea ax,[bp+0x16]  ; 01113
 push ax  ; 01116
-call load_resource_3  ; 01117
+call strcat  ; 01117
 db 0x8B, 0xE5  ; 0111A mov sp,bp
 mov ax,0x8000  ; 0111C
 push ax  ; 0111F
@@ -679,7 +679,7 @@ mov ax,0x32d  ; 0116B
 push ax  ; 0116E
 lea ax,[bp+0x16]  ; 0116F
 push ax  ; 01172
-call load_resource_3  ; 01173
+call strcat  ; 01173
 db 0x8B, 0xE5  ; 01176 mov sp,bp
 mov ax,0x8000  ; 01178
 push ax  ; 0117B
@@ -755,7 +755,7 @@ mov ax,0x332  ; 0122E
 push ax  ; 01231
 lea ax,[bp+0x16]  ; 01232
 push ax  ; 01235
-call load_resource_3  ; 01236
+call strcat  ; 01236
 db 0x8B, 0xE5  ; 01239 mov sp,bp
 mov ax,0x8000  ; 0123B
 push ax  ; 0123E

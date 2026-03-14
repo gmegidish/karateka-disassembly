@@ -1,319 +1,421 @@
-; C main(), resource loading entry
+; C main() and CRT string functions (strncmp, strcat, strncat)
 
 
 ; ---- function main ----
+; Lattice C main() - called from C runtime startup at 0x01F5.
+; Parses command line into argc/argv, sets up I/O handles, initializes
+; the file system, then calls game_init(argv, argc).
+;
+; Parameters:
+;   [bp+0x12] = pointer to raw command line string (from PSP)
+;
+; Local variables:
+;   [bp+0x0]  = temp: current character value
+;   [bp+0x4]  = temp: saved character
+;   [bp+0x5]  = device mode flags (text/binary)
+;   [bp+0x8]  = save_vectors result for stdin
+;   [bp+0xa]  = save_vectors result for stdout
+;   [bp+0xc]  = save_vectors result for stderr
+;
+; DS = DGROUP (code+data segment)
+; ES = PSP segment (set by DOS before program start)
 main:
 push bp  ; 05953
-sub sp,0xe  ; 05954
+sub sp,0xe  ; 05954 - allocate 14 bytes of locals
 db 0x8B, 0xEC  ; 05957 mov bp,sp
-mov word [0xe43e],0x0  ; 05959
+
+; --- Phase 1: Parse command line into argc/argv ---
+; Scans the command line string, splitting on whitespace (ctype bit 3).
+; Stores up to 32 argument pointers in argv[]. Null-terminates each arg
+; by replacing the whitespace delimiter with 0x00.
+mov word [argc],0x0  ; 05959 - argc = 0
 loc_0595F:
-cmp word [0xe43e],0x20  ; 0595F
+cmp word [argc],0x20  ; 0595F - if argc >= 32, stop parsing
 jnl short loc_059D4  ; 05964 jnl 0x59d4
 loc_05966:
-mov si,[bp+0x12]  ; 05966
-mov al,[si]  ; 05969
+; Skip whitespace characters (ctype bit 3 = whitespace)
+mov si,[bp+0x12]  ; 05966 - si = current position in cmdline
+mov al,[si]  ; 05969 - al = current char
 xor ah,ah  ; 0596B
 inc ax  ; 0596D
 db 0x8B, 0xF8  ; 0596E mov di,ax
-mov al,[di-0x1b3c]  ; 05970
+mov al,[di-0x1b3c]  ; 05970 - lookup ctype[char] (0xe4c4 = ctype table)
 xor ah,ah  ; 05974
-db 0x25, 0x08, 0x00  ; 05976 and ax,0x8
-jz short loc_05980  ; 05979 jz 0x5980
-inc word [bp+0x12]  ; 0597B
-jmp short loc_05966  ; 0597E jmp 0x5966
+db 0x25, 0x08, 0x00  ; 05976 and ax,0x8 - test whitespace bit
+jz short loc_05980  ; 05979 - not whitespace, start new arg
+inc word [bp+0x12]  ; 0597B - skip this whitespace char
+jmp short loc_05966  ; 0597E - check next char
 loc_05980:
+; Check for end of string
 mov si,[bp+0x12]  ; 05980
 mov al,[si]  ; 05983
 xor ah,ah  ; 05985
 test ax,ax  ; 05987
-jz short loc_059D4  ; 05989 jz 0x59d4
-mov ax,[0xe43e]  ; 0598B
-inc word [0xe43e]  ; 0598E
-shl ax,1  ; 05992
+jz short loc_059D4  ; 05989 - null terminator, done parsing
+
+; Record this argument in argv[]
+mov ax,[argc]  ; 0598B
+inc word [argc]  ; 0598E - argc++
+shl ax,1  ; 05992 - word index
 db 0x8B, 0xF0  ; 05994 mov si,ax
 mov ax,[bp+0x12]  ; 05996
-mov [si-0x1bc0],ax  ; 05999
+mov [si-0x1bc0],ax  ; 05999 - argv[i] = pointer to this arg (0xe440 = argv)
 loc_0599D:
+; Scan forward to next whitespace or end of string
 mov si,[bp+0x12]  ; 0599D
 mov al,[si]  ; 059A0
 xor ah,ah  ; 059A2
 test ax,ax  ; 059A4
-mov [bp+0x0],ax  ; 059A6
-jz short loc_059BE  ; 059A9 jz 0x59be
+mov [bp+0x0],ax  ; 059A6 - save char value
+jz short loc_059BE  ; 059A9 - null terminator, end of arg
 inc ax  ; 059AB
 db 0x8B, 0xF8  ; 059AC mov di,ax
-mov al,[di-0x1b3c]  ; 059AE
+mov al,[di-0x1b3c]  ; 059AE - lookup ctype[char]
 xor ah,ah  ; 059B2
-db 0x25, 0x08, 0x00  ; 059B4 and ax,0x8
-jnz short loc_059BE  ; 059B7 jnz 0x59be
-inc word [bp+0x12]  ; 059B9
-jmp short loc_0599D  ; 059BC jmp 0x599d
+db 0x25, 0x08, 0x00  ; 059B4 and ax,0x8 - test whitespace bit
+jnz short loc_059BE  ; 059B7 - whitespace found, end of arg
+inc word [bp+0x12]  ; 059B9 - advance to next char
+jmp short loc_0599D  ; 059BC - keep scanning
 loc_059BE:
+; Null-terminate this argument
 mov si,[bp+0x12]  ; 059BE
 mov al,[si]  ; 059C1
-inc word [bp+0x12]  ; 059C3
-mov byte [si],0x0  ; 059C6
-mov [bp+0x4],al  ; 059C9
+inc word [bp+0x12]  ; 059C3 - advance past delimiter
+mov byte [si],0x0  ; 059C6 - null-terminate the arg
+mov [bp+0x4],al  ; 059C9 - save original delimiter char
 xor ah,ah  ; 059CC
 test ax,ax  ; 059CE
-jnz short loc_0595F  ; 059D0 jnz 0x595f
-jmp short loc_059D4  ; 059D2 jmp 0x59d4
+jnz short loc_0595F  ; 059D0 - more chars, parse next arg
+jmp short loc_059D4  ; 059D2 - done
+
+; --- Phase 2: Check DOS version ---
 loc_059D4:
-mov al,[0xf]  ; 059D4
+mov al,[dos_version]  ; 059D4 - DOS major version
 xor ah,ah  ; 059D7
 db 0x3D, 0x02, 0x00  ; 059D9 cmp ax,0x2
-jl short loc_059E1  ; 059DC jl 0x59e1
-jmp 0x5ca6  ; 059DE
+jl short loc_059E1  ; 059DC - DOS < 2: skip I/O redirection setup
+jmp 0x5ca6  ; 059DE - DOS >= 2: jump to I/O redirection handler (in crt.asm)
+
+; --- Phase 3: Set up I/O handles (DOS 1.x path) ---
 loc_059E1:
-mov ax,0xe1b0  ; 059E1
+; Save interrupt vectors for stdin (INT 19h)
+mov ax,iob_stdin  ; 059E1 - address of stdin I/O block
 push ax  ; 059E4
-mov ax,0xe480  ; 059E5
+mov ax,0xe480  ; 059E5 - address of vector save buffer
 push ax  ; 059E8
-mov ax,0x19  ; 059E9
+mov ax,0x19  ; 059E9 - INT 19h
 push ax  ; 059EC
-call save_vectors  ; 059ED
+call save_vectors  ; 059ED - save_vectors(0x19, save_buf, iob_stdin)
 db 0x8B, 0xE5  ; 059F0 mov sp,bp
-mov bl,[0x39]  ; 059F2
+
+; Check if stdout redirect is append mode (>>)
+mov bl,[stdout_redir]  ; 059F2 - first char of redirect path
 xor bh,bh  ; 059F6
-cmp bx,0x3e  ; 059F8
-mov [bp+0x8],ax  ; 059FB
-jz short loc_05A16  ; 059FE jz 0x5a16
-mov ax,0xe1be  ; 05A00
+cmp bx,0x3e  ; 059F8 - is it '>' (0x3E)?
+mov [bp+0x8],ax  ; 059FB - save stdin result
+jz short loc_05A16  ; 059FE - yes: append mode, use INT 3Ah
+
+; Save interrupt vectors for stdout (INT 39h, normal mode)
+mov ax,iob_stdout  ; 05A00 - address of stdout I/O block
 push ax  ; 05A03
-mov ax,0xe482  ; 05A04
+mov ax,0xe482  ; 05A04 - address of vector save buffer
 push ax  ; 05A07
-mov ax,0x39  ; 05A08
+mov ax,0x39  ; 05A08 - INT 39h
 push ax  ; 05A0B
-call save_vectors  ; 05A0C
+call save_vectors  ; 05A0C - save_vectors(0x39, save_buf, iob_stdout)
 db 0x8B, 0xE5  ; 05A0F mov sp,bp
-mov [bp+0xa],ax  ; 05A11
+mov [bp+0xa],ax  ; 05A11 - save stdout result
 jmp short loc_05A2A  ; 05A14 jmp 0x5a2a
+
 loc_05A16:
-mov ax,0xe1be  ; 05A16
+; Save interrupt vectors for stdout (INT 3Ah, append mode)
+mov ax,iob_stdout  ; 05A16 - address of stdout I/O block
 push ax  ; 05A19
-mov ax,0xe484  ; 05A1A
+mov ax,0xe484  ; 05A1A - address of vector save buffer
 push ax  ; 05A1D
-mov ax,0x3a  ; 05A1E
+mov ax,0x3a  ; 05A1E - INT 3Ah
 push ax  ; 05A21
-call save_vectors  ; 05A22
+call save_vectors  ; 05A22 - save_vectors(0x3a, save_buf, iob_stdout)
 db 0x8B, 0xE5  ; 05A25 mov sp,bp
-mov [bp+0xa],ax  ; 05A27
+mov [bp+0xa],ax  ; 05A27 - save stdout result
+
 loc_05A2A:
-mov ax,0xe1cc  ; 05A2A
+; Save interrupt vectors for stderr
+mov ax,iob_stderr  ; 05A2A - address of stderr I/O block
 push ax  ; 05A2D
-mov ax,0xe484  ; 05A2E
+mov ax,0xe484  ; 05A2E - address of save buffer
 push ax  ; 05A31
-mov ax,0xe486  ; 05A32
+mov ax,0xe486  ; 05A32 - address of save buffer 2
 push ax  ; 05A35
 call save_vectors  ; 05A36
 db 0x8B, 0xE5  ; 05A39 mov sp,bp
 test ax,ax  ; 05A3B
-mov [bp+0xc],ax  ; 05A3D
-jnz short loc_05A4B  ; 05A40 jnz 0x5a4b
+mov [bp+0xc],ax  ; 05A3D - save stderr result
+jnz short loc_05A4B  ; 05A40 - if non-zero, skip CRT I/O init
+
+; stderr setup failed, initialize CRT I/O manually
 mov ax,0x1  ; 05A42
 push ax  ; 05A45
-call crt_init_io  ; 05A46
+call crt_init_io  ; 05A46 - crt_init_io(1)
 db 0x8B, 0xE5  ; 05A49 mov sp,bp
+
+; --- Phase 4: Initialize file system ---
 loc_05A4B:
-cmp word [bp+0x8],0x0  ; 05A4B
-jnz short loc_05A66  ; 05A4F jnz 0x5a66
-push word [bp+0xc]  ; 05A51
-mov ax,0xe487  ; 05A54
+cmp word [bp+0x8],0x0  ; 05A4B - check stdin result
+jnz short loc_05A66  ; 05A4F - non-zero: skip file system init
+
+; stdin handle not available, initialize file system
+push word [bp+0xc]  ; 05A51 - stderr result
+mov ax,0xe487  ; 05A54 - file system config address
 push ax  ; 05A57
 call init_file_system  ; 05A58
 db 0x8B, 0xE5  ; 05A5B mov sp,bp
 mov ax,0x1  ; 05A5D
 push ax  ; 05A60
-call show_insert_disk  ; 05A61
+call show_insert_disk  ; 05A61 - prompt for game disk
 db 0x8B, 0xE5  ; 05A64 mov sp,bp
+
 loc_05A66:
-push word [0xe5c8]  ; 05A66
+; Format stdin I/O block string
+push word [stdio_bufsiz]  ; 05A66 - default buffer size (512)
 call string_copy  ; 05A6A
 db 0x8B, 0xE5  ; 05A6D mov sp,bp
 push ax  ; 05A6F
 push word [bp+0x8]  ; 05A70
 call format_string  ; 05A73
 db 0x8B, 0xE5  ; 05A76 mov sp,bp
+
+; Clear bit 3 of stdin I/O block flags
 mov si,[bp+0x8]  ; 05A78
-mov al,[si+0x8]  ; 05A7B
+mov al,[si+0x8]  ; 05A7B - flags byte at iob+8
 xor ah,ah  ; 05A7E
-db 0x25, 0xF7, 0xFF  ; 05A80 and ax,0xfff7
+db 0x25, 0xF7, 0xFF  ; 05A80 and ax,0xfff7 - clear bit 3
 mov [si+0x8],al  ; 05A83
+
+; Check stdout result
 cmp word [bp+0xa],0x0  ; 05A86
-jz short loc_05A8F  ; 05A8A jz 0x5a8f
-jmp 0x5d14  ; 05A8C
+jz short loc_05A8F  ; 05A8A - zero: need to init file system for stdout
+jmp 0x5d14  ; 05A8C - non-zero: jump to stdout init (in crt.asm)
+
 loc_05A8F:
-push word [bp+0xc]  ; 05A8F
-mov ax,0xe49e  ; 05A92
+; Initialize file system for stdout path
+push word [bp+0xc]  ; 05A8F - stderr result
+mov ax,0xe49e  ; 05A92 - second file system config address
 push ax  ; 05A95
 call init_file_system  ; 05A96
 db 0x8B, 0xE5  ; 05A99 mov sp,bp
 mov ax,0x1  ; 05A9B
 push ax  ; 05A9E
-call show_insert_disk  ; 05A9F
+call show_insert_disk  ; 05A9F - prompt for game disk
 db 0x8B, 0xE5  ; 05AA2 mov sp,bp
 jmp short loc_05B14  ; 05AA4 jmp 0x5b14
-mov byte [0xe1b9],0x0  ; 05AA6
+
+; --- Phase 5: Configure stdio device flags (reached from DOS 2+ path) ---
+; Sets up _iob[] flags for stdin/stdout/stderr based on device mode
+mov byte [iob_stdin+9],0x0  ; 05AA6 - stdin flags2 = 0
 mov al,0x1  ; 05AAB
 mov bl,0x2  ; 05AAD
-mov byte [0xe1d4],0x6  ; 05AAF
-mov cx,[0xe5ca]  ; 05AB4
-xor cx,[0xe5c6]  ; 05AB8
-and cx,0x8000  ; 05ABC
-mov [0xe1c7],al  ; 05AC0
-mov [0xe1b8],al  ; 05AC3
-mov [0xe1d5],bl  ; 05AC6
-mov [0xe1c6],bl  ; 05ACA
-jz short loc_05AD5  ; 05ACE jz 0x5ad5
-mov ax,0x10  ; 05AD0
+mov byte [iob_stderr+8],0x6  ; 05AAF - stderr flags1 = 6 (read+write+special)
+mov cx,[stdio_mode]  ; 05AB4 - global mode flags
+xor cx,[stdio_flags]  ; 05AB8 - XOR with stdio flags
+and cx,0x8000  ; 05ABC - isolate bit 15 (text/binary mode mismatch)
+mov [iob_stdout+9],al  ; 05AC0 - stdout flags2 = 1
+mov [iob_stdin+8],al  ; 05AC3 - stdin flags1 = 1 (text mode/open)
+mov [iob_stderr+9],bl  ; 05AC6 - stderr flags2 = 2
+mov [iob_stdout+8],bl  ; 05ACA - stdout flags1 = 2
+jz short loc_05AD5  ; 05ACE - no mode mismatch: ax = 0
+mov ax,0x10  ; 05AD0 - mode mismatch: ax = 0x10
 jmp short loc_05AD7  ; 05AD3 jmp 0x5ad7
 loc_05AD5:
 db 0x33, 0xC0  ; 05AD5 xor ax,ax
 loc_05AD7:
-mov [bp+0x5],ax  ; 05AD7
-or ax,0xc0  ; 05ADA
-mov word [0xe5fa],0x1  ; 05ADD
+mov [bp+0x5],ax  ; 05AD7 - save device mode flags
+or ax,0xc0  ; 05ADA - add read+write bits
+mov word [file_stdout+2],0x1  ; 05ADD - stdout FILE fd = 1
 mov bx,[bp+0x5]  ; 05AE3
-or bx,0xa0  ; 05AE6
-mov word [0xe624],0x2  ; 05AEA
+or bx,0xa0  ; 05AE6 - add read+binary bits
+mov word [file_stderr+2],0x2  ; 05AEA - stderr FILE fd = 2
 mov cx,0x1  ; 05AF0
 push cx  ; 05AF3
-mov [0xe5ce],al  ; 05AF4
-mov [0xe622],bl  ; 05AF7
-mov [0xe5f8],bl  ; 05AFB
-call dos_ioctl  ; 05AFF
+mov [file_stdin],al  ; 05AF4 - stdin FILE flags = mode | 0xc0
+mov [file_stderr],bl  ; 05AF7 - stderr FILE flags = mode | 0xa0
+mov [file_stdout],bl  ; 05AFB - stdout FILE flags = mode | 0xa0
+call dos_ioctl  ; 05AFF - check if stdout is a character device
 db 0x8B, 0xE5  ; 05B02 mov sp,bp
-and ax,0x80  ; 05B04
-jz short loc_05B14  ; 05B07 jz 0x5b14
-mov al,[0xe1c6]  ; 05B09
+and ax,0x80  ; 05B04 - bit 7 = character device flag
+jz short loc_05B14  ; 05B07 - not a char device: skip
+
+; stdout is a character device, set char-device bit in flags
+mov al,[iob_stdout+8]  ; 05B09 - get stdout flags1
 xor ah,ah  ; 05B0C
-db 0x0D, 0x04, 0x00  ; 05B0E or ax,0x4
-mov [0xe1c6],al  ; 05B11
+db 0x0D, 0x04, 0x00  ; 05B0E or ax,0x4 - set bit 2 (character device)
+mov [iob_stdout+8],al  ; 05B11 - store updated flags
+
+; --- Phase 6: Call game_init(argv, argc) ---
 loc_05B14:
-mov ax,0xe440  ; 05B14
+mov ax,argv  ; 05B14 - address of argument vector
 push ax  ; 05B17
-push word [0xe43e]  ; 05B18
-call game_init  ; 05B1C
+push word [argc]  ; 05B18 - argument count
+call game_init  ; 05B1C - game_init(argc, argv)
 db 0x8B, 0xE5  ; 05B1F mov sp,bp
+
+; Cleanup: dismiss disk prompt
 db 0x33, 0xC0  ; 05B21 xor ax,ax
 push ax  ; 05B23
-call show_insert_disk  ; 05B24
+call show_insert_disk  ; 05B24 - show_insert_disk(0) = dismiss
 db 0x8B, 0xE5  ; 05B27 mov sp,bp
-add sp,0xe  ; 05B29
+add sp,0xe  ; 05B29 - free locals
 pop bp  ; 05B2C
 ret  ; 05B2D
 
-; ---- function sub_05B2E ----
-sub_05B2E:
+; ---- function strncmp ----
+; Compare two strings up to n characters.
+; Lattice C runtime strncmp() - uses alternate 0x82 opcode encoding.
+;
+; Parameters:
+;   [bp+0xc]  = str1 pointer
+;   [bp+0xe]  = str2 pointer
+;   [bp+0x10] = max character count
+;
+; Returns:
+;   AX = 0 if equal, positive if str1 > str2, negative if str1 < str2
+;
+; Note: db 0x82 bytes are the alternate CMP encoding (0x82 vs 0x80)
+;   that NASM doesn't generate. "82 3C 00" = "cmp byte [si],0x0"
+;   and "82 3D 00" = "cmp byte [di],0x0".
+strncmp:
 push bp  ; 05B2E
 sub sp,0x8  ; 05B2F
 db 0x8B, 0xEC  ; 05B32 mov bp,sp
 loc_05B34:
-cmp word [bp+0x10],0x0  ; 05B34
+cmp word [bp+0x10],0x0  ; 05B34 - count exhausted?
 jz short loc_05B6F  ; 05B38 jz 0x5b6f
-mov si,[bp+0xc]  ; 05B3A
-db 0x82  ; 05B3D
-cmp al,0x0  ; 05B3E
+mov si,[bp+0xc]  ; 05B3A - si = str1
+db 0x82  ; 05B3D         --+
+cmp al,0x0  ; 05B3E          | = cmp byte [si],0x0 (*str1 == null?) (*str1 == null?)
 jz short loc_05B6F  ; 05B40 jz 0x5b6f
-mov di,[bp+0xe]  ; 05B42
-db 0x82  ; 05B45
-cmp ax,0x7400  ; 05B46
-and ax,0xc68b  ; 05B49
-inc word [bp+0xc]  ; 05B4C
-inc word [bp+0xe]  ; 05B4F
-mov bl,[di]  ; 05B52
+mov di,[bp+0xe]  ; 05B42 - di = str2
+db 0x82  ; 05B45         --+
+cmp ax,0x7400  ; 05B46      | = cmp byte [di],0x0; jz ...  (db 82 3D 00 74 xx)
+and ax,0xc68b  ; 05B49    | these bytes decode as the compare + conditional jump
+inc word [bp+0xc]  ; 05B4C - str1++
+inc word [bp+0xe]  ; 05B4F - str2++
+mov bl,[di]  ; 05B52 - bl = *str2 (via ctype/tolower lookup)
 xor bh,bh  ; 05B54
 db 0x8B, 0xF0  ; 05B56 mov si,ax
-mov cl,[si]  ; 05B58
+mov cl,[si]  ; 05B58 - cl = *str1 (via lookup)
 xor ch,ch  ; 05B5A
-db 0x2B, 0xCB  ; 05B5C sub cx,bx
+db 0x2B, 0xCB  ; 05B5C sub cx,bx - diff = *str1 - *str2
 mov [bp+0x6],cx  ; 05B5E
-jz short loc_05B6A  ; 05B61 jz 0x5b6a
-db 0x8B, 0xC1  ; 05B63 mov ax,cx
+jz short loc_05B6A  ; 05B61 - if equal, continue
+db 0x8B, 0xC1  ; 05B63 mov ax,cx - return difference
 add sp,0x8  ; 05B65
 pop bp  ; 05B68
 ret  ; 05B69
 loc_05B6A:
-dec word [bp+0x10]  ; 05B6A
-jmp short loc_05B34  ; 05B6D jmp 0x5b34
+dec word [bp+0x10]  ; 05B6A - count--
+jmp short loc_05B34  ; 05B6D - next iteration
 loc_05B6F:
-cmp word [bp+0x10],0x0  ; 05B6F
-jz short loc_05B95  ; 05B73 jz 0x5b95
-mov si,[bp+0xc]  ; 05B75
-db 0x82  ; 05B78
-cmp al,0x0  ; 05B79
-jz short loc_05B85  ; 05B7B jz 0x5b85
-mov ax,0x1  ; 05B7D
+; One or both strings ended, check which
+cmp word [bp+0x10],0x0  ; 05B6F - count exhausted?
+jz short loc_05B95  ; 05B73 - yes: strings equal up to n chars
+mov si,[bp+0xc]  ; 05B75 - check if str1 has more
+db 0x82  ; 05B78         --+
+cmp al,0x0  ; 05B79          | = cmp byte [si],0x0
+jz short loc_05B85  ; 05B7B - str1 ended
+mov ax,0x1  ; 05B7D - str1 has more: return 1 (str1 > str2)
 add sp,0x8  ; 05B80
 pop bp  ; 05B83
 ret  ; 05B84
 loc_05B85:
-mov si,[bp+0xe]  ; 05B85
-db 0x82  ; 05B88
-cmp al,0x0  ; 05B89
-jz short loc_05B95  ; 05B8B jz 0x5b95
-mov ax,0xffff  ; 05B8D
+mov si,[bp+0xe]  ; 05B85 - check if str2 has more
+db 0x82  ; 05B88         --+
+cmp al,0x0  ; 05B89          | = cmp byte [si],0x0
+jz short loc_05B95  ; 05B8B - str2 also ended: equal
+mov ax,0xffff  ; 05B8D - str2 has more: return -1 (str1 < str2)
 add sp,0x8  ; 05B90
 pop bp  ; 05B93
 ret  ; 05B94
 loc_05B95:
-db 0x33, 0xC0  ; 05B95 xor ax,ax
+db 0x33, 0xC0  ; 05B95 xor ax,ax - return 0 (equal)
 add sp,0x8  ; 05B97
 pop bp  ; 05B9A
 ret  ; 05B9B
 
-; ---- function load_resource_3 ----
-load_resource_3:
+; ---- function strcat ----
+; Append source string to end of dest string.
+; Lattice C runtime strcat().
+;
+; Parameters:
+;   [bp+0xc] = dest string pointer
+;   [bp+0xe] = source string pointer
+;
+; Returns:
+;   AX = dest pointer
+strcat:
 push bp  ; 05B9C
 sub sp,0x8  ; 05B9D
 db 0x8B, 0xEC  ; 05BA0 mov bp,sp
-push word [bp+0xc]  ; 05BA2
-call sub_066B9  ; 05BA5
+push word [bp+0xc]  ; 05BA2 - push dest
+call sub_066B9  ; 05BA5 - strlen(dest)
 db 0x8B, 0xE5  ; 05BA8 mov sp,bp
 mov bx,[bp+0xc]  ; 05BAA
-db 0x03, 0xD8  ; 05BAD add bx,ax
-mov [bp+0x6],bx  ; 05BAF
+db 0x03, 0xD8  ; 05BAD add bx,ax - bx = dest + strlen(dest) = end of dest
+mov [bp+0x6],bx  ; 05BAF - save write position
 loc_05BB2:
-mov si,[bp+0x6]  ; 05BB2
+; Copy loop: copy src chars to end of dest until null
+mov si,[bp+0x6]  ; 05BB2 - si = write position
 inc word [bp+0x6]  ; 05BB5
-mov di,[bp+0xe]  ; 05BB8
+mov di,[bp+0xe]  ; 05BB8 - di = read position (src)
 inc word [bp+0xe]  ; 05BBB
-mov al,[di]  ; 05BBE
-mov [si],al  ; 05BC0
+mov al,[di]  ; 05BBE - al = *src
+mov [si],al  ; 05BC0 - *dest_end = *src
 test al,al  ; 05BC2
-jnz short loc_05BB2  ; 05BC4 jnz 0x5bb2
-mov ax,[bp+0xc]  ; 05BC6
+jnz short loc_05BB2  ; 05BC4 - loop until null terminator copied
+mov ax,[bp+0xc]  ; 05BC6 - return dest pointer
 add sp,0x8  ; 05BC9
 pop bp  ; 05BCC
 ret  ; 05BCD
+
+; ---- function strncat ----
+; Append at most n characters from source to end of dest string.
+; Lattice C runtime strncat(). Not called in this program (dead CRT code).
+;
+; Parameters:
+;   [bp+0xa] = dest string pointer
+;   [bp+0xc] = source string pointer
+;   [bp+0xe] = max characters to append
+;
+; Returns:
+;   AX = dest pointer
+strncat:
 push bp  ; 05BCE
 sub sp,0x6  ; 05BCF
 db 0x8B, 0xEC  ; 05BD2 mov bp,sp
-push word [bp+0xa]  ; 05BD4
-call sub_066B9  ; 05BD7
+push word [bp+0xa]  ; 05BD4 - push dest
+call sub_066B9  ; 05BD7 - strlen(dest)
 db 0x8B, 0xE5  ; 05BDA mov sp,bp
 mov bx,[bp+0xa]  ; 05BDC
-db 0x03, 0xD8  ; 05BDF add bx,ax
-mov [bp+0x4],bx  ; 05BE1
+db 0x03, 0xD8  ; 05BDF add bx,ax - bx = end of dest
+mov [bp+0x4],bx  ; 05BE1 - save write position
 loc_05BE4:
-mov ax,[bp+0xe]  ; 05BE4
-dec word [bp+0xe]  ; 05BE7
+mov ax,[bp+0xe]  ; 05BE4 - remaining count
+dec word [bp+0xe]  ; 05BE7 - count--
 test ax,ax  ; 05BEA
-jng short loc_05C04  ; 05BEC jng 0x5c04
-mov si,[bp+0xc]  ; 05BEE
+jng short loc_05C04  ; 05BEC - count <= 0: done
+mov si,[bp+0xc]  ; 05BEE - si = src
 inc word [bp+0xc]  ; 05BF1
-mov al,[si]  ; 05BF4
-mov di,[bp+0x4]  ; 05BF6
-mov [di],al  ; 05BF9
+mov al,[si]  ; 05BF4 - al = *src
+mov di,[bp+0x4]  ; 05BF6 - di = write position
+mov [di],al  ; 05BF9 - *dest_end = *src
 test al,al  ; 05BFB
-jz short loc_05C04  ; 05BFD jz 0x5c04
-inc word [bp+0x4]  ; 05BFF
-jmp short loc_05BE4  ; 05C02 jmp 0x5be4
+jz short loc_05C04  ; 05BFD - null terminator: done
+inc word [bp+0x4]  ; 05BFF - advance write position
+jmp short loc_05BE4  ; 05C02 - next char
 loc_05C04:
 mov si,[bp+0x4]  ; 05C04
-mov byte [si],0x0  ; 05C07
-mov ax,[bp+0xa]  ; 05C0A
+mov byte [si],0x0  ; 05C07 - null-terminate result
+mov ax,[bp+0xa]  ; 05C0A - return dest pointer
 add sp,0x6  ; 05C0D
 pop bp  ; 05C10
 ret  ; 05C11

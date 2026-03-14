@@ -94,7 +94,7 @@ mov ax,0x5  ; 0132F
 push ax  ; 01332
 push word [si+0x1e8]  ; 01333
 push word [bp+0x16]  ; 01337
-call sub_05B2E  ; 0133A
+call strncmp  ; 0133A
 db 0x8B, 0xE5  ; 0133D mov sp,bp
 mov [bp+0x10],al  ; 0133F
 xor ah,ah  ; 01342

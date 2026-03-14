@@ -1,6 +1,36 @@
 ; Data section
 ; Everything after 0x6C9D is data (no call targets beyond this point)
 
+; ===== Variable definitions (DS-relative addresses) =====
+; These EQU constants give symbolic names to memory locations used in code.
+
+; Lattice C runtime variables (low memory, within code segment)
+dos_version     equ 0x0f        ; byte - DOS major version (from INT 21h/30h)
+stack_limit     equ 0x17        ; word - stack overflow check threshold
+stdout_redir    equ 0x39        ; byte - first char of stdout redirect path
+
+; C runtime globals
+argc            equ 0xe43e      ; word - parsed argument count (max 32)
+argv            equ 0xe440      ; word[32] - parsed argument vector (pointers to strings)
+
+; Lattice C _iob[] entries (14-byte I/O control blocks)
+iob_stdin       equ 0xe1b0      ; stdin I/O block
+iob_stdout      equ 0xe1be      ; stdout I/O block
+iob_stderr      equ 0xe1cc      ; stderr I/O block
+
+; Stdio globals
+stdio_flags     equ 0xe5c6      ; word - global text/binary mode flags
+stdio_bufsiz    equ 0xe5c8      ; word - default I/O buffer size (512)
+stdio_mode      equ 0xe5ca      ; word - mode flags
+
+; FILE struct array (42 bytes each, 20 entries starting at 0xe5ce)
+file_stdin      equ 0xe5ce      ; FILE struct for fd 0 (stdin)
+file_stdout     equ 0xe5f8      ; FILE struct for fd 1 (stdout)
+file_stderr     equ 0xe622      ; FILE struct for fd 2 (stderr)
+
+; Character type table (used for whitespace detection in argv parsing)
+; ctype_table   equ 0xe4c4    ; byte[256] - bit 3 = whitespace
+
 ; --- lattice_c_runtime_tail (0x06C9D-0x06CB0) ---
 db 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x4C, 0x61, 0x74, 0x74, 0x69, 0x63, 0x65, 0x20, 0x43, 0x20, 0x32  ; 06C9D |.....Lattice C 2|
 db 0x2E, 0x31, 0x00  ; 06CAD |.1.|

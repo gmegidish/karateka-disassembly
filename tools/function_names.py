@@ -54,7 +54,9 @@ FUNCTION_NAMES = {
     0x04FDD: "load_file",             # High-level file load (calls dos_read_file)
     0x055F9: "load_resource",         # Load game resource file
     0x056DE: "load_resource_2",       # Another resource loader
-    0x05B9C: "load_resource_3",       # Another resource loader
+    0x05B2E: "strncmp",               # C runtime strncmp()
+    0x05B9C: "strcat",                # C runtime strcat()
+    0x05BCE: "strncat",               # C runtime strncat() (dead code)
 
     # === Interrupt Vector Management ===
     0x0482B: "install_handlers",      # INT 21h/25h - install critical error handler (INT 24h)
@@ -164,6 +166,7 @@ FUNCTION_NAMES = {
     0x0589A: "print_error",           # Print error message and exit
     0x05DE3: "read_data_block",       # Read a block of data from file
     0x066DF: "format_string",         # String formatting (printf-like)
+    0x066B9: "strlen",                # C runtime strlen()
     0x06810: "string_copy",           # String copy utility
 
     # === Math ===
