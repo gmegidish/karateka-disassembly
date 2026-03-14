@@ -2,6 +2,20 @@
 
 
 ; ---- function effect_wipe ----
+; Sets up a screen wipe transition effect, then calls effect_fade.
+;
+; Parameters (on stack):
+;   [bp+0x6] = wipe type:
+;              2 = wide wipe (speed 0x20, step 0x20)
+;              7 = uses scene index 5
+;              other = narrow wipe (speed 0, step 4), adds [0x12e] to scene index
+;
+; Uses globals:
+;   [0xd672] = wipe state (incremented if == 1)
+;   [0xbcd5] = wipe step size (4 or 0x20)
+;   [0x102]  = wipe speed (0 or 0x20)
+;   [0xc3a6] = scene/effect index (base 3, modified by type)
+;   [0x12e]  = scene offset added to index
 effect_wipe:
 push bp  ; 03A2D
 sub sp,0x2  ; 03A2E
@@ -42,6 +56,15 @@ pop bp  ; 03A88
 ret  ; 03A89
 
 ; ---- function effect_fade ----
+; Initializes the fade/transition effect by loading parameters from lookup tables.
+; No explicit parameters (reads scene index from [0xc3a6]).
+;
+; Uses three parallel lookup tables (indexed by [0xc3a6] * 2):
+;   [si-0x3c58] -> [0xc3a0] (effect param 1)
+;   [si-0x3c4a] -> [0xc3a2] (effect param 2)
+;   [si-0x3c3c] -> [0xc3a4] (effect param 3)
+;
+; Also sets: [0xbb2a]=0xFFFF, [0xd652]=0, [0xee]=1 (buffer display mode)
 effect_fade:
 push bp  ; 03A8A
 sub sp,0x4  ; 03A8B
@@ -69,6 +92,11 @@ pop bp  ; 03ACE
 ret  ; 03ACF
 
 ; ---- function effect_scroll_left ----
+; Initializes a leftward screen scroll transition.
+; No explicit parameters. Reads scene index from [0x12c].
+;
+; Sets [0xee]=2 (background display mode), [0xbb2a]=0xFFFF, [0xd652]=0.
+; Loads effect parameters from same lookup tables as effect_fade.
 effect_scroll_left:
 push bp  ; 03AD0
 sub sp,0x4  ; 03AD1
@@ -97,6 +125,11 @@ pop bp  ; 03B17
 ret  ; 03B18
 
 ; ---- function effect_scroll_right ----
+; Initializes a rightward screen scroll transition.
+; No explicit parameters. Uses [0xce28] for position calculation.
+;
+; Sets [0xd5aa]=1, [0x110]=0x1F, calls calc_screen_offset(2) to
+; compute scroll base address, then clears [0xfa] and [0xd650].
 effect_scroll_right:
 push bp  ; 03B19
 sub sp,0x2  ; 03B1A
@@ -126,6 +159,13 @@ pop bp  ; 03B5A
 ret  ; 03B5B
 
 ; ---- function effect_dissolve ----
+; Performs one step of a dissolve transition effect.
+; No explicit parameters. Decrements [0x116] each call.
+;
+; Each step: wait_vsync(1), subtract 4 from [0xbcd5].
+; When [0x116] reaches 0: sets [0xf8]=1, loads [0xc40c] into [0xc3d2],
+;   returns AX=0 (effect complete).
+; Otherwise: increments [0x124], clears [0x10c], loads [0xc3d4] into [0xc3d2].
 effect_dissolve:
 push bp  ; 03B5C
 sub sp,0x2  ; 03B5D
@@ -163,6 +203,27 @@ pop bp  ; 03BAC
 ret  ; 03BAD
 
 ; ---- function wait_vsync ----
+; Central timing/sync function. Dispatches to various sound and
+; screen sync routines based on the sync type parameter.
+; Called 21 times throughout the codebase.
+;
+; Parameters (on stack):
+;   [bp+0x4] = sync type (BL):
+;              0 = no-op (return immediately)
+;              1-8, 9-21, 22-24, 25+ = different sync routines
+;
+; Uses globals:
+;   [0xd6bc] = speed mode (0=normal, 1=selective skip, 2+=skip all)
+;
+; The unlabeled code blocks after loc_03BE7 (0x3BE9-0x3CF0) are
+; individual sync routines reached via jump table at DS:0xD6BD
+; ([bx-0x2943]). Each routine calls screen_copy and/or toggle_speaker
+; with different timing parameters, then returns via pop bp / ret.
+;
+; Sync routines at 0x3C97-0x3CF0 load music data pointers (BX = address
+; of note data) and fall through to the music player at loc_03CF1.
+; The music player reads note data: 0xFF=end, 0xFE=reset vibrato,
+; 0xFD nn=set vibrato, else=play note with duration/pitch control.
 wait_vsync:
 push bp  ; 03BAE
 db 0x8B, 0xEC  ; 03BAF mov bp,sp
@@ -268,22 +329,22 @@ jnz short loc_03C5C  ; 03C67 jnz 0x3c5c
 pop bp  ; 03C69
 ret  ; 03C6A
 mov ax,[0xd710]  ; 03C6B
-mov [0xd6f8],al  ; 03C6E
+mov [speaker_delay],al  ; 03C6E
 call play_speaker_data  ; 03C71
 pop bp  ; 03C74
 ret  ; 03C75
 mov ax,[0xd712]  ; 03C76
-mov [0xd6f8],al  ; 03C79
+mov [speaker_delay],al  ; 03C79
 call play_speaker_data  ; 03C7C
 pop bp  ; 03C7F
 ret  ; 03C80
 mov ax,[0xd714]  ; 03C81
-mov [0xd6f8],al  ; 03C84
+mov [speaker_delay],al  ; 03C84
 call play_speaker_data  ; 03C87
 pop bp  ; 03C8A
 ret  ; 03C8B
 mov ax,[0xd716]  ; 03C8C
-mov [0xd6f8],al  ; 03C8F
+mov [speaker_delay],al  ; 03C8F
 call play_speaker_data  ; 03C92
 pop bp  ; 03C95
 ret  ; 03C96
@@ -334,14 +395,14 @@ jmp short loc_03CF1  ; 03CEE jmp 0x3cf1
 nop  ; 03CF0
 loc_03CF1:
 mov al,[bx]  ; 03CF1
-mov [0xd706],al  ; 03CF3
+mov [music_tempo_hi],al  ; 03CF3
 inc bx  ; 03CF6
 mov al,[bx]  ; 03CF7
-mov [0xd707],al  ; 03CF9
+mov [music_tempo_lo],al  ; 03CF9
 inc bx  ; 03CFC
-mov [0xd6fd],bx  ; 03CFD
+mov [music_note_ptr],bx  ; 03CFD
 loc_03D01:
-mov bx,[0xd6fd]  ; 03D01
+mov bx,[music_note_ptr]  ; 03D01
 mov al,[bx]  ; 03D05
 cmp al,0xff  ; 03D07
 jnz short loc_03D0D  ; 03D09 jnz 0x3d0d
@@ -350,81 +411,90 @@ ret  ; 03D0C
 loc_03D0D:
 cmp al,0xfe  ; 03D0D
 jnz short loc_03D1D  ; 03D0F jnz 0x3d1d
-mov byte [0xd708],0x0  ; 03D11
+mov byte [music_vibrato],0x0  ; 03D11
 inc bx  ; 03D16
-mov [0xd6fd],bx  ; 03D17
+mov [music_note_ptr],bx  ; 03D17
 jmp short loc_03D01  ; 03D1B jmp 0x3d01
 loc_03D1D:
 cmp al,0xfd  ; 03D1D
 jnz short loc_03D2E  ; 03D1F jnz 0x3d2e
 inc bx  ; 03D21
 mov al,[bx]  ; 03D22
-mov [0xd708],al  ; 03D24
+mov [music_vibrato],al  ; 03D24
 inc bx  ; 03D27
-mov [0xd6fd],bx  ; 03D28
+mov [music_note_ptr],bx  ; 03D28
 jmp short loc_03D01  ; 03D2C jmp 0x3d01
 loc_03D2E:
-mov [0xd709],al  ; 03D2E
+mov [music_note_cnt],al  ; 03D2E
 inc bx  ; 03D31
 mov al,[bx]  ; 03D32
-mov [0xd701],al  ; 03D34
-mov [0xd702],al  ; 03D37
-mov [0xd700],al  ; 03D3A
+mov [music_pitch_a],al  ; 03D34
+mov [music_pitch_b],al  ; 03D37
+mov [music_pitch],al  ; 03D3A
 inc bx  ; 03D3D
 mov al,[bx]  ; 03D3E
-mov [0xd703],al  ; 03D40
-mov al,[0xd703]  ; 03D43
+mov [music_period],al  ; 03D40
+mov al,[music_period]  ; 03D43
 db 0x8A, 0xC8  ; 03D46 mov cl,al
 db 0x8A, 0xD0  ; 03D48 mov dl,al
 loc_03D4A:
-mov al,[0xd706]  ; 03D4A
-mov [0xd704],al  ; 03D4D
+mov al,[music_tempo_hi]  ; 03D4A
+mov [music_outer],al  ; 03D4D
 loc_03D50:
-mov byte [0xd705],0xff  ; 03D50
+mov byte [music_inner],0xff  ; 03D50
 loc_03D55:
 dec cl  ; 03D55
 jnz short loc_03D7F  ; 03D57 jnz 0x3d7f
-dec byte [0xd701]  ; 03D59
+dec byte [music_pitch_a]  ; 03D59
 jnz short loc_03D7F  ; 03D5D jnz 0x3d7f
-cmp byte [0xd700],0x80  ; 03D5F
+cmp byte [music_pitch],0x80  ; 03D5F
 jl short loc_03D69  ; 03D64 jl 0x3d69
 call toggle_speaker  ; 03D66
 loc_03D69:
-mov cl,[0xd703]  ; 03D69
-mov al,[0xd700]  ; 03D6D
-mov [0xd701],al  ; 03D70
-cmp byte [0xd708],0x0  ; 03D73
+mov cl,[music_period]  ; 03D69
+mov al,[music_pitch]  ; 03D6D
+mov [music_pitch_a],al  ; 03D70
+cmp byte [music_vibrato],0x0  ; 03D73
 jz short loc_03D7F  ; 03D78 jz 0x3d7f
-mov al,[0xd708]  ; 03D7A
+mov al,[music_vibrato]  ; 03D7A
 db 0x8A, 0xD0  ; 03D7D mov dl,al
 loc_03D7F:
 dec dl  ; 03D7F
 jnz short loc_03D9F  ; 03D81 jnz 0x3d9f
-dec byte [0xd702]  ; 03D83
+dec byte [music_pitch_b]  ; 03D83
 jnz short loc_03D7F  ; 03D87 jnz 0x3d7f
-cmp byte [0xd700],0x80  ; 03D89
+cmp byte [music_pitch],0x80  ; 03D89
 jl short loc_03D93  ; 03D8E jl 0x3d93
 call toggle_speaker  ; 03D90
 loc_03D93:
-mov dl,[0xd703]  ; 03D93
+mov dl,[music_period]  ; 03D93
 dec dl  ; 03D97
-mov al,[0xd700]  ; 03D99
-mov [0xd702],al  ; 03D9C
+mov al,[music_pitch]  ; 03D99
+mov [music_pitch_b],al  ; 03D9C
 loc_03D9F:
-dec byte [0xd705]  ; 03D9F
+dec byte [music_inner]  ; 03D9F
 jnz short loc_03D55  ; 03DA3 jnz 0x3d55
-dec byte [0xd704]  ; 03DA5
+dec byte [music_outer]  ; 03DA5
 jnz short loc_03D50  ; 03DA9 jnz 0x3d50
-dec byte [0xd709]  ; 03DAB
+dec byte [music_note_cnt]  ; 03DAB
 jnz short loc_03D4A  ; 03DAF jnz 0x3d4a
-add word [0xd6fd],0x3  ; 03DB1
+add word [music_note_ptr],0x3  ; 03DB1
 jmp 0x3f01  ; 03DB6
 
 ; ---- function screen_copy ----
+; Nested busy-wait delay loop for frame timing.
+;
+; Parameters:
+;   CX = inner loop count (delay factor)
+;
+; Uses globals:
+;   [screen_copy_cnt] = outer loop count
+;
+; Preserves BX, DX.
 screen_copy:
 push dx  ; 03DB9
 push bx  ; 03DBA
-mov bx,[0xd70e]  ; 03DBB
+mov bx,[screen_copy_cnt]  ; 03DBB
 db 0x8B, 0xD1  ; 03DBF mov dx,cx
 loc_03DC1:
 db 0x8B, 0xCA  ; 03DC1 mov cx,dx
@@ -443,6 +513,8 @@ pop dx  ; 03DD3
 ret  ; 03DD4
 
 ; ---- function toggle_speaker ----
+; Toggles the PC speaker gate (bit 1 of port 0x61).
+; No parameters. Preserves AX.
 toggle_speaker:
 push ax  ; 03DD5
 in al,byte 0x61  ; 03DD6
@@ -452,21 +524,32 @@ pop ax  ; 03DDC
 ret  ; 03DDD
 
 ; ---- function play_speaker_data ----
+; Plays 256 bytes of 1-bit audio data through the PC speaker.
+; No parameters on stack.
+;
+; Reads audio data from DS:0xDA56. For each byte, processes 8 bits:
+; each bit toggles the speaker when it differs from the previous state.
+; Playback speed controlled by [speaker_delay] (delay loop per sample).
+;
+; Uses globals:
+;   [speaker_delay] = sample delay (set before call)
+;   [0xd70c] = delay counter (decremented per sample)
+;   [speaker_prev_bit] = previous bit state (for edge detection)
 play_speaker_data:
 mov cx,0x100  ; 03DDE
-mov bx,0xda56  ; 03DE1
+mov bx,speaker_pcm_buf  ; 03DE1
 mov dl,0x8  ; 03DE4
 mov al,[bx]  ; 03DE6
 loc_03DE8:
-mov ah,[0xd6f8]  ; 03DE8
-mov [0xd70c],ah  ; 03DEC
+mov ah,[speaker_delay]  ; 03DE8
+mov [speaker_delay_cnt],ah  ; 03DEC
 loc_03DF0:
-dec byte [0xd70c]  ; 03DF0
+dec byte [speaker_delay_cnt]  ; 03DF0
 jnz short loc_03DF0  ; 03DF4 jnz 0x3df0
-xor al,[0xd70d]  ; 03DF6
+xor al,[speaker_prev_bit]  ; 03DF6
 jns short loc_03E10  ; 03DFA jns 0x3e10
-xor al,[0xd70d]  ; 03DFC
-mov [0xd70d],al  ; 03E00
+xor al,[speaker_prev_bit]  ; 03DFC
+mov [speaker_prev_bit],al  ; 03E00
 call toggle_speaker  ; 03E03
 loc_03E06:
 shl al,1  ; 03E06
@@ -476,10 +559,18 @@ inc bx  ; 03E0C
 loop 0x3de4  ; 03E0D
 ret  ; 03E0F
 loc_03E10:
-xor al,[0xd70d]  ; 03E10
+xor al,[speaker_prev_bit]  ; 03E10
 jmp short loc_03E06  ; 03E14 jmp 0x3e06
 
 ; ---- function init_screen_buffers ----
+; Swaps the double-buffer pointers and clears figure slot dirty flags.
+; No parameters. No stack frame.
+;
+; Swaps [0xb87a] <-> [0xb89c] and shifts values through a chain of
+; buffer pointer words (0xb89e through 0xb8a6).
+; Then iterates figure slots (even indices 2..0x22, skipping 4->A and
+; adding gap at C->E and 1C->1E), clearing bit 0 of each slot's
+; 9-byte flag block at [slot_ptr-0x4795].
 init_screen_buffers:
 mov ax,[0xb87a]  ; 03E16
 mov bx,[0xb89c]  ; 03E19
@@ -523,6 +614,22 @@ jl short loc_03E45  ; 03E79 jl 0x3e45
 ret  ; 03E7B
 
 ; ---- function render_glyphs ----
+; Renders a null-terminated string of custom game glyphs to the offscreen buffer.
+; Characters below 'a' (0x61) are treated as spaces (advance 2 bytes).
+;
+; Parameters (registers):
+;   SI = pointer to null-terminated text string
+;   DI = destination offset in offscreen buffer
+;
+; Each glyph is looked up in the font bitmap table at DS:0xB86A
+; (pointer table at DS:[-0x4796], widths at DS:[-0x248C]).
+; Glyphs are variable-width, rendered column by column with
+; sub-pixel alignment via shift_glyph_pixels.
+;
+; Uses globals:
+;   [0xdbb1] = sub-pixel shift (0-3, multiplied by 2 for bit shift)
+;   [0xdbb2] = column counter
+;   [0xdbb4] = row counter
 render_glyphs:
 mov byte [0xdbb1],0x0  ; 03E7C
 loc_03E81:
@@ -607,6 +714,16 @@ jmp 0x4081  ; 03F25
 ret  ; 03F28
 
 ; ---- function shift_glyph_pixels ----
+; Shifts a 32-bit pixel value (DX:AX) right by [0xdbb1]*2 bits
+; for sub-pixel glyph alignment in CGA's 2-bit-per-pixel mode.
+;
+; Parameters (registers):
+;   DX:AX = 32-bit pixel data to shift
+;
+; Returns:
+;   DX:AX = shifted pixel data
+;
+; If [0xdbb1] == 0, returns immediately (no shift needed).
 shift_glyph_pixels:
 cmp byte [0xdbb1],0x0  ; 03F29
 jz short loc_03F3E  ; 03F2E jz 0x3f3e
@@ -621,6 +738,14 @@ loc_03F3E:
 ret  ; 03F3E
 
 ; ---- function show_scroll_text ----
+; Shows scrolling story narration text (intro/outro).
+; No parameters. No stack frame.
+;
+; Uses globals:
+;   [0xdbb5] = number of text lines to display
+;   [0xdbb6] = start of text data (null-terminated lines)
+;
+; Clears screen, then calls scroll_text_up to animate the scroll.
 show_scroll_text:
 call clear_screen  ; 03F3F
 call update_display  ; 03F42
@@ -632,6 +757,11 @@ call scroll_text_up  ; 03F52
 ret  ; 03F55
 
 ; ---- function draw_ui_element ----
+; Draws a single UI text element at a fixed screen position.
+; No parameters. No stack frame.
+;
+; Renders text from DS:0xDEB6 at buffer position DS:0x20B6,
+; then displays and waits 0x48 ticks (~4 seconds).
 draw_ui_element:
 call clear_screen  ; 03F56
 call update_display  ; 03F59
@@ -644,6 +774,17 @@ call delay_with_input  ; 03F6D
 ret  ; 03F70
 
 ; ---- function show_dialog ----
+; Shows a multi-line dialog box and waits for keypress or joystick.
+; No parameters. No stack frame.
+;
+; Uses globals:
+;   [0xddc0] = number of text lines
+;   [0xddc1] = start of text data (null-terminated lines)
+;   [0xdf44] = joystick button state (nonzero = pressed)
+;
+; Lines are rendered 0x3C0 bytes apart (12 CGA scanlines) starting
+; at buffer offset DS:0x977. Polls keyboard with wait_vsync(0x15)
+; between checks.
 show_dialog:
 call flush_keyboard  ; 03F71
 call clear_screen  ; 03F74
@@ -676,6 +817,12 @@ loc_03FB6:
 ret  ; 03FB6
 
 ; ---- function draw_scene_element ----
+; Draws two lines of scene text (e.g., credits) at fixed positions.
+; No parameters. No stack frame.
+;
+; Line 1: DS:0xDEBE at buffer DS:0x1D92
+; Line 2: DS:0xDEC8 at buffer DS:0x228B
+; Waits 0x48 ticks after display.
 draw_scene_element:
 call clear_screen  ; 03FB7
 lea di,[0x1d92]  ; 03FBA
@@ -690,6 +837,12 @@ call delay_with_input  ; 03FD6
 ret  ; 03FD9
 
 ; ---- function draw_gate ----
+; Draws two lines of gate/door text at fixed positions.
+; No parameters. No stack frame.
+;
+; Line 1: DS:0xDED7 at buffer DS:0x1D8D
+; Line 2: DS:0xDEE6 at buffer DS:0x2287
+; Waits 0x48 ticks after display.
 draw_gate:
 call clear_screen  ; 03FDA
 lea di,[0x1d8d]  ; 03FDD
@@ -704,6 +857,13 @@ call delay_with_input  ; 03FF9
 ret  ; 03FFC
 
 ; ---- function check_disk_prompt ----
+; Shows "make sure your karateka disk is in drive a" prompt (3 lines).
+; Waits for any keypress before returning.
+; No parameters. No stack frame.
+;
+; Line 1: DS:0xDEFA at buffer DS:0x1B01
+; Line 2: DS:0xDF12 at buffer DS:0x2009
+; Line 3: DS:0xDF26 at buffer DS:0x24FF
 check_disk_prompt:
 call clear_screen  ; 03FFD
 lea di,[0x1b01]  ; 04000
@@ -720,6 +880,20 @@ call wait_for_key  ; 04024
 ret  ; 04027
 
 ; ---- function scroll_text_up ----
+; Scrolls text upward on CGA VRAM, one scanline at a time.
+; Renders each new text line from the offscreen buffer at the bottom.
+; No parameters. Preserves ES.
+;
+; Uses globals:
+;   [0xddbe] = pointer to current text line (advanced after each line)
+;   [0xdbb3] = remaining line count (decremented, stops at 0)
+;   [0xe0e7] = VRAM offset for bottom scanline (from scanline LUT)
+;
+; For each pixel row scrolled: shifts all VRAM scanlines up by one
+; (copying from [bx-0x20a5] to [bx-0x20a7] via ES=B800h), then
+; copies a row from the rendered text buffer to the bottom.
+; Polls keyboard between rows; exits early if key pressed.
+; Delays 1 tick between rows for smooth scrolling.
 scroll_text_up:
 push es  ; 04028
 mov ax,0xb800  ; 04029
@@ -781,6 +955,18 @@ pop es  ; 0409F
 ret  ; 040A0
 
 ; ---- function update_score ----
+; Checksum verification / anti-tamper check.
+; No parameters. No stack frame.
+;
+; Computes two checksums over code regions:
+;   1. Sum of bytes at CS:0x255..0x515 (game_init area, 0x2C1 bytes)
+;      Expected: AL == 0x5B
+;   2. Sum of bytes at CS:0x169C..0x171C (disk.asm area, 0x81 bytes)
+;      Expected: AL == 0x19
+;
+; If both checksums pass: returns normally.
+; If either fails: zeroes out 11 words at DS:[-0x3C2E..], effectively
+;   corrupting game state as a tamper response.
 update_score:
 lea si,[0x255]  ; 040A1
 mov bx,0x2c0  ; 040A5
@@ -809,6 +995,19 @@ jnl short loc_040C9  ; 040D2 jnl 0x40c9
 ret  ; 040D4
 
 ; ---- function sub_040D5 ----
+; Timer-based random seed generator. Reads the timer value, applies
+; a linear transformation (val * 0xE5D + 3) / 0x8000, stores the
+; remainder back as the new seed.
+;
+; No parameters on stack.
+;
+; Local variables:
+;   [bp+0x2] = timer/seed value
+;
+; Returns: AX = pseudo-random value (remainder of division)
+;
+; The unlabeled function at 0x4111 saves the current timer value
+; by calling sub_04123(1, &local).
 sub_040D5:
 push bp  ; 040D5
 sub sp,0x4  ; 040D6
@@ -849,6 +1048,11 @@ pop bp  ; 04121
 ret  ; 04122
 
 ; ---- function sub_04123 ----
+; Gets or sets the timer seed value at [0xdf40].
+;
+; Parameters (on stack):
+;   [bp+0x6] = direction: 0 = get (read [0xdf40] into *ptr), 1 = set (write *ptr to [0xdf40])
+;   [bp+0x8] = pointer to word value
 sub_04123:
 push bp  ; 04123
 sub sp,0x2  ; 04124

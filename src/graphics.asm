@@ -2,6 +2,9 @@
 
 
 ; ---- function clear_screen ----
+; Fills the offscreen buffer (DS:0x337) with zeros.
+; No parameters. Preserves ES.
+; Buffer size: 0x3E80 bytes (320x200 CGA, 2 bits/pixel = 16000 bytes).
 clear_screen:
 push es  ; 00B4E
 push ds  ; 00B4F
@@ -14,6 +17,20 @@ pop es  ; 00B5C
 ret  ; 00B5D
 
 ; ---- function draw_screen ----
+; Reads the next frame data from two animation sequences.
+; No parameters. No stack frame.
+;
+; Uses globals:
+;   [0x421e] = read position for sequence 1 (base 0x443c)
+;   [0x4220] = read position for sequence 2 (base 0x893a, via [si-0x76c6])
+;   [0x422c] = repeat counter for seq 1 (0x7B = run-length marker)
+;   [0x422d] = repeat value for seq 1
+;   [0x422e] = repeat counter for seq 2
+;   [0x422f] = repeat value for seq 2
+;
+; Returns:
+;   DL = frame data from sequence 1
+;   AL = frame data from sequence 2
 draw_screen:
 cmp byte [0x422c],0x0  ; 00B5E
 jz short loc_00B70  ; 00B63 jz 0xb70
@@ -58,6 +75,21 @@ loc_00BC8:
 ret  ; 00BC8
 
 ; ---- function render_figures ----
+; Draws all active figures from the figure slot list to screen.
+; No parameters. No stack frame.
+;
+; Iterates 4-byte slots starting at index 3 in the figure list.
+; Each slot: [slot+0]=figure_id (0xFF=end), [slot+1..2]=position, [slot+3]=flags.
+; Calls init_actor or process_animation for each figure, then
+; transfers to screen via update_display, draw_background, or blit_buffer_to_vram
+; depending on render mode [0xbb31].
+;
+; Uses globals:
+;   [0xbb2e] = current slot index (starts at 3)
+;   [0xbb30] = vsync wait count
+;   [0xbb31] = render mode (0=normal, nonzero=blit)
+;   [0xbb32] = first figure ID (passed to draw_sprite)
+;   [0xee]   = display mode (0=background copy, nonzero=buffer copy)
 render_figures:
 mov word [0xbb2e],0x3  ; 00BC9
 mov al,[0xbb32]  ; 00BCF
@@ -119,6 +151,19 @@ add sp,0x2  ; 00C4E
 ret  ; 00C51
 
 ; ---- function draw_sprite ----
+; Prepares the offscreen buffer and background for the current scene.
+; Dispatches rendering based on scene state [0xea].
+;
+; Parameters:
+;   AL = figure/render mode value (from [0xbb32])
+;
+; Uses globals:
+;   [0xea]   = scene state (0-1: fill pattern, 2: clear, 3+: sky pattern)
+;   [0xe4]   = current background ID
+;   [0xbb2a] = last rendered background ID (skip redraw if same)
+;   [0xbcd0] = scene transition pending flag
+;
+; ES = DS on entry (set internally). Preserves ES on exit.
 draw_sprite:
 push es  ; 00C52
 push ds  ; 00C53
@@ -238,6 +283,13 @@ pop es  ; 00D66
 ret  ; 00D67
 
 ; ---- function update_display ----
+; Copies the offscreen buffer (DS:0x337) to CGA VRAM (B800:0000).
+; No parameters. No stack frame. Preserves ES.
+;
+; Copies 200 scanlines, 80 bytes (40 words) each, using a scanline
+; lookup table at DS:0xDF59 ([bx-0x20a7]) that maps logical line
+; numbers to CGA's interleaved VRAM addresses (even lines at 0x0000,
+; odd lines at 0x2000).
 update_display:
 mov bx,0x0  ; 00D68
 lea si,[0x337]  ; 00D6B
@@ -255,6 +307,13 @@ pop es  ; 00D87
 ret  ; 00D88
 
 ; ---- function draw_background ----
+; Copies a region of the offscreen buffer directly to CGA VRAM.
+; No parameters. No stack frame. Preserves ES.
+;
+; Selects the region based on [0xe4] vs [0xbb2a] (background changed?)
+; and [0xea] (scene state >= 2 adjusts region).
+; Default: 168 lines from DS:0xD37, LUT offset 0x40.
+; If background unchanged: 84 lines from DS:0x2777, LUT offset 0xE8.
 draw_background:
 mov dl,0xa8  ; 00D89
 lea si,[0xd37]  ; 00D8B
@@ -286,6 +345,11 @@ pop es  ; 00DCE
 ret  ; 00DCF
 
 ; ---- function scroll_screen ----
+; Clears the bottom portion of the offscreen buffer (ground/scroll region).
+; No parameters. No stack frame. Preserves ES.
+;
+; Default: clears 0x690 words starting at DS:0x26D7.
+; If [0xea] >= 2: extends region up by 0x1E0 bytes and adds 0xF0 words.
 scroll_screen:
 lea di,[0x26d7]  ; 00DD0
 mov cx,0x690  ; 00DD4
@@ -303,6 +367,15 @@ pop es  ; 00DED
 ret  ; 00DEE
 
 ; ---- function blit_buffer_to_vram ----
+; Transfers offscreen buffer to CGA VRAM with a visible pixel-sweep effect.
+; No parameters. Saves/restores BP and ES.
+;
+; Processes one pixel column at a time (BX = 0..0x4F = 80 columns).
+; For each column, makes 4 passes over all 200 scanlines, copying
+; 2 bits per pass (bits 7-6, 5-4, 3-2, 1-0) with a delay between passes.
+; This creates a visual "dissolve" effect as the image appears.
+;
+; Uses the same scanline LUT at DS:0xDF59 as update_display.
 blit_buffer_to_vram:
 push bp  ; 00DEF
 db 0x33, 0xDB  ; 00DF0 xor bx,bx
@@ -391,12 +464,20 @@ pop bp  ; 00EE6
 ret  ; 00EE7
 
 ; ---- function blit_column_delay ----
+; Busy-wait delay: 1000 iterations of an empty loop.
+; No parameters. No stack frame. Called between blit_buffer_to_vram passes.
 blit_column_delay:
 mov cx,0x3e8  ; 00EE8
 loop 0xeeb  ; 00EEB
 ret  ; 00EED
 
 ; ---- function animate_figure ----
+; Draws a single figure animation frame with background.
+; No parameters. No stack frame. Preserves ES.
+;
+; Sequence: clear screen -> copy background (0x1040 bytes from DS:0xA6D6
+; to DS:0x1917) -> update display -> delay -> animate figure at
+; position (0x5C, 0x28, 0xB4) -> update display -> delay.
 animate_figure:
 call clear_screen  ; 00EEE
 push es  ; 00EF1
@@ -424,6 +505,11 @@ pop es  ; 00F25
 ret  ; 00F26
 
 ; ---- function animate_step ----
+; Performs a single animation step: clear, draw figure, display, wait.
+; No parameters. No stack frame.
+;
+; Draws figure at position (0x5B, 0x6A, 0x73), enables single-step
+; mode [0x168]=1 during the delay, then disables it.
 animate_step:
 call clear_screen  ; 00F27
 mov ax,0x73  ; 00F2A
@@ -442,6 +528,17 @@ mov word [0x168],0x0  ; 00F4B
 ret  ; 00F51
 
 ; ---- function load_palette ----
+; Loads a palette file from disk and sets the CGA palette.
+;
+; Parameters (on stack, Lattice C convention):
+;   [bp+0x12] = palette index (passed to set_cga_palette)
+;   [bp+0x14] = data offset index into resource table
+;
+; Local variables:
+;   [bp+0x6] = file handle from set_cga_palette
+;   [bp+0x8] = total data size (high byte << 8 + low byte)
+;
+; Returns: AX = total data size
 load_palette:
 push bp  ; 00F52
 sub sp,0xe  ; 00F53
@@ -491,6 +588,18 @@ pop bp  ; 00FB9
 ret  ; 00FBA
 
 ; ---- function load_background ----
+; Loads a .bcg background file, decompresses it into the offscreen buffer,
+; and displays it.
+;
+; Parameters (on stack, Lattice C convention):
+;   (none visible - uses filename from set_cga_palette result)
+;
+; Local variables:
+;   [bp+0x4] = file handle from set_cga_palette
+;   [bp+0x6] = total file size
+;
+; Loads data to DS:0x337 (offscreen buffer), calls load_resource to
+; decompress, then update_display + wait_vsync(0x19) to show it.
 load_background:
 push bp  ; 00FBB
 sub sp,0xc  ; 00FBC
@@ -543,6 +652,26 @@ pop bp  ; 01025
 ret  ; 01026
 
 ; ---- function load_animation ----
+; Loads a complete animation set: two figure data files (.gal) and
+; builds frame offset tables for both.
+;
+; Parameters (on stack, Lattice C convention):
+;   [bp+0x2e] = animation set index (indexes into resource pointer tables
+;               at [si+0x264] and [si+0x2c0])
+;
+; Local variables:
+;   [bp+0x0]  = temp
+;   [bp+0x8]  = file handle from set_cga_palette
+;   [bp+0xa]  = secondary data size
+;   [bp+0xc]  = frame offset counter (iterates by 4, up to 0x2A8)
+;   [bp+0x10] = secondary data size copy
+;   [bp+0x12] = computed frame offset (16-bit)
+;   [bp+0x14] = frame index byte
+;   [bp+0x16..0x2D] = filename buffer (24 bytes)
+;
+; Loads primary data to DS:0x443C + [0x160], secondary to DS:0x893A + [0x164].
+; Builds frame offset lookup tables at [0x423C] and [0x873A].
+; Uses strcat to build filenames by appending extensions.
 load_animation:
 push bp  ; 01027
 sub sp,0x2a  ; 01028
