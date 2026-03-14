@@ -5,7 +5,7 @@
 play_sound:
 lea bx,[0xce3e]  ; 019A2
 lea di,[0xcdea]  ; 019A6
-call sub_0197E  ; 019AA
+call build_anim_offsets  ; 019AA
 ret  ; 019AD
 
 ; ---- function init_sound ----
@@ -25,7 +25,7 @@ mov ax,0xd59c  ; 019C3
 push ax  ; 019C6
 call init_figure  ; 019C7
 db 0x8B, 0xE5  ; 019CA mov sp,bp
-call sub_01976  ; 019CC
+call build_anim_offsets_alt  ; 019CC
 db 0x33, 0xC0  ; 019CF xor ax,ax
 mov bx,0x5  ; 019D1
 push bx  ; 019D4

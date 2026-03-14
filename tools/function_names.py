@@ -41,10 +41,10 @@ FUNCTION_NAMES = {
     0x044D3: "check_joystick",        # Check joystick input
 
     # === Timer ===
-    0x018BF: "delay_ticks",           # INT 1Ah - delay for N timer ticks
-    0x018D5: "delay_with_input",      # Delay with keyboard check (interruptible)
-    0x018EF: "timer_mark",            # INT 1Ah - save current timer value
-    0x018F8: "timer_wait_3ticks",     # INT 1Ah - wait for 3 ticks since last mark
+    0x018BF: "delay_ticks",           # INT 1Ah - busy-wait for AX timer ticks (~55ms each)
+    0x018D5: "delay_with_input",      # Interruptible delay: AX/2 iterations of 2-tick waits, breaks on keypress
+    0x018EF: "timer_mark",            # INT 1Ah - record current tick for frame pacing
+    0x018F8: "timer_wait_3ticks",     # INT 1Ah - wait until 3 ticks since timer_mark (~165ms, ~6 FPS)
 
     # === Disk / File Operations ===
     0x016C1: "read_disk_sector",      # INT 13h - raw disk sector read
@@ -57,19 +57,20 @@ FUNCTION_NAMES = {
     0x05B9C: "load_resource_3",       # Another resource loader
 
     # === Interrupt Vector Management ===
-    0x0482B: "install_handlers",      # INT 21h/25h - install interrupt handlers
+    0x0482B: "install_handlers",      # INT 21h/25h - install critical error handler (INT 24h)
     0x04883: "save_int_vectors",      # Save original interrupt vectors
     0x0483C: "restore_int_vectors",   # Restore original interrupt vectors
 
     # === Graphics Rendering ===
-    0x00B4E: "clear_screen",          # Called 14x - screen clear/fill
+    0x00B4E: "clear_screen",          # Clear offscreen buffer at DS:0x337
     0x00B5E: "draw_screen",           # Called 8x - main screen draw
-    0x00C52: "draw_sprite",           # Sprite drawing routine
-    0x00D68: "update_display",        # Called 14x - display update/vsync
-    0x00D89: "draw_background",       # Background rendering
-    0x00DD0: "scroll_screen",         # Screen scrolling
-    0x00DEF: "draw_figure",           # Figure/character drawing
-    0x00EE8: "erase_figure",          # Erase figure from screen
+    0x00BC9: "render_figures",        # Draw all active figures from figure slot list to screen
+    0x00C52: "draw_sprite",           # Prepare offscreen buffer + background, dispatch by render_mode/scene_state
+    0x00D68: "update_display",        # Copy offscreen buffer (DS:0x337) to CGA VRAM (B800:0) via scanline LUT
+    0x00D89: "draw_background",       # Copy background region directly to CGA VRAM
+    0x00DD0: "scroll_screen",         # Clear scroll region of offscreen buffer
+    0x00DEF: "blit_buffer_to_vram",   # Transfer offscreen buffer to CGA VRAM pixel-column by pixel-column (4 bit-plane passes with visible sweep)
+    0x00EE8: "blit_column_delay",     # Busy-wait delay (1000 cycles) between bit-plane passes in blit
     0x00EEE: "animate_figure",        # Animate a figure (calls draw + delay)
     0x00F27: "animate_step",          # Single animation step
     0x00F52: "load_palette",          # Load color palette
@@ -78,13 +79,19 @@ FUNCTION_NAMES = {
     0x0166D: "set_cga_palette",       # Set CGA palette colors
     0x01277: "init_figure",           # Initialize figure/sprite data
     0x012EB: "setup_figure_data",     # Setup figure animation data
-    0x01734: "setup_screen",          # Screen setup/configuration
+
+    # === Animation Script System ===
+    0x01734: "run_anim_script",       # Animation script interpreter - reads bytecode commands from 0xBD04, dispatches via jump table at 0xBCE8
+    0x017FB: "anim_cmd_do_scr",       # Animation command: render current frame (calls render_figures), waits for key in single_step_mode
+    0x0186C: "anim_cmd_init_sal",     # Animation command: reset figure list and rendering state (init scene animation list)
+    0x01976: "build_anim_offsets_alt", # Build animation frame offset table for secondary data (base 0xC428, table 0xC3D4)
+    0x0197E: "build_anim_offsets",    # Build animation frame offset table - scans 42 frames (0x11-byte records or 2-byte skip markers, 0xFF terminated)
 
     # === Sound ===
     0x019A2: "play_sound",            # Sound effect playback
     0x019AE: "init_sound",            # Initialize sound system
     0x019EE: "stop_sound",            # Stop current sound
-    0x0190B: "set_music_callback",    # Set up music interrupt callback
+    0x0190B: "set_music_callback",    # Save scene state, play animation+music sequence, restore state, redirect return address
 
     # === Game Logic ===
     0x00255: "game_init",             # Main game initialization - calls everything
@@ -125,16 +132,19 @@ FUNCTION_NAMES = {
     0x03B5C: "effect_dissolve",       # Dissolve effect
     0x03BAE: "wait_vsync",            # Wait for vertical sync (called 21x!)
     0x03DB9: "screen_copy",           # Screen buffer copy
-    0x03DD5: "screen_copy_region",    # Copy screen region
+    0x03DD5: "toggle_speaker",        # Toggle PC speaker gate (port 0x61 bit 1) - used by sound playback
+    0x03DDE: "play_speaker_data",     # Play 256 bytes of 1-bit audio from 0xDA56 through PC speaker
     0x03E16: "init_screen_buffers",   # Initialize screen double-buffer
-    0x03E7C: "swap_screen_buffers",   # Swap front/back buffers
-    0x03F3F: "draw_health_bar",       # Draw health/status bar
+    0x03E7C: "render_glyphs",         # Render null-terminated glyph string: chars >= 'a' looked up in font bitmap table, variable-width, drawn to offscreen buffer at DI
+    0x03F29: "shift_glyph_pixels",    # Sub-pixel shift: shift DX:AX right by [0xdbb1]*2 bits for fractional glyph alignment
+    0x03F3F: "show_scroll_text",      # Show scrolling text (story narration) - line count from [0xdbb5], text from [0xdbb6]
     0x03F56: "draw_ui_element",       # Draw UI element
-    0x03F71: "show_dialog",           # Show dialog/text box
+    0x03F71: "show_dialog",           # Show multi-line dialog - line count from [0xddc0], text from [0xddc1], 12 scanlines apart
     0x03FB7: "draw_scene_element",    # Draw scene-specific element
     0x03FDA: "draw_gate",             # Draw gate/door
     0x03FFD: "check_disk_prompt",     # Check disk and show prompt if needed
     0x040A1: "update_score",          # Update score display
+    0x04028: "scroll_text_up",        # Scroll text up on CGA VRAM one scanline at a time, render new line at bottom from offscreen buffer
 
     # === Physics / Movement ===
     0x04441: "update_position",       # Update actor position

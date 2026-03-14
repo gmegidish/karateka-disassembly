@@ -57,8 +57,8 @@ mov [0x4220],si  ; 00BC4
 loc_00BC8:
 ret  ; 00BC8
 
-; ---- function sub_00BC9 ----
-sub_00BC9:
+; ---- function render_figures ----
+render_figures:
 mov word [0xbb2e],0x3  ; 00BC9
 mov al,[0xbb32]  ; 00BCF
 call draw_sprite  ; 00BD2
@@ -110,7 +110,7 @@ call wait_vsync  ; 00C3B
 add sp,0x2  ; 00C3E
 ret  ; 00C41
 loc_00C42:
-call draw_figure  ; 00C42
+call blit_buffer_to_vram  ; 00C42
 mov al,[0xbb30]  ; 00C45
 mov ah,0x0  ; 00C48
 push ax  ; 00C4A
@@ -302,8 +302,8 @@ rep stosw  ; 00DEB
 pop es  ; 00DED
 ret  ; 00DEE
 
-; ---- function draw_figure ----
-draw_figure:
+; ---- function blit_buffer_to_vram ----
+blit_buffer_to_vram:
 push bp  ; 00DEF
 db 0x33, 0xDB  ; 00DF0 xor bx,bx
 push es  ; 00DF2
@@ -326,7 +326,7 @@ or [es:bx+di],al  ; 00E22
 add si,0xa0  ; 00E25
 add bp,0x2  ; 00E29
 loop 0xe01  ; 00E2C
-call erase_figure  ; 00E2E
+call blit_column_delay  ; 00E2E
 lea si,[0x337]  ; 00E31
 db 0x33, 0xED  ; 00E35 xor bp,bp
 mov cx,0x64  ; 00E37
@@ -344,7 +344,7 @@ or [es:bx+di],al  ; 00E5B
 add si,0xa0  ; 00E5E
 add bp,0x2  ; 00E62
 loop 0xe3a  ; 00E65
-call erase_figure  ; 00E67
+call blit_column_delay  ; 00E67
 lea si,[0x337]  ; 00E6A
 db 0x33, 0xED  ; 00E6E xor bp,bp
 mov cx,0x64  ; 00E70
@@ -362,7 +362,7 @@ or [es:bx+di],al  ; 00E94
 add si,0xa0  ; 00E97
 add bp,0x2  ; 00E9B
 loop 0xe73  ; 00E9E
-call erase_figure  ; 00EA0
+call blit_column_delay  ; 00EA0
 lea si,[0x337]  ; 00EA3
 db 0x33, 0xED  ; 00EA7 xor bp,bp
 mov cx,0x64  ; 00EA9
@@ -380,7 +380,7 @@ or [es:bx+di],al  ; 00ECD
 add si,0xa0  ; 00ED0
 add bp,0x2  ; 00ED4
 loop 0xeac  ; 00ED7
-call erase_figure  ; 00ED9
+call blit_column_delay  ; 00ED9
 inc bx  ; 00EDC
 cmp bx,0x50  ; 00EDD
 jz short loc_00EE5  ; 00EE0 jz 0xee5
@@ -390,8 +390,8 @@ pop es  ; 00EE5
 pop bp  ; 00EE6
 ret  ; 00EE7
 
-; ---- function erase_figure ----
-erase_figure:
+; ---- function blit_column_delay ----
+blit_column_delay:
 mov cx,0x3e8  ; 00EE8
 loop 0xeeb  ; 00EEB
 ret  ; 00EED

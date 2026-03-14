@@ -9,7 +9,7 @@ mov ss,ax  ; 0000B
 mov sp,0x80  ; 0000D
 sti  ; 00010
 mov ah,0x30  ; 00011
-int 0x21  ; 00013 - INT 21h/AH=30h: Get DOS version number (returns AL=major, AH=minor)
+int 0x21  ; 00013
 db 0x0A, 0xC0  ; 00015 or al,al
 jnz short loc_0001C  ; 00017 jnz 0x1c
 mov ax,0x1  ; 00019
@@ -244,17 +244,17 @@ call main  ; 001F5
 cmp byte [0xf],0x2  ; 001F8
 jl short loc_00204  ; 001FD jl 0x204
 mov ax,0x4c00  ; 001FF
-int 0x21  ; 00202 - INT 21h/AH=4Ch: Terminate program with exit code 0 (success)
+int 0x21  ; 00202
 loc_00204:
 db 0x8B, 0xE5  ; 00204 mov sp,bp
 retf  ; 00206
 mov ah,0x9  ; 00207
-int 0x21  ; 00209 - INT 21h/AH=09h: Print '$'-terminated string at DS:DX
+int 0x21  ; 00209
 mov es,word [0x5b]  ; 0020B
 cmp byte [0xf],0x2  ; 0020F
 jl short loc_0021B  ; 00214 jl 0x21b
 mov ax,0x4c01  ; 00216
-int 0x21  ; 00219 - INT 21h/AH=4Ch: Terminate program with exit code 1 (error)
+int 0x21  ; 00219
 loc_0021B:
 push es  ; 0021B
 db 0x33, 0xC0  ; 0021C xor ax,ax
@@ -265,11 +265,11 @@ db 0x2D, 0x04, 0x00  ; 00223 sub ax,0x4
 db 0x8B, 0xE0  ; 00226 mov sp,ax
 mov dx,0xc7  ; 00228
 mov ah,0x9  ; 0022B
-int 0x21  ; 0022D - INT 21h/AH=09h: Print '$'-terminated string at DS:DX
+int 0x21  ; 0022D
 cmp byte [0xf],0x2  ; 0022F
 jl short loc_0023B  ; 00234 jl 0x23b
 mov ax,0x4c01  ; 00236
-int 0x21  ; 00239 - INT 21h/AH=4Ch: Terminate program with exit code 1 (error)
+int 0x21  ; 00239
 loc_0023B:
 retf  ; 0023B
 
@@ -280,7 +280,7 @@ jl short loc_0024C  ; 00241 jl 0x24c
 db 0x8B, 0xEC  ; 00243 mov bp,sp
 mov ax,[bp+0x2]  ; 00245
 mov ah,0x4c  ; 00248
-int 0x21  ; 0024A - INT 21h/AH=4Ch: Terminate program with exit code in AL
+int 0x21  ; 0024A
 loc_0024C:
 mov ax,[0x15]  ; 0024C
 db 0x2D, 0x04, 0x00  ; 0024F sub ax,0x4

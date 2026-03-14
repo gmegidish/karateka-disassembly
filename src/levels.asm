@@ -1062,7 +1062,7 @@ cmp word [0x130],0x7  ; 03674
 jnz short loc_03697  ; 03679 jnz 0x3697
 cmp word [0x10c],0x40  ; 0367B
 jng short loc_03690  ; 03680 jng 0x3690
-call setup_screen  ; 03682
+call run_anim_script  ; 03682
 call show_dialog  ; 03685
 mov ax,0x1  ; 03688
 add sp,0x6  ; 0368B

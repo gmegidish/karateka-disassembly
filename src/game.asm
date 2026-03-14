@@ -88,7 +88,7 @@ db 0x8B, 0xE5  ; 0032B mov sp,bp
 call timer_wait_3ticks  ; 0032D
 call scene_update  ; 00330
 call level_setup  ; 00333
-call sub_00BC9  ; 00336
+call render_figures  ; 00336
 mov ax,[0x154]  ; 00339
 test ax,ax  ; 0033C
 jng short loc_00383  ; 0033E jng 0x383
@@ -215,7 +215,7 @@ jz short loc_00461  ; 00459 jz 0x461
 call load_scene  ; 0045B
 jmp 0x742  ; 0045E
 loc_00461:
-call draw_health_bar  ; 00461
+call show_scroll_text  ; 00461
 test ax,ax  ; 00464
 jz short loc_0046E  ; 00466 jz 0x46e
 call load_scene  ; 00468
@@ -235,7 +235,7 @@ mov ax,0x6  ; 00490
 push ax  ; 00493
 call load_animation  ; 00494
 db 0x8B, 0xE5  ; 00497 mov sp,bp
-call setup_screen  ; 00499
+call run_anim_script  ; 00499
 test ax,ax  ; 0049C
 jz short loc_004A6  ; 0049E jz 0x4a6
 call load_scene  ; 004A0
@@ -258,7 +258,7 @@ db 0x33, 0xC0  ; 004C6 xor ax,ax
 push ax  ; 004C8
 call combat_update  ; 004C9
 db 0x8B, 0xE5  ; 004CC mov sp,bp
-call setup_screen  ; 004CE
+call run_anim_script  ; 004CE
 test ax,ax  ; 004D1
 jz short loc_004DA  ; 004D3 jz 0x4da
 call game_shutdown  ; 004D5
@@ -275,7 +275,7 @@ jz short loc_00537  ; 004F8 jz 0x537
 call timer_wait_3ticks  ; 004FA
 call scene_update  ; 004FD
 call level_setup  ; 00500
-call sub_00BC9  ; 00503
+call render_figures  ; 00503
 mov ax,[0x154]  ; 00506
 test ax,ax  ; 00509
 jng short loc_0052C  ; 0050B jng 0x52c
@@ -380,6 +380,6 @@ mov [0xdf44],ax  ; 005D5
 mov [0xea],ax  ; 005D8
 call init_figure  ; 005DB
 db 0x8B, 0xE5  ; 005DE mov sp,bp
-call setup_screen  ; 005E0
+call run_anim_script  ; 005E0
 pop bp  ; 005E3
 ret  ; 005E4

@@ -197,7 +197,7 @@ ret  ; 03BE8
 mov cx,0x2  ; 03BE9
 loc_03BEC:
 push cx  ; 03BEC
-call screen_copy_region  ; 03BED
+call toggle_speaker  ; 03BED
 call screen_copy  ; 03BF0
 pop cx  ; 03BF3
 inc cx  ; 03BF4
@@ -208,7 +208,7 @@ ret  ; 03BFB
 mov cx,0x2  ; 03BFC
 loc_03BFF:
 push cx  ; 03BFF
-call screen_copy_region  ; 03C00
+call toggle_speaker  ; 03C00
 call screen_copy  ; 03C03
 pop cx  ; 03C06
 inc cx  ; 03C07
@@ -220,7 +220,7 @@ ret  ; 03C0F
 mov cx,0x2  ; 03C10
 loc_03C13:
 push cx  ; 03C13
-call screen_copy_region  ; 03C14
+call toggle_speaker  ; 03C14
 call screen_copy  ; 03C17
 pop cx  ; 03C1A
 inc cx  ; 03C1B
@@ -233,7 +233,7 @@ mov bl,0xa  ; 03C24
 loc_03C26:
 mov cx,0x5  ; 03C26
 call screen_copy  ; 03C29
-call screen_copy_region  ; 03C2C
+call toggle_speaker  ; 03C2C
 dec bl  ; 03C2F
 jnz short loc_03C26  ; 03C31 jnz 0x3c26
 pop bp  ; 03C33
@@ -242,7 +242,7 @@ mov bl,0x10  ; 03C35
 loc_03C37:
 mov cx,0xa  ; 03C37
 call screen_copy  ; 03C3A
-call screen_copy_region  ; 03C3D
+call toggle_speaker  ; 03C3D
 dec bl  ; 03C40
 jnz short loc_03C37  ; 03C42 jnz 0x3c37
 pop bp  ; 03C44
@@ -250,7 +250,7 @@ ret  ; 03C45
 mov cx,0x10  ; 03C46
 loc_03C49:
 push cx  ; 03C49
-call screen_copy_region  ; 03C4A
+call toggle_speaker  ; 03C4A
 call screen_copy  ; 03C4D
 pop cx  ; 03C50
 shr cx,1  ; 03C51
@@ -262,29 +262,29 @@ mov bl,0x3  ; 03C5A
 loc_03C5C:
 mov cx,0x10  ; 03C5C
 call screen_copy  ; 03C5F
-call screen_copy_region  ; 03C62
+call toggle_speaker  ; 03C62
 dec bl  ; 03C65
 jnz short loc_03C5C  ; 03C67 jnz 0x3c5c
 pop bp  ; 03C69
 ret  ; 03C6A
 mov ax,[0xd710]  ; 03C6B
 mov [0xd6f8],al  ; 03C6E
-call sub_03DDE  ; 03C71
+call play_speaker_data  ; 03C71
 pop bp  ; 03C74
 ret  ; 03C75
 mov ax,[0xd712]  ; 03C76
 mov [0xd6f8],al  ; 03C79
-call sub_03DDE  ; 03C7C
+call play_speaker_data  ; 03C7C
 pop bp  ; 03C7F
 ret  ; 03C80
 mov ax,[0xd714]  ; 03C81
 mov [0xd6f8],al  ; 03C84
-call sub_03DDE  ; 03C87
+call play_speaker_data  ; 03C87
 pop bp  ; 03C8A
 ret  ; 03C8B
 mov ax,[0xd716]  ; 03C8C
 mov [0xd6f8],al  ; 03C8F
-call sub_03DDE  ; 03C92
+call play_speaker_data  ; 03C92
 pop bp  ; 03C95
 ret  ; 03C96
 mov bx,0xd736  ; 03C97
@@ -388,7 +388,7 @@ dec byte [0xd701]  ; 03D59
 jnz short loc_03D7F  ; 03D5D jnz 0x3d7f
 cmp byte [0xd700],0x80  ; 03D5F
 jl short loc_03D69  ; 03D64 jl 0x3d69
-call screen_copy_region  ; 03D66
+call toggle_speaker  ; 03D66
 loc_03D69:
 mov cl,[0xd703]  ; 03D69
 mov al,[0xd700]  ; 03D6D
@@ -404,7 +404,7 @@ dec byte [0xd702]  ; 03D83
 jnz short loc_03D7F  ; 03D87 jnz 0x3d7f
 cmp byte [0xd700],0x80  ; 03D89
 jl short loc_03D93  ; 03D8E jl 0x3d93
-call screen_copy_region  ; 03D90
+call toggle_speaker  ; 03D90
 loc_03D93:
 mov dl,[0xd703]  ; 03D93
 dec dl  ; 03D97
@@ -442,8 +442,8 @@ pop bx  ; 03DD2
 pop dx  ; 03DD3
 ret  ; 03DD4
 
-; ---- function screen_copy_region ----
-screen_copy_region:
+; ---- function toggle_speaker ----
+toggle_speaker:
 push ax  ; 03DD5
 in al,byte 0x61  ; 03DD6
 xor al,0x2  ; 03DD8
@@ -451,8 +451,8 @@ out byte 0x61,al  ; 03DDA
 pop ax  ; 03DDC
 ret  ; 03DDD
 
-; ---- function sub_03DDE ----
-sub_03DDE:
+; ---- function play_speaker_data ----
+play_speaker_data:
 mov cx,0x100  ; 03DDE
 mov bx,0xda56  ; 03DE1
 mov dl,0x8  ; 03DE4
@@ -467,7 +467,7 @@ xor al,[0xd70d]  ; 03DF6
 jns short loc_03E10  ; 03DFA jns 0x3e10
 xor al,[0xd70d]  ; 03DFC
 mov [0xd70d],al  ; 03E00
-call screen_copy_region  ; 03E03
+call toggle_speaker  ; 03E03
 loc_03E06:
 shl al,1  ; 03E06
 dec dl  ; 03E08
@@ -522,8 +522,8 @@ cmp bx,0x24  ; 03E76
 jl short loc_03E45  ; 03E79 jl 0x3e45
 ret  ; 03E7B
 
-; ---- function swap_screen_buffers ----
-swap_screen_buffers:
+; ---- function render_glyphs ----
+render_glyphs:
 mov byte [0xdbb1],0x0  ; 03E7C
 loc_03E81:
 mov bl,[si]  ; 03E81
@@ -563,7 +563,7 @@ rcr dx,1  ; 03EC5
 dec ch  ; 03EC7
 jnz short loc_03EBD  ; 03EC9 jnz 0x3ebd
 db 0x33, 0xC0  ; 03ECB xor ax,ax
-call sub_03F29  ; 03ECD
+call shift_glyph_pixels  ; 03ECD
 xchg dh,dl  ; 03ED0
 xchg ah,al  ; 03ED2
 or [di],dx  ; 03ED4
@@ -606,8 +606,8 @@ pop si  ; 03F24
 jmp 0x4081  ; 03F25
 ret  ; 03F28
 
-; ---- function sub_03F29 ----
-sub_03F29:
+; ---- function shift_glyph_pixels ----
+shift_glyph_pixels:
 cmp byte [0xdbb1],0x0  ; 03F29
 jz short loc_03F3E  ; 03F2E jz 0x3f3e
 mov cl,[0xdbb1]  ; 03F30
@@ -620,15 +620,15 @@ jnz short loc_03F36  ; 03F3C jnz 0x3f36
 loc_03F3E:
 ret  ; 03F3E
 
-; ---- function draw_health_bar ----
-draw_health_bar:
+; ---- function show_scroll_text ----
+show_scroll_text:
 call clear_screen  ; 03F3F
 call update_display  ; 03F42
 mov al,[0xdbb5]  ; 03F45
 mov [0xdbb3],al  ; 03F48
 lea ax,[0xdbb6]  ; 03F4B
 mov [0xddbe],ax  ; 03F4F
-call sub_04028  ; 03F52
+call scroll_text_up  ; 03F52
 ret  ; 03F55
 
 ; ---- function draw_ui_element ----
@@ -637,7 +637,7 @@ call clear_screen  ; 03F56
 call update_display  ; 03F59
 lea di,[0x20b6]  ; 03F5C
 lea si,[0xdeb6]  ; 03F60
-call swap_screen_buffers  ; 03F64
+call render_glyphs  ; 03F64
 call update_display  ; 03F67
 mov ax,0x48  ; 03F6A
 call delay_with_input  ; 03F6D
@@ -653,7 +653,7 @@ lea si,[0xddc1]  ; 03F7E
 lea di,[0x977]  ; 03F82
 loc_03F86:
 push di  ; 03F86
-call swap_screen_buffers  ; 03F87
+call render_glyphs  ; 03F87
 pop di  ; 03F8A
 add di,0x3c0  ; 03F8B
 inc si  ; 03F8F
@@ -680,10 +680,10 @@ draw_scene_element:
 call clear_screen  ; 03FB7
 lea di,[0x1d92]  ; 03FBA
 lea si,[0xdebe]  ; 03FBE
-call swap_screen_buffers  ; 03FC2
+call render_glyphs  ; 03FC2
 lea di,[0x228b]  ; 03FC5
 lea si,[0xdec8]  ; 03FC9
-call swap_screen_buffers  ; 03FCD
+call render_glyphs  ; 03FCD
 call update_display  ; 03FD0
 mov ax,0x48  ; 03FD3
 call delay_with_input  ; 03FD6
@@ -694,10 +694,10 @@ draw_gate:
 call clear_screen  ; 03FDA
 lea di,[0x1d8d]  ; 03FDD
 lea si,[0xded7]  ; 03FE1
-call swap_screen_buffers  ; 03FE5
+call render_glyphs  ; 03FE5
 lea di,[0x2287]  ; 03FE8
 lea si,[0xdee6]  ; 03FEC
-call swap_screen_buffers  ; 03FF0
+call render_glyphs  ; 03FF0
 call update_display  ; 03FF3
 mov ax,0x48  ; 03FF6
 call delay_with_input  ; 03FF9
@@ -708,19 +708,19 @@ check_disk_prompt:
 call clear_screen  ; 03FFD
 lea di,[0x1b01]  ; 04000
 lea si,[0xdefa]  ; 04004
-call swap_screen_buffers  ; 04008
+call render_glyphs  ; 04008
 lea di,[0x2009]  ; 0400B
 lea si,[0xdf12]  ; 0400F
-call swap_screen_buffers  ; 04013
+call render_glyphs  ; 04013
 lea di,[0x24ff]  ; 04016
 lea si,[0xdf26]  ; 0401A
-call swap_screen_buffers  ; 0401E
+call render_glyphs  ; 0401E
 call update_display  ; 04021
 call wait_for_key  ; 04024
 ret  ; 04027
 
-; ---- function sub_04028 ----
-sub_04028:
+; ---- function scroll_text_up ----
+scroll_text_up:
 push es  ; 04028
 mov ax,0xb800  ; 04029
 mov es,ax  ; 0402C
@@ -735,7 +735,7 @@ pop es  ; 0403D
 rep stosw  ; 0403E
 pop es  ; 04040
 lea di,[0x337]  ; 04041
-call swap_screen_buffers  ; 04045
+call render_glyphs  ; 04045
 inc si  ; 04048
 mov [0xddbe],si  ; 04049
 db 0x33, 0xD2  ; 0404D xor dx,dx

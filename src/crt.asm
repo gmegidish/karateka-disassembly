@@ -20,7 +20,7 @@ db 0x03, 0xDA  ; 05C37 add bx,dx
 push bx  ; 05C39
 les ax,word [0x59]  ; 05C3A
 mov ah,0x4a  ; 05C3E
-int 0x21  ; 05C40 - INT 21h/AH=4Ah: Resize memory block (ES=segment, BX=new size in paragraphs)
+int 0x21  ; 05C40
 pop bx  ; 05C42
 jc short loc_05C4E  ; 05C43 jc 0x5c4e
 mov [0x69],bx  ; 05C45
@@ -55,7 +55,7 @@ jc short loc_05C95  ; 05C7B jc 0x5c95
 les ax,word [0x59]  ; 05C7D
 push bx  ; 05C81
 mov ah,0x4a  ; 05C82
-int 0x21  ; 05C84 - INT 21h/AH=4Ah: Resize memory block (grow allocation)
+int 0x21  ; 05C84
 pop bx  ; 05C86
 jc short loc_05C92  ; 05C87 jc 0x5c92
 mov [0x69],bx  ; 05C89
@@ -79,7 +79,7 @@ mov word [0x80],0x0  ; 05C9E
 mov dx,[bp+0x4]  ; 05CA4
 mov cx,[bp+0x6]  ; 05CA7
 mov ah,0x3c  ; 05CAA
-int 0x21  ; 05CAC - INT 21h/AH=3Ch: Create file (DS:DX=filename, CX=attributes, returns AX=handle)
+int 0x21  ; 05CAC
 jnc short loc_05CB3  ; 05CAE jnc 0x5cb3
 mov [0x80],ax  ; 05CB0
 loc_05CB3:
@@ -94,7 +94,7 @@ mov word [0x80],0x0  ; 05CB8
 mov dx,[bp+0x4]  ; 05CBE
 mov ax,[bp+0x6]  ; 05CC1
 mov ah,0x3d  ; 05CC4
-int 0x21  ; 05CC6 - INT 21h/AH=3Dh: Open file (DS:DX=filename, AL=access mode, returns AX=handle)
+int 0x21  ; 05CC6
 jnc short loc_05CCD  ; 05CC8 jnc 0x5ccd
 mov [0x80],ax  ; 05CCA
 loc_05CCD:
@@ -108,7 +108,7 @@ db 0x8B, 0xEC  ; 05CD0 mov bp,sp
 mov word [0x80],0x0  ; 05CD2
 mov bx,[bp+0x4]  ; 05CD8
 mov ah,0x3e  ; 05CDB
-int 0x21  ; 05CDD - INT 21h/AH=3Eh: Close file (BX=file handle)
+int 0x21  ; 05CDD
 jnc short loc_05CE4  ; 05CDF jnc 0x5ce4
 mov [0x80],ax  ; 05CE1
 loc_05CE4:
@@ -124,7 +124,7 @@ mov bx,[bp+0x4]  ; 05CEF
 mov cx,[bp+0x8]  ; 05CF2
 mov dx,[bp+0x6]  ; 05CF5
 mov ah,0x3f  ; 05CF8
-int 0x21  ; 05CFA - INT 21h/AH=3Fh: Read file (BX=handle, CX=count, DS:DX=buffer, returns AX=bytes read)
+int 0x21  ; 05CFA
 jnc short loc_05D03  ; 05CFC jnc 0x5d03
 mov [0x80],ax  ; 05CFE
 db 0x33, 0xC0  ; 05D01 xor ax,ax
@@ -141,7 +141,7 @@ mov bx,[bp+0x4]  ; 05D0E
 mov cx,[bp+0x8]  ; 05D11
 mov dx,[bp+0x6]  ; 05D14
 mov ah,0x40  ; 05D17
-int 0x21  ; 05D19 - INT 21h/AH=40h: Write file (BX=handle, CX=count, DS:DX=buffer, returns AX=bytes written)
+int 0x21  ; 05D19
 jnc short loc_05D22  ; 05D1B jnc 0x5d22
 mov [0x80],ax  ; 05D1D
 db 0x33, 0xC0  ; 05D20 xor ax,ax
@@ -159,7 +159,7 @@ mov ah,0x42  ; 05D30
 mov bx,[bp+0x4]  ; 05D32
 mov cx,[bp+0x8]  ; 05D35
 mov dx,[bp+0x6]  ; 05D38
-int 0x21  ; 05D3B - INT 21h/AH=42h: Seek file (BX=handle, CX:DX=offset, AL=origin, returns DX:AX=new pos)
+int 0x21  ; 05D3B
 jnc short loc_05D42  ; 05D3D jnc 0x5d42
 mov [0x80],ax  ; 05D3F
 loc_05D42:
@@ -175,7 +175,7 @@ db 0x8B, 0xEC  ; 05D49 mov bp,sp
 mov word [0x80],0x0  ; 05D4B
 mov dx,[bp+0x4]  ; 05D51
 mov ah,0x41  ; 05D54
-int 0x21  ; 05D56 - INT 21h/AH=41h: Delete file (DS:DX=filename)
+int 0x21  ; 05D56
 jnc short loc_05D5D  ; 05D58 jnc 0x5d5d
 mov [0x80],ax  ; 05D5A
 loc_05D5D:
@@ -188,7 +188,7 @@ mov dx,[bp+0x4]  ; 05D68
 mov ax,[bp+0x6]  ; 05D6B
 mov ah,0x43  ; 05D6E
 mov cx,[bp+0x8]  ; 05D70
-int 0x21  ; 05D73 - INT 21h/AH=43h: Get/set file attributes (DS:DX=filename, AL=0 get/1 set, CX=attrs)
+int 0x21  ; 05D73
 jnc short loc_05D7A  ; 05D75 jnc 0x5d7a
 mov [0x80],ax  ; 05D77
 loc_05D7A:
@@ -202,7 +202,7 @@ push bp  ; 05D7E
 db 0x8B, 0xEC  ; 05D7F mov bp,sp
 mov bx,[bp+0x4]  ; 05D81
 mov ax,0x4400  ; 05D84
-int 0x21  ; 05D87 - INT 21h/AX=4400h: IOCTL get device info (BX=handle, returns DX=device info word)
+int 0x21  ; 05D87
 db 0x8B, 0xC2  ; 05D89 mov ax,dx
 pop bp  ; 05D8B
 ret  ; 05D8C
@@ -215,7 +215,7 @@ mov word [0x80],0x0  ; 05D90
 mov dx,[bp+0x4]  ; 05D96
 mov di,[bp+0x6]  ; 05D99
 mov ah,0x56  ; 05D9C
-int 0x21  ; 05D9E - INT 21h/AH=56h: Rename file (DS:DX=old name, ES:DI=new name)
+int 0x21  ; 05D9E
 jnc short loc_05DA7  ; 05DA0 jnc 0x5da7
 mov [0x80],ax  ; 05DA2
 pop bp  ; 05DA5
@@ -1337,7 +1337,7 @@ push bp  ; 06725
 db 0x8B, 0xEC  ; 06726 mov bp,sp
 mov dx,[bp+0x4]  ; 06728
 mov ah,0xa  ; 0672B
-int 0x21  ; 0672D - INT 21h/AH=0Ah: Buffered line input (DS:DX=buffer, byte 0=max len)
+int 0x21  ; 0672D
 pop bp  ; 0672F
 ret  ; 06730
 
@@ -1882,7 +1882,7 @@ db 0x8B, 0xEC  ; 06B85 mov bp,sp
 mov ah,[bp+0x4]  ; 06B87
 mov al,[bp+0x8]  ; 06B8A
 mov dx,[bp+0x6]  ; 06B8D
-int 0x21  ; 06B90 - INT 21h: Generic DOS call (AH=function from param, AL=char, DX=param)
+int 0x21  ; 06B90
 mov ah,0x0  ; 06B92
 pop bp  ; 06B94
 ret  ; 06B95

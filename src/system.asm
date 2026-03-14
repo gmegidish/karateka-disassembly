@@ -263,7 +263,7 @@ mov ax,0x0  ; 0482C
 mov ds,ax  ; 0482F
 mov ax,0x2524  ; 04831
 lea dx,[0x4810]  ; 04834
-int 0x21  ; 04838 - INT 21h/AH=25h: Set interrupt vector 24h (critical error handler) to DS:DX
+int 0x21  ; 04838
 pop ds  ; 0483A
 ret  ; 0483B
 
