@@ -15,7 +15,7 @@ db 0x8B, 0xEC  ; 0167C mov bp,sp
 loc_0167E:
 push word [bp+0xa]  ; 0167E
 push word [bp+0x8]  ; 01681
-call file_manager  ; 01684
+call open_file_slot  ; 01684
 db 0x8B, 0xE5  ; 01687 mov sp,bp
 mov [bp+0x2],ax  ; 01689
 inc ax  ; 0168C

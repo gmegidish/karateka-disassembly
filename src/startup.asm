@@ -189,7 +189,7 @@ db 0x25, 0x0F, 0x00  ; 00170 and ax,0xf
 db 0x81, 0xE3, 0xF0, 0xFF  ; 00173 and bx,0xfff0
 mov [0x65],bx  ; 00177
 mov [0x67],ax  ; 0017B
-call resource_manager  ; 0017E
+call reset_heap  ; 0017E
 db 0x0B, 0xC0  ; 00181 or ax,ax
 jnz short loc_00139  ; 00183 jnz 0x139
 pop dx  ; 00185

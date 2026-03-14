@@ -217,7 +217,7 @@ ret  ; 03BAD
 ;
 ; The unlabeled code blocks after loc_03BE7 (0x3BE9-0x3CF0) are
 ; individual sync routines reached via jump table at DS:0xD6BD
-; ([bx-0x2943]). Each routine calls screen_copy and/or toggle_speaker
+; ([bx-0x2943]). Each routine calls busy_wait_delay and/or toggle_speaker
 ; with different timing parameters, then returns via pop bp / ret.
 ;
 ; Sync routines at 0x3C97-0x3CF0 load music data pointers (BX = address
@@ -259,7 +259,7 @@ mov cx,0x2  ; 03BE9
 loc_03BEC:
 push cx  ; 03BEC
 call toggle_speaker  ; 03BED
-call screen_copy  ; 03BF0
+call busy_wait_delay  ; 03BF0
 pop cx  ; 03BF3
 inc cx  ; 03BF4
 cmp cx,0x28  ; 03BF5
@@ -270,7 +270,7 @@ mov cx,0x2  ; 03BFC
 loc_03BFF:
 push cx  ; 03BFF
 call toggle_speaker  ; 03C00
-call screen_copy  ; 03C03
+call busy_wait_delay  ; 03C03
 pop cx  ; 03C06
 inc cx  ; 03C07
 inc cx  ; 03C08
@@ -282,7 +282,7 @@ mov cx,0x2  ; 03C10
 loc_03C13:
 push cx  ; 03C13
 call toggle_speaker  ; 03C14
-call screen_copy  ; 03C17
+call busy_wait_delay  ; 03C17
 pop cx  ; 03C1A
 inc cx  ; 03C1B
 inc cx  ; 03C1C
@@ -293,7 +293,7 @@ ret  ; 03C23
 mov bl,0xa  ; 03C24
 loc_03C26:
 mov cx,0x5  ; 03C26
-call screen_copy  ; 03C29
+call busy_wait_delay  ; 03C29
 call toggle_speaker  ; 03C2C
 dec bl  ; 03C2F
 jnz short loc_03C26  ; 03C31 jnz 0x3c26
@@ -302,7 +302,7 @@ ret  ; 03C34
 mov bl,0x10  ; 03C35
 loc_03C37:
 mov cx,0xa  ; 03C37
-call screen_copy  ; 03C3A
+call busy_wait_delay  ; 03C3A
 call toggle_speaker  ; 03C3D
 dec bl  ; 03C40
 jnz short loc_03C37  ; 03C42 jnz 0x3c37
@@ -312,7 +312,7 @@ mov cx,0x10  ; 03C46
 loc_03C49:
 push cx  ; 03C49
 call toggle_speaker  ; 03C4A
-call screen_copy  ; 03C4D
+call busy_wait_delay  ; 03C4D
 pop cx  ; 03C50
 shr cx,1  ; 03C51
 cmp cx,0x1  ; 03C53
@@ -322,7 +322,7 @@ ret  ; 03C59
 mov bl,0x3  ; 03C5A
 loc_03C5C:
 mov cx,0x10  ; 03C5C
-call screen_copy  ; 03C5F
+call busy_wait_delay  ; 03C5F
 call toggle_speaker  ; 03C62
 dec bl  ; 03C65
 jnz short loc_03C5C  ; 03C67 jnz 0x3c5c
@@ -481,20 +481,20 @@ jnz short loc_03D4A  ; 03DAF jnz 0x3d4a
 add word [music_note_ptr],0x3  ; 03DB1
 jmp 0x3f01  ; 03DB6
 
-; ---- function screen_copy ----
+; ---- function busy_wait_delay ----
 ; Nested busy-wait delay loop for frame timing.
 ;
 ; Parameters:
 ;   CX = inner loop count (delay factor)
 ;
 ; Uses globals:
-;   [screen_copy_cnt] = outer loop count
+;   [busy_wait_delay_cnt] = outer loop count
 ;
 ; Preserves BX, DX.
-screen_copy:
+busy_wait_delay:
 push dx  ; 03DB9
 push bx  ; 03DBA
-mov bx,[screen_copy_cnt]  ; 03DBB
+mov bx,[busy_wait_delay_cnt]  ; 03DBB
 db 0x8B, 0xD1  ; 03DBF mov dx,cx
 loc_03DC1:
 db 0x8B, 0xCA  ; 03DC1 mov cx,dx

@@ -16,7 +16,7 @@ rep stosw  ; 00B5A
 pop es  ; 00B5C
 ret  ; 00B5D
 
-; ---- function draw_screen ----
+; ---- function advance_anim_frame ----
 ; Reads the next frame data from two animation sequences.
 ; No parameters. No stack frame.
 ;
@@ -31,7 +31,7 @@ ret  ; 00B5D
 ; Returns:
 ;   DL = frame data from sequence 1
 ;   AL = frame data from sequence 2
-draw_screen:
+advance_anim_frame:
 cmp byte [0x422c],0x0  ; 00B5E
 jz short loc_00B70  ; 00B63 jz 0xb70
 mov dl,[0x422d]  ; 00B65
@@ -580,7 +580,7 @@ mov [bp+0x8],bx  ; 00FA3
 call load_file  ; 00FA6
 db 0x8B, 0xE5  ; 00FA9 mov sp,bp
 push word [bp+0x6]  ; 00FAB
-call load_resource  ; 00FAE
+call close_file_slot  ; 00FAE
 db 0x8B, 0xE5  ; 00FB1 mov sp,bp
 mov ax,[bp+0x8]  ; 00FB3
 add sp,0xe  ; 00FB6
@@ -598,7 +598,7 @@ ret  ; 00FBA
 ;   [bp+0x4] = file handle from set_cga_palette
 ;   [bp+0x6] = total file size
 ;
-; Loads data to DS:0x337 (offscreen buffer), calls load_resource to
+; Loads data to DS:0x337 (offscreen buffer), calls close_file_slot to
 ; decompress, then update_display + wait_vsync(0x19) to show it.
 load_background:
 push bp  ; 00FBB
@@ -640,7 +640,7 @@ mov [bp+0x6],bx  ; 01006
 call load_file  ; 01009
 db 0x8B, 0xE5  ; 0100C mov sp,bp
 push word [bp+0x4]  ; 0100E
-call load_resource  ; 01011
+call close_file_slot  ; 01011
 db 0x8B, 0xE5  ; 01014 mov sp,bp
 call update_display  ; 01016
 mov ax,0x19  ; 01019
@@ -688,7 +688,7 @@ db 0x8B, 0xF0  ; 0103D mov si,ax
 push word [si+0x264]  ; 0103F
 lea ax,[bp+0x16]  ; 01043
 push ax  ; 01046
-call load_resource_2  ; 01047
+call strcpy  ; 01047
 db 0x8B, 0xE5  ; 0104A mov sp,bp
 mov ax,0x32d  ; 0104C
 push ax  ; 0104F
@@ -712,7 +712,7 @@ mov [bp+0x8],ax  ; 01074
 call load_file  ; 01077
 db 0x8B, 0xE5  ; 0107A mov sp,bp
 push word [bp+0x8]  ; 0107C
-call load_resource  ; 0107F
+call close_file_slot  ; 0107F
 db 0x8B, 0xE5  ; 01082 mov sp,bp
 mov word [bp+0xc],0x0  ; 01084
 loc_01089:
@@ -764,7 +764,7 @@ db 0x8B, 0xF0  ; 01100 mov si,ax
 push word [si+0x264]  ; 01102
 lea ax,[bp+0x16]  ; 01106
 push ax  ; 01109
-call load_resource_2  ; 0110A
+call strcpy  ; 0110A
 db 0x8B, 0xE5  ; 0110D mov sp,bp
 mov ax,0x332  ; 0110F
 push ax  ; 01112
@@ -789,7 +789,7 @@ mov [bp+0x10],bx  ; 0113A
 call load_file  ; 0113D
 db 0x8B, 0xE5  ; 01140 mov sp,bp
 push word [bp+0x8]  ; 01142
-call load_resource  ; 01145
+call close_file_slot  ; 01145
 db 0x8B, 0xE5  ; 01148 mov sp,bp
 cmp word [0x160],0x0  ; 0114A
 jnz short loc_01157  ; 0114F jnz 0x1157
@@ -802,7 +802,7 @@ db 0x8B, 0xF0  ; 0115C mov si,ax
 push word [si+0x2c0]  ; 0115E
 lea ax,[bp+0x16]  ; 01162
 push ax  ; 01165
-call load_resource_2  ; 01166
+call strcpy  ; 01166
 db 0x8B, 0xE5  ; 01169 mov sp,bp
 mov ax,0x32d  ; 0116B
 push ax  ; 0116E
@@ -826,7 +826,7 @@ mov [bp+0x8],ax  ; 01193
 call load_file  ; 01196
 db 0x8B, 0xE5  ; 01199 mov sp,bp
 push word [bp+0x8]  ; 0119B
-call load_resource  ; 0119E
+call close_file_slot  ; 0119E
 db 0x8B, 0xE5  ; 011A1 mov sp,bp
 mov word [bp+0xc],0x0  ; 011A3
 loc_011A8:
@@ -878,7 +878,7 @@ db 0x8B, 0xF0  ; 0121F mov si,ax
 push word [si+0x2c0]  ; 01221
 lea ax,[bp+0x16]  ; 01225
 push ax  ; 01228
-call load_resource_2  ; 01229
+call strcpy  ; 01229
 db 0x8B, 0xE5  ; 0122C mov sp,bp
 mov ax,0x332  ; 0122E
 push ax  ; 01231
@@ -901,7 +901,7 @@ mov [bp+0x8],ax  ; 01255
 call load_file  ; 01258
 db 0x8B, 0xE5  ; 0125B mov sp,bp
 push word [bp+0x8]  ; 0125D
-call load_resource  ; 01260
+call close_file_slot  ; 01260
 db 0x8B, 0xE5  ; 01263 mov sp,bp
 cmp word [0x164],0x0  ; 01265
 jnz short loc_01272  ; 0126A jnz 0x1272

@@ -54,7 +54,7 @@ mov al,[0x4223]  ; 006C2
 cbw  ; 006C5
 db 0x8B, 0xF8  ; 006C6 mov di,ax
 loc_006C8:
-call draw_screen  ; 006C8
+call advance_anim_frame  ; 006C8
 dec di  ; 006CB
 jnz short loc_006C8  ; 006CC jnz 0x6c8
 dec byte [0x4222]  ; 006CE
@@ -68,7 +68,7 @@ mov [0x422a],al  ; 006DF
 mov di,[0x4230]  ; 006E2
 add di,0x4f  ; 006E6
 loc_006E9:
-call draw_screen  ; 006E9
+call advance_anim_frame  ; 006E9
 cmp al,0x0  ; 006EC
 jz short loc_0071B  ; 006EE jz 0x71b
 mov cx,0x8  ; 006F0
@@ -136,7 +136,7 @@ mov al,[0x4223]  ; 0078A
 mov [0x422a],al  ; 0078D
 mov di,[0x421c]  ; 00790
 loc_00794:
-call draw_screen  ; 00794
+call advance_anim_frame  ; 00794
 cmp al,0x0  ; 00797
 jz short loc_007DB  ; 00799 jz 0x7db
 mov cx,0x8  ; 0079B
@@ -178,7 +178,7 @@ mov al,[0x4223]  ; 007F3
 mov [0x422a],al  ; 007F6
 mov di,[0x4230]  ; 007F9
 loc_007FD:
-call draw_screen  ; 007FD
+call advance_anim_frame  ; 007FD
 cmp al,0x0  ; 00800
 jz short loc_00831  ; 00802 jz 0x831
 mov cx,0x8  ; 00804
@@ -273,7 +273,7 @@ mov al,[0x4223]  ; 008E0
 cbw  ; 008E3
 db 0x8B, 0xF8  ; 008E4 mov di,ax
 loc_008E6:
-call draw_screen  ; 008E6
+call advance_anim_frame  ; 008E6
 dec di  ; 008E9
 jnz short loc_008E6  ; 008EA jnz 0x8e6
 add word [bp+0x6],0x4  ; 008EC
@@ -290,7 +290,7 @@ cmp byte [bp+0x4],0xc8  ; 00908
 jc short loc_00911  ; 0090C jc 0x911
 jmp 0xc6b  ; 0090E
 loc_00911:
-call draw_screen  ; 00911
+call advance_anim_frame  ; 00911
 cmp al,0x0  ; 00914
 jz short loc_00936  ; 00916 jz 0x936
 mov ah,0x0  ; 00918
@@ -369,7 +369,7 @@ mov al,[0x4223]  ; 009CA
 db 0x8A, 0xD8  ; 009CD mov bl,al
 mov di,[0x4232]  ; 009CF
 loc_009D3:
-call draw_screen  ; 009D3
+call advance_anim_frame  ; 009D3
 cmp al,0x0  ; 009D6
 jz short loc_00A0B  ; 009D8 jz 0xa0b
 cmp byte [0x4226],0x0  ; 009DA
@@ -409,7 +409,7 @@ cmp byte [bp+0x4],0xc8  ; 00A32
 jc short loc_00A3B  ; 00A36 jc 0xa3b
 jmp 0xd1e  ; 00A38
 loc_00A3B:
-call draw_screen  ; 00A3B
+call advance_anim_frame  ; 00A3B
 cmp al,0x0  ; 00A3E
 jz short loc_00A60  ; 00A40 jz 0xa60
 mov ah,0x0  ; 00A42

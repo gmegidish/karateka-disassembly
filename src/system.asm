@@ -369,7 +369,7 @@ mov ax,0x1a4  ; 04907
 push ax  ; 0490A
 push bx  ; 0490B
 push word [bp+0x12]  ; 0490C
-call file_manager  ; 0490F
+call open_file_slot  ; 0490F
 db 0x8B, 0xE5  ; 04912 mov sp,bp
 mov [bp+0x6],ax  ; 04914
 inc ax  ; 04917
@@ -386,7 +386,7 @@ push ax  ; 04927
 db 0x33, 0xDB  ; 04928 xor bx,bx
 push bx  ; 0492A
 push word [bp+0x6]  ; 0492B
-call parse_resource_data  ; 0492E
+call seek_and_read  ; 0492E
 db 0x8B, 0xE5  ; 04931 mov sp,bp
 db 0x82  ; 04933
 db 0x7E, 0x0C  ; 04934 jng 0x4942
@@ -408,7 +408,7 @@ mov bx,[bp+0x8]  ; 04954
 db 0x0B, 0xD8  ; 04957 or bx,ax
 push bx  ; 04959
 push word [bp+0x12]  ; 0495A
-call file_manager  ; 0495D
+call open_file_slot  ; 0495D
 db 0x8B, 0xE5  ; 04960 mov sp,bp
 mov [bp+0x6],ax  ; 04962
 inc ax  ; 04965
@@ -443,7 +443,7 @@ mov ax,0x1a4  ; 0499D
 push ax  ; 049A0
 push bx  ; 049A1
 push word [bp+0x12]  ; 049A2
-call file_manager  ; 049A5
+call open_file_slot  ; 049A5
 db 0x8B, 0xE5  ; 049A8 mov sp,bp
 mov [bp+0x6],ax  ; 049AA
 inc ax  ; 049AD
@@ -546,7 +546,7 @@ mov byte [si+0x8],0x0  ; 04A7D
 mov al,[si+0x9]  ; 04A81
 xor ah,ah  ; 04A84
 push ax  ; 04A86
-call load_resource  ; 04A87
+call close_file_slot  ; 04A87
 db 0x8B, 0xE5  ; 04A8A mov sp,bp
 add sp,0x4  ; 04A8C
 pop bp  ; 04A8F
@@ -691,7 +691,7 @@ mov ax,[bp+0x2]  ; 04BAA
 cmp ax,[0xe5cc]  ; 04BAD
 jnl short loc_04BBE  ; 04BB1 jnl 0x4bbe
 push ax  ; 04BB3
-call load_resource  ; 04BB4
+call close_file_slot  ; 04BB4
 db 0x8B, 0xE5  ; 04BB7 mov sp,bp
 inc word [bp+0x2]  ; 04BB9
 jmp short loc_04BAA  ; 04BBC jmp 0x4baa
@@ -795,8 +795,8 @@ add sp,0x8  ; 04C94
 pop bp  ; 04C97
 ret  ; 04C98
 
-; ---- function resource_manager ----
-resource_manager:
+; ---- function reset_heap ----
+reset_heap:
 push bp  ; 04C99
 sub sp,0xe  ; 04C9A
 db 0x8B, 0xEC  ; 04C9D mov bp,sp
@@ -887,8 +887,8 @@ add sp,0xe  ; 04D72
 pop bp  ; 04D75
 ret  ; 04D76
 
-; ---- function build_filename ----
-build_filename:
+; ---- function get_file_slot ----
+get_file_slot:
 push bp  ; 04D77
 sub sp,0x2  ; 04D78
 db 0x8B, 0xEC  ; 04D7B mov bp,sp
@@ -919,8 +919,8 @@ add sp,0x2  ; 04DB4
 pop bp  ; 04DB7
 ret  ; 04DB8
 
-; ---- function file_manager ----
-file_manager:
+; ---- function open_file_slot ----
+open_file_slot:
 push bp  ; 04DB9
 sub sp,0xc  ; 04DBA
 db 0x8B, 0xEC  ; 04DBD mov bp,sp
@@ -1052,7 +1052,7 @@ add ax,0xe2c8  ; 04ED3
 inc ax  ; 04ED6
 push ax  ; 04ED7
 push word [bp+0x10]  ; 04ED8
-call crt_str_util  ; 04EDB
+call crt_strcmp  ; 04EDB
 db 0x8B, 0xE5  ; 04EDE mov sp,bp
 test ax,ax  ; 04EE0
 jnz short loc_04F00  ; 04EE2 jnz 0x4f00
@@ -1155,7 +1155,7 @@ and bx,0x7fff  ; 04FCA
 push bx  ; 04FCE
 push ax  ; 04FCF
 push word [bp+0xa]  ; 04FD0
-call file_manager  ; 04FD3
+call open_file_slot  ; 04FD3
 db 0x8B, 0xE5  ; 04FD6 mov sp,bp
 add sp,0x6  ; 04FD8
 pop bp  ; 04FDB

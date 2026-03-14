@@ -35,7 +35,7 @@ FUNCTION_NAMES = {
     0x06810: "string_copy",          # String copy utility
     0x06954: "crt_free_small",       # 16-bit free wrapper (zero-extends, calls crt_free)
     0x06974: "crt_free",             # Free-list free with block coalescing
-    0x06AF4: "crt_str_util",         # String utility
+    0x06AF4: "crt_strcmp",            # C runtime strcmp() - compare two null-terminated strings
     0x06B3A: "crt_cmp_long",         # Signed 32-bit comparison (AX:BX vs CX:DX)
     0x06B57: "crt_mul_long",         # Unsigned 32-bit multiply (AX:BX * CX:DX)
     0x06B84: "dos_int21",            # Generic INT 21h wrapper
@@ -82,10 +82,10 @@ FUNCTION_NAMES = {
     0x0169C: "disk_setup",           # Disk I/O setup
     0x04B7F: "show_insert_disk",     # "make sure your karateka disk is in drive a"
     0x04FDD: "load_file",            # High-level file load (calls dos_read_file)
-    0x052D8: "write_resource",       # Write buffer to file with CRLF translation
-    0x055F9: "load_resource",        # Load game resource file
+    0x052D8: "write_file_data",      # Write buffer to file with optional LF->CRLF translation
+    0x055F9: "close_file_slot",      # Close DOS file handle and clear file slot
     0x05659: "delete_resource_file", # Delete file (only in real-disk mode)
-    0x056DE: "load_resource_2",      # Another resource loader
+    0x056DE: "strcpy",               # C runtime strcpy() - copy null-terminated string
     0x05741: "scanf_format_parser",  # Lattice C internal scanf format-string walker
 
     # === Interrupt Vector Management ===
@@ -98,7 +98,7 @@ FUNCTION_NAMES = {
 
     # === Graphics Rendering ===
     0x00B4E: "clear_screen",         # Clear offscreen buffer at DS:0x337
-    0x00B5E: "draw_screen",          # Called 8x - main screen draw
+    0x00B5E: "advance_anim_frame",   # Reads animation frame data from two streams, handles RLE repeat markers
     0x00BC9: "render_figures",       # Draw all active figures from figure slot list to screen
     0x00C52: "draw_sprite",          # Prepare offscreen buffer + background, dispatch by render_mode/scene_state
     0x00D68: "update_display",       # Copy offscreen buffer (DS:0x337) to CGA VRAM (B800:0) via scanline LUT
@@ -173,7 +173,7 @@ FUNCTION_NAMES = {
     0x03B19: "effect_scroll_right",  # Scroll right effect
     0x03B5C: "effect_dissolve",      # Dissolve effect
     0x03BAE: "wait_vsync",           # Wait for vertical sync (called 21x!)
-    0x03DB9: "screen_copy",          # Nested busy-wait delay loop
+    0x03DB9: "busy_wait_delay",      # Nested busy-wait delay loop
     0x03DD5: "toggle_speaker",       # Toggle PC speaker gate (port 0x61 bit 1)
     0x03DDE: "play_speaker_data",    # Play 256 bytes of 1-bit audio from speaker_pcm_buf
     0x03E16: "init_screen_buffers",  # Swap double-buffer pointers, clear figure slot flags
@@ -200,14 +200,14 @@ FUNCTION_NAMES = {
 
     # === File / Resource Management ===
     0x04883: "save_vectors",         # Save interrupt vectors
-    0x04C99: "resource_manager",     # Resource management (entry point)
-    0x04DB9: "file_manager",         # File management wrapper
-    0x04D77: "build_filename",       # Construct filename from parts
-    0x05501: "parse_resource_data",  # Parse resource file data
-    0x05356: "callback_handler",     # Callback/function pointer handler
+    0x04C99: "reset_heap",           # Reset heap pointers and free-list, optionally shrink DOS memory
+    0x04DB9: "open_file_slot",       # Find free file table slot, set up flags for file operation
+    0x04D77: "get_file_slot",        # Validate file slot index, return pointer to 42-byte file table entry
+    0x05501: "seek_and_read",        # Seek to offset in file, read data block
+    # 0x05356 is a call site within write_file_data, not a separate function
     0x05907: "init_file_system",     # Initialize file system
     0x0589A: "print_error",          # Print error message and exit
-    0x05DE3: "read_data_block",      # Read a block of data from file
+    0x05DE3: "dos_putchar",          # INT 21h/02h - write character to stdout
 
     # === Math ===
     0x0205E: "math_multiply",        # Multiplication helper

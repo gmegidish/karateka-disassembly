@@ -10,7 +10,7 @@ mov ax,[bp+0x1e]  ; 04FE3
 test ax,ax  ; 04FE6
 js short loc_04FF9  ; 04FE8 js 0x4ff9
 push word [bp+0x1a]  ; 04FEA
-call build_filename  ; 04FED
+call get_file_slot  ; 04FED
 db 0x8B, 0xE5  ; 04FF0 mov sp,bp
 test ax,ax  ; 04FF2
 mov [bp+0x12],ax  ; 04FF4
@@ -82,7 +82,7 @@ jmp short loc_05040  ; 05090 jmp 0x5040
 loc_05092:
 mov ax,0xa  ; 05092
 push ax  ; 05095
-call read_data_block  ; 05096
+call dos_putchar  ; 05096
 db 0x8B, 0xE5  ; 05099 mov sp,bp
 mov ax,[bp+0x6]  ; 0509B
 add sp,0x16  ; 0509E
@@ -291,7 +291,7 @@ push cx  ; 05266
 push bx  ; 05267
 push ax  ; 05268
 push word [bp+0x1a]  ; 05269
-call parse_resource_data  ; 0526C
+call seek_and_read  ; 0526C
 db 0x8B, 0xE5  ; 0526F mov sp,bp
 mov ax,[bp+0xa]  ; 05271
 add sp,0x16  ; 05274
@@ -342,8 +342,8 @@ jmp word near [cs:si+0x52be]  ; 052D1
 loc_052D6:
 jmp short loc_052B0  ; 052D6 jmp 0x52b0
 
-; ---- function write_resource ----
-write_resource:
+; ---- function write_file_data ----
+write_file_data:
 push bp  ; 052D8
 sub sp,0x14  ; 052D9
 db 0x8B, 0xEC  ; 052DC mov bp,sp
@@ -351,7 +351,7 @@ mov ax,[bp+0x1c]  ; 052DE
 test ax,ax  ; 052E1
 js short loc_052F4  ; 052E3 js 0x52f4
 push word [bp+0x18]  ; 052E5
-call build_filename  ; 052E8
+call get_file_slot  ; 052E8
 db 0x8B, 0xE5  ; 052EB mov sp,bp
 test ax,ax  ; 052ED
 mov [bp+0x10],ax  ; 052EF
@@ -423,7 +423,7 @@ push ax  ; 05382
 db 0x33, 0xDB  ; 05383 xor bx,bx
 push bx  ; 05385
 push word [bp+0x18]  ; 05386
-call parse_resource_data  ; 05389
+call seek_and_read  ; 05389
 db 0x8B, 0xE5  ; 0538C mov sp,bp
 loc_0538E:
 mov al,[0xf]  ; 0538E
@@ -578,13 +578,13 @@ jmp word near [cs:si+0x54e7]  ; 054FA
 loc_054FF:
 jmp short loc_054D9  ; 054FF jmp 0x54d9
 
-; ---- function parse_resource_data ----
-parse_resource_data:
+; ---- function seek_and_read ----
+seek_and_read:
 push bp  ; 05501
 sub sp,0x12  ; 05502
 db 0x8B, 0xEC  ; 05505 mov bp,sp
 push word [bp+0x16]  ; 05507
-call build_filename  ; 0550A
+call get_file_slot  ; 0550A
 db 0x8B, 0xE5  ; 0550D mov sp,bp
 test ax,ax  ; 0550F
 mov [bp+0xe],ax  ; 05511
@@ -654,7 +654,7 @@ push bx  ; 055AD
 push ax  ; 055AE
 push word [bp+0x9]  ; 055AF
 push word [bp+0x16]  ; 055B2
-call parse_resource_data  ; 055B5
+call seek_and_read  ; 055B5
 db 0x8B, 0xE5  ; 055B8 mov sp,bp
 db 0x0B, 0xC3  ; 055BA or ax,bx
 jz short loc_055DC  ; 055BC jz 0x55dc
@@ -686,13 +686,13 @@ add sp,0x12  ; 055F4
 pop bp  ; 055F7
 ret  ; 055F8
 
-; ---- function load_resource ----
-load_resource:
+; ---- function close_file_slot ----
+close_file_slot:
 push bp  ; 055F9
 sub sp,0x8  ; 055FA
 db 0x8B, 0xEC  ; 055FD mov bp,sp
 push word [bp+0xc]  ; 055FF
-call build_filename  ; 05602
+call get_file_slot  ; 05602
 db 0x8B, 0xE5  ; 05605 mov sp,bp
 test ax,ax  ; 05607
 mov [bp+0x4],ax  ; 05609
@@ -793,8 +793,8 @@ add sp,0x4e  ; 056D9
 pop bp  ; 056DC
 ret  ; 056DD
 
-; ---- function load_resource_2 ----
-load_resource_2:
+; ---- function strcpy ----
+strcpy:
 push bp  ; 056DE
 sub sp,0x8  ; 056DF
 db 0x8B, 0xEC  ; 056E2 mov bp,sp

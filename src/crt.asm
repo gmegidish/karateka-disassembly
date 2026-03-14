@@ -256,8 +256,8 @@ add sp,0x2  ; 05DDE
 pop bp  ; 05DE1
 ret  ; 05DE2
 
-; ---- function read_data_block ----
-read_data_block:
+; ---- function dos_putchar ----
+dos_putchar:
 push bp  ; 05DE3
 db 0x8B, 0xEC  ; 05DE4 mov bp,sp
 push word [bp+0x4]  ; 05DE6
@@ -1091,7 +1091,7 @@ lea cx,[bp+0x4]  ; 06510
 push cx  ; 06513
 push bx  ; 06514
 mov [bp+0x4],al  ; 06515
-call write_resource  ; 06518
+call write_file_data  ; 06518
 db 0x8B, 0xE5  ; 0651B mov sp,bp
 mov word [bp+0x10],0xffff  ; 0651D
 mov [bp+0x5],ax  ; 06522
@@ -1159,7 +1159,7 @@ xor ah,ah  ; 065AE
 push word [bp+0x9]  ; 065B0
 push word [si+0x6]  ; 065B3
 push ax  ; 065B6
-call write_resource  ; 065B7
+call write_file_data  ; 065B7
 db 0x8B, 0xE5  ; 065BA mov sp,bp
 mov [bp+0x5],ax  ; 065BC
 jmp short loc_065C9  ; 065BF jmp 0x65c9
@@ -1782,8 +1782,8 @@ add sp,0x14  ; 06AEF
 pop bp  ; 06AF2
 ret  ; 06AF3
 
-; ---- function crt_str_util ----
-crt_str_util:
+; ---- function crt_strcmp ----
+crt_strcmp:
 push bp  ; 06AF4
 sub sp,0x4  ; 06AF5
 db 0x8B, 0xEC  ; 06AF8 mov bp,sp
