@@ -127,7 +127,7 @@ FUNCTION_NAMES = {
     0x019A2: "play_sound",           # Sound effect playback
     0x019AE: "init_sound",           # Initialize sound system
     0x019EE: "stop_sound",           # Stop current sound
-    0x0190B: "set_music_callback",   # Save scene state, play animation+music sequence, restore state, redirect return address
+    0x0190B: "play_music_sequence",  # Save scene state, play animation+music sequence, restore state, redirect return address
 
     # === Game Logic ===
     0x00255: "game_init",            # Main game initialization - calls everything
@@ -157,7 +157,7 @@ FUNCTION_NAMES = {
     0x0317F: "blit_transition_col_left", # Blit left-side wipe column from buffer 0xd654
     0x03196: "blit_transition_col_right", # Blit right-side wipe column from buffer 0xd662
     0x031AA: "cutscene_play",        # Play cutscene sequence (16 callees)
-    0x03162: "cutscene_step",        # Single cutscene step
+    0x03162: "clear_gate_column",    # Clear 7-row column in transition buffer (gate animation)
 
     # === Animation System ===
     0x029E9: "anim_frame_update",    # Animation frame update

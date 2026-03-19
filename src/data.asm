@@ -95,8 +95,10 @@ camera_x_min     equ 0x108      ; word - camera X minimum bound
 camera_x_max     equ 0x10a      ; word - camera X maximum bound
 
 ; Level/scene state
+scene_param_e2   equ 0xe2       ; word - scene-specific parameter (1=special encounter active)
 current_level    equ 0xea       ; word - current level/area (0-3)
 player_facing    equ 0xec       ; word - player facing direction (bit 0: 0=left, 1=right)
+anim_render_mode equ 0xee       ; word - animation render mode (1=normal, 2=transition)
 game_mode        equ 0xf0       ; word - game mode (0=normal, 1=special)
 player_faces_right equ 0xf2     ; word - 1 if player faces right
 enemy_atk_freq   equ 0xf4       ; word - enemy attack frequency threshold (0-255)
@@ -108,17 +110,34 @@ enemy_was_hit    equ 0xfe       ; word - 1 if enemy was just hit
 enemy_x_min      equ 0x100      ; word - enemy X minimum bound
 player_x_min     equ 0x102      ; word - player X left boundary
 player_x_max     equ 0x104      ; word - player X right boundary
+encounter_target equ 0x106      ; word - target X position for encounter trigger
 player_anim_id   equ 0x10c      ; word - player current animation ID
 enemy_x          equ 0x10e      ; word - enemy X position
 enemy_anim_id    equ 0x110      ; word - enemy current animation ID
 enemy_facing     equ 0x112      ; word - enemy facing direction
-enemy_health     equ 0x116      ; word - enemy health points (max 9)
-enemy_frozen     equ 0x118      ; word - 1 if enemy is frozen/disabled
-scene_locked     equ 0x11a      ; word - 1 if scene is locked (cutscene)
+player_hits_left equ 0x114      ; word - player hit points remaining / right wipe column count
+enemy_health     equ 0x116      ; word - enemy health points (max 9) / left wipe column count
+enemy_frozen     equ 0x118      ; word - countdown frames until enemy unfreezes
+scene_locked     equ 0x11a      ; word - countdown frames until scene unlocks
+hit_regen_rate_p equ 0x11c      ; word - player health regen rate (ticks between regen)
+encounter_counter equ 0x11e     ; word - hit exchange counter during encounter
+hit_regen_rate_e equ 0x120      ; word - enemy health regen rate (ticks between regen)
+hit_regen_init_e equ 0x122      ; word - enemy health regen initial rate (reset value)
 enemy_health_regen equ 0x124    ; word - enemy health recovery amount
-game_state_12e   equ 0x12e      ; word - game state flag
+hit_regen_timer_e equ 0x126     ; word - enemy health regen countdown timer
+hit_regen_timer_p equ 0x128     ; word - player health regen countdown timer
+scroll_counter   equ 0x12c      ; word - screen scroll step counter
+scene_transition_pending equ 0x12e ; word - 1 if scene transition is pending
+scene_index      equ 0x130      ; word - current scene/encounter index within level
+scene_slot_flags equ 0x142      ; word[8] - per-scene-slot active flags
+level_advance    equ 0x152      ; word - levels to advance (0=none, 3=skip to level 3)
+approach_flag    equ 0x154      ; word - approach state (1=approach, 2=retreat, 3=trigger, 4=done)
 anim_mode        equ 0x156      ; word - animation processing mode
 player_y_off     equ 0x158      ; word - player Y offset
+approach_timer   equ 0x166      ; word - approach/wait timer countdown
+player_flag_170  equ 0x170      ; word - player state flag (blocks enemy health drain)
+player_flag_172  equ 0x172      ; word - 1 if approach regen setup done
+player_flag_174  equ 0x174      ; word - player state flag
 combat_counter_a equ 0x16c      ; word - combat counter
 combat_counter_b equ 0x16e      ; word - combat counter
 
@@ -130,12 +149,28 @@ player_anim_end  equ 0xbb2e     ; word - player animation end pointer
 player_x         equ 0xbcd5     ; word - player X position
 player_anim_div_a equ 0xc3a0    ; word - player animation divisor
 player_anim_div_b equ 0xc3a2    ; word - player animation dividend
+anim_bg_counter  equ 0xc3a6     ; word - background scene counter (indexes into bg lookup tables)
 player_frame_ptr equ 0xc3d2     ; word - player animation frame pointer
 player_frame_bak equ 0xc3d4     ; word - player animation frame backup
 
 ; Enemy animation state
 enemy_frame_ptr  equ 0xcde8     ; word - enemy animation frame pointer
 enemy_frame_bak  equ 0xcdea     ; word - enemy animation frame backup
+
+; Animation script interpreter state
+script_running   equ 0xbcd0     ; byte - 1 while animation script is executing
+anim_rel_pos_mode equ 0xbcd7    ; byte - relative position mode counter (0=absolute)
+single_step_mode equ 0xbcd8     ; word - 1 if animation runs in single-step (debug) mode
+saved_return_addr equ 0xbcde    ; word - saved return address for play_music_sequence
+saved_level      equ 0xbcda     ; word - saved current_level during music callback
+saved_camera_x   equ 0xbcdc     ; word - saved camera_x during music callback
+saved_bp         equ 0xbce0     ; word - saved BP during music callback
+delay_tick_target equ 0xbce2    ; word - target tick count for delay_ticks
+delay_iter_count equ 0xbce4     ; word - remaining iterations for delay_with_input
+script_pc        equ 0xbce6     ; word - animation script program counter (byte offset)
+anim_jump_table  equ 0xbce8     ; word[14] - jump table for animation script opcodes
+timer_mark_tick  equ 0xbcd1     ; word - timer tick recorded by timer_mark
+anim_fig_bg      equ 0xbb32     ; byte - current background figure index
 
 ; Animation working variables
 anim_write_off   equ 0xd5a4     ; word - animation data write offset
@@ -146,8 +181,22 @@ player_dir_flag  equ 0xd5ae     ; byte - player direction flag
 enemy_dir_flag   equ 0xd5b0     ; byte - enemy direction flag
 anim_data_limit  equ 0xd5b2     ; word - animation data limit
 enemy_defeated   equ 0xd64c     ; word - 1 if enemy defeated
-combat_state_d652 equ 0xd652    ; word - combat state variable
+wipe_prev_right  equ 0xd650     ; word - previous right wipe column count (for delta detection)
+wipe_prev_left   equ 0xd652     ; word - previous left wipe column count (for delta detection)
+trans_buf_left   equ 0xd654     ; 14 bytes - transition column data buffer (left)
+trans_buf_right  equ 0xd662     ; 14 bytes - transition column data buffer (right)
+gate_anim_left   equ 0xd670     ; byte - gate animation cooldown (left)
+gate_anim_right  equ 0xd671     ; byte - gate animation cooldown (right)
 anim_state_bb2a  equ 0xbb2a     ; word - animation state variable
+
+; Cutscene/level transition state (used by cutscene_play)
+cutscene_state   equ 0xd672     ; word - cutscene sub-state counter
+ui_pending       equ 0xd674     ; word - 1 if UI element needs to be displayed
+eagle_active     equ 0xd676     ; word - 1 if eagle encounter is active (level 2)
+eagle_scroll_dir equ 0xd678     ; word - eagle scroll direction (+/- for left/right)
+eagle_trigger    equ 0xd67a     ; word - 1 if eagle attack triggered
+eagle_cooldown   equ 0xd67c     ; word - eagle cooldown counter
+princess_rescued equ 0xd67e     ; word - 1 if princess rescue triggered (level 3)
 
 ; Character type table (used for whitespace detection in argv parsing)
 ; ctype_table   equ 0xe4c4    ; byte[256] - bit 3 = whitespace
