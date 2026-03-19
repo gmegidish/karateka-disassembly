@@ -124,9 +124,9 @@ FUNCTION_NAMES = {
     0x0197E: "build_anim_offsets",   # Build animation frame offset table - scans 42 frames (0x11-byte records or 2-byte skip markers, 0xFF terminated)
 
     # === Sound ===
-    0x019A2: "play_sound",           # Sound effect playback
-    0x019AE: "init_sound",           # Initialize sound system
-    0x019EE: "stop_sound",           # Stop current sound
+    0x019A2: "build_enemy_anim_offsets", # Build frame offset lookup table for enemy animations
+    0x019AE: "load_player_anim_data", # Load player animation script data and build offset tables
+    0x019EE: "compact_anim_data",    # Compact/reorganize animation bytecode data and rebuild lookup tables
     0x0190B: "play_music_sequence",  # Save scene state, play animation+music sequence, restore state, redirect return address
 
     # === Game Logic ===
@@ -193,8 +193,8 @@ FUNCTION_NAMES = {
     0x04123: "rand_seed_io",         # Get/set random seed at [0xdf40]
 
     # === Physics / Movement ===
-    0x04441: "update_position",      # Update actor position
-    0x043AA: "apply_gravity",        # Apply gravity to actor
+    0x04441: "add_figure_to_scene",  # Add figure entry to scene animation list buffer
+    0x043AA: "check_hit_zone",       # Check if combat move hits based on move type and distance
     0x04619: "init_controls",        # Initialize control scheme
     0x04A37: "fclose_iob",           # Flush and close an IOB file entry
     0x04A91: "fgets_iob",            # Read line from stdin IOB until newline or EOF
@@ -213,8 +213,8 @@ FUNCTION_NAMES = {
     0x05DE3: "dos_putchar",          # INT 21h/02h - write character to stdout
 
     # === Math ===
-    0x0205E: "math_multiply",        # Multiplication helper
-    0x022A4: "math_divide",          # Division helper
-    0x022BC: "math_modulo",          # Modulo helper
+    0x0205E: "player_anim_select",   # Select next animation ID for player character
+    0x022A4: "memcpy_block",         # Copy block of bytes from source to destination
+    0x022BC: "copy_sprite_frame",    # Copy sprite frame data with X offset adjustment
     0x02605: "enemy_ai_decide",      # Enemy AI decision function
 }

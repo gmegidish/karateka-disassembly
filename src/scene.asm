@@ -8,10 +8,10 @@
 ; Algorithm:
 ;   1. Reset sprite update flags
 ;   2. Align player_x and enemy_x to 4-pixel boundaries
-;   3. Compute animation write offset via math_divide
+;   3. Copy animation data to write buffer via memcpy_block
 ;   4. If combat_active > 1, skip to end (combat transition)
 ;   5. PLAYER LOOP: Walk the player animation frame table:
-;      - If end marker (0xFF), call anim_process or math_multiply to get next anim ID
+;      - If end marker (0xFF), call anim_process or player_anim_select to get next anim ID
 ;      - Look up new frame pointer from animation table
 ;      - Extract anim ID, direction, facing from frame data
 ;      - Apply X velocity (signed byte), clamp to [player_x_min, player_x_max]
@@ -44,7 +44,7 @@ scene_update:
 	push	word [0xc3a0]		; 02308
 	lea	ax,[0xbb33]		; 0230C
 	push	ax			; 02310
-	call	math_divide		; 02311
+	call	memcpy_block		; 02311
 	add	sp,0x6			; 02314
 	mov	[0xd5a4],ax		; 02317
 	cmp	word [0xf8],0x1		; 0231A  ; if combat_active > 1, skip animation
@@ -60,7 +60,7 @@ loc_02328:
 	call	anim_process		; 02336
 	jmp	short loc_0233E		; 02339 jmp 0x233e
 loc_0233B:
-	call	math_multiply		; 0233B
+	call	player_anim_select	; 0233B
 loc_0233E:
 	db	0x3D, 0x2A, 0x00	; 0233E cmp ax,0x2a
 	jc	short loc_02345		; 02341 jc 0x2345
@@ -159,7 +159,7 @@ loc_0243D:
 	lea	ax,[0xbb33]		; 02448
 	add	ax,[0xd5a4]		; 0244C
 	push	ax			; 02450
-	call	math_modulo		; 02451
+	call	copy_sprite_frame		; 02451
 	add	sp,0x6			; 02454
 	add	word [0xd5a4],0x8	; 02457
 	add	word [0xc3d2],0x11	; 0245C  ; advance to next frame (17 bytes per entry)
@@ -297,7 +297,7 @@ loc_025B3:
 	add	ax,[0xd5a4]		; 025E2
 	push	ax			; 025E6
 	mov	[0xd5a8],ax		; 025E7
-	call	math_divide		; 025EA
+	call	memcpy_block		; 025EA
 	add	sp,0x6			; 025ED
 	add	[0xd5a4],ax		; 025F0
 	mov	si,[0xd5a4]		; 025F4

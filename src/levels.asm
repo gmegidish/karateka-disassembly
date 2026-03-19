@@ -25,7 +25,7 @@
 ; 3. If player facing right: handle active enemy encounter logic
 ;    - Check animation states and Y offsets to trigger anim_set_figure
 ;    - Handle combat_phase > 0: manage gate opening and scrolling
-; 4. If no active enemy: call apply_gravity, manage health regen timers
+; 4. If no active enemy: call check_hit_zone, manage health regen timers
 ; 5. If enemy facing player: handle enemy-side hit detection
 level_setup:
 	push	bp			; 02BDD
@@ -147,7 +147,7 @@ loc_02CBB:
 	push	ax			; 02CC3
 	db	0x33, 0xC0		; 02CC4 xor ax,ax
 	push	ax			; 02CC6  actor=0 (player)
-	call	update_position		; 02CC7
+	call	add_figure_to_scene		; 02CC7
 	db	0x8B, 0xE5		; 02CCA mov sp,bp
 
 ; If scene_index == 5: scroll right and set up encounter
@@ -174,7 +174,7 @@ loc_02CFB:
 	push	word [0xd5b0]		; 02D00  enemy_dir_flag
 	push	word [bp+0x4]		; 02D04  distance
 	push	ax			; 02D07  adjusted anim_id
-	call	apply_gravity		; 02D08
+	call	check_hit_zone		; 02D08
 	db	0x8B, 0xE5		; 02D0B mov sp,bp
 	db	0x3D, 0x04, 0x00	; 02D0D cmp ax,0x4  hit result == 4?
 	mov	[bp+0x6],ax		; 02D10  save result
@@ -247,7 +247,7 @@ loc_02DA2:
 	push	ax			; 02DA7
 	db	0x33, 0xC0		; 02DA8 xor ax,ax
 	push	ax			; 02DAA  actor=0 (player)
-	call	update_position		; 02DAB
+	call	add_figure_to_scene		; 02DAB
 	db	0x8B, 0xE5		; 02DAE mov sp,bp
 
 ; --- Player health regeneration ---
@@ -300,7 +300,7 @@ loc_02E10:
 	push	word [0xd5ae]		; 02E15  player_dir_flag
 	push	word [bp+0x4]		; 02E19  distance
 	push	ax			; 02E1C  adjusted anim_id
-	call	apply_gravity		; 02E1D
+	call	check_hit_zone		; 02E1D
 	db	0x8B, 0xE5		; 02E20 mov sp,bp
 	db	0x3D, 0x04, 0x00	; 02E22 cmp ax,0x4  hit result == 4?
 	mov	[bp+0x6],ax		; 02E25
@@ -378,7 +378,7 @@ loc_02EB9:
 	push	ax			; 02EC3
 	mov	ax,0x1			; 02EC4  actor=1 (enemy)
 	push	ax			; 02EC7
-	call	update_position		; 02EC8
+	call	add_figure_to_scene		; 02EC8
 	db	0x8B, 0xE5		; 02ECB mov sp,bp
 	jmp	short loc_02EDF		; 02ECD jmp 0x2edf
 loc_02ECF:
@@ -387,7 +387,7 @@ loc_02ECF:
 	push	ax			; 02ED5
 	mov	ax,0x1			; 02ED6  actor=1 (enemy)
 	push	ax			; 02ED9
-	call	update_position		; 02EDA
+	call	add_figure_to_scene		; 02EDA
 	db	0x8B, 0xE5		; 02EDD mov sp,bp
 
 loc_02EDF:
@@ -540,7 +540,7 @@ loc_03009:
 	push	ax			; 0300E
 	db	0x33, 0xC0		; 0300F xor ax,ax
 	push	ax			; 03011  actor=0 (player)
-	call	update_position		; 03012
+	call	add_figure_to_scene		; 03012
 	db	0x8B, 0xE5		; 03015 mov sp,bp
 	add	sp,0x2			; 03017
 	pop	bp			; 0301A
@@ -1226,7 +1226,7 @@ loc_03536:
 	push	ax			; 03557
 	call	load_anim_script	; 03558
 	db	0x8B, 0xE5		; 0355B mov sp,bp
-	call	play_sound		; 0355D
+	call	build_enemy_anim_offsets		; 0355D
 
 ; Set up final battle scene
 	mov	word [0x130],0x6	; 03560  scene_index = 6
@@ -1402,7 +1402,7 @@ loc_036A7:
 	push	ax			; 036E8
 	call	load_anim_script	; 036E9
 	db	0x8B, 0xE5		; 036EC mov sp,bp
-	call	play_sound		; 036EE
+	call	build_enemy_anim_offsets		; 036EE
 ; Set up final encounter
 	mov	word [0xfa],0x0		; 036F1  combat_phase = 0
 	mov	word [0x10e],0xc8	; 036F7  enemy_x = 200

@@ -41,9 +41,9 @@ loc_01694:
 ; ---- function reset_to_game_start ----
 ; Non-local goto (longjmp) back to game_init's stack frame.
 ; Restores SP from BP (which still points to game_init's frame),
-; then pushes the address of loc_002B8 (the init_sound call in
+; then pushes the address of loc_002B8 (the load_player_anim_data call in
 ; game_init) and returns to it. This effectively restarts the game
-; from the sound initialization point, unwinding the entire call stack.
+; from the animation data loading point, unwinding the entire call stack.
 ;
 ; No parameters. Does not return to caller.
 reset_to_game_start:

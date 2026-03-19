@@ -2,6 +2,18 @@
 
 
 ; ---- function load_file ----
+; High-level file read. Reads from an already-open file slot.
+; Supports multiple read modes based on [bp+0x1E]:
+;   mode < 0: error (invalid) — returns -1
+;   mode 0-1: read a line via dos_read_line
+;   mode > 1: read N bytes (capped at 128)
+; Gets file slot via get_file_slot, reads data, parses with scanf-style conversion.
+;
+; Input:
+;   [bp+0x1A] = file slot index
+;   [bp+0x1C] = output buffer pointer
+;   [bp+0x1E] = read mode/count
+; Output: AX = -1 on error, otherwise bytes read or parsed count
 load_file:
 	push	bp			; 04FDD
 	sub	sp,0x16			; 04FDE
@@ -343,6 +355,15 @@ loc_052D6:
 	jmp	short loc_052B0		; 052D6 jmp 0x52b0
 
 ; ---- function write_file_data ----
+; Writes buffer to file with optional LF->CRLF translation.
+; Handles both raw binary writes (via dos_write_file) and character-by-character
+; output through function pointers for device-mode files.
+;
+; Input:
+;   [bp+0x18] = file slot index
+;   [bp+0x1A] = buffer pointer
+;   [bp+0x1C] = byte count / mode flags
+; Output: AX = bytes written, or -1 on error
 write_file_data:
 	push	bp			; 052D8
 	sub	sp,0x14			; 052D9
@@ -579,6 +600,15 @@ loc_054FF:
 	jmp	short loc_054D9		; 054FF jmp 0x54d9
 
 ; ---- function seek_and_read ----
+; Seeks to a given offset in a file, then reads data.
+; For whence==2 (SEEK_END), performs a search-back loop reading single bytes
+; to find the actual end of data.
+;
+; Input:
+;   [bp+0x16] = file slot index
+;   [bp+0x18]::[bp+0x1A] = 32-bit seek offset
+;   [bp+0x1C] = whence (0=SET, 1=CUR, 2=END)
+; Output: AX:BX = new file position (32-bit), or -1:-1 on error
 seek_and_read:
 	push	bp			; 05501
 	sub	sp,0x12			; 05502
@@ -687,6 +717,11 @@ loc_055EE:
 	ret				; 055F8
 
 ; ---- function close_file_slot ----
+; Closes a DOS file handle and clears the file slot entry.
+; Only calls dos_close_file for real files (not device slots).
+;
+; Input: [bp+0xC] = file slot index
+; Output: AX = 0 on success, -1 on error
 close_file_slot:
 	push	bp			; 055F9
 	sub	sp,0x8			; 055FA
@@ -729,6 +764,11 @@ loc_0564B:
 	ret				; 05658
 
 ; ---- function delete_resource_file ----
+; Deletes a file, but only in real-disk mode (DOS version > 1).
+; In ramdisk mode, does nothing.
+;
+; Input: [bp+0x2C] = filename pointer
+; Output: AX = 0 on success, -1 on error
 delete_resource_file:
 	push	bp			; 05659
 	sub	sp,0x28			; 0565A
@@ -794,6 +834,10 @@ loc_056D9:
 	ret				; 056DD
 
 ; ---- function strcpy ----
+; C runtime strcpy. Copies null-terminated string from src to dest.
+;
+; Input: [bp+0xC] = dest, [bp+0xE] = src
+; Output: AX = dest pointer
 strcpy:
 	push	bp			; 056DE
 	sub	sp,0x8			; 056DF
@@ -842,6 +886,15 @@ loc_05733:
 	ret				; 05740
 
 ; ---- function scanf_format_parser ----
+; Lattice C internal scanf format-string parser.
+; Reads values from an input string according to format specifiers (%d, %s, etc.).
+; Handles %* (suppressed assignment), whitespace skipping, and literal matching.
+;
+; Input:
+;   [bp+0x14] = input string pointer
+;   [bp+0x16] = format string pointer
+;   [bp+0x18..] = output variable pointers (varargs)
+; Output: AX = number of successfully matched fields, or -1 on input failure
 scanf_format_parser:
 	push	bp			; 05741
 	sub	sp,0x10			; 05742
@@ -994,6 +1047,11 @@ loc_05895:
 	ret				; 05899
 
 ; ---- function print_error ----
+; Prints a null-terminated error message string to stdout, followed by a newline.
+; Uses buffered output via the stdout IOB at [0xE1BE].
+;
+; Input: [bp+0xA] = error message string pointer
+; Output: none (writes to stdout)
 print_error:
 	push	bp			; 0589A
 	sub	sp,0x6			; 0589B
@@ -1048,6 +1106,14 @@ loc_05902:
 	ret				; 05906
 
 ; ---- function init_file_system ----
+; Writes a string to a file I/O buffer, character by character.
+; Uses buffered output: writes directly to buffer if space available,
+; otherwise calls crt_file_write_byte to flush and write.
+;
+; Input:
+;   [bp+0xC] = string pointer
+;   [bp+0xE] = pointer to FILE/IOB structure
+; Output: AX = last character written
 init_file_system:
 	push	bp			; 05907
 	sub	sp,0x8			; 05908

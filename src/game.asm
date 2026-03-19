@@ -2,6 +2,14 @@
 
 
 ; ---- function game_init ----
+; Master initialization and outer game loop. This is the top-level entry
+; point called from main(). Sets up graphics, installs interrupt handlers,
+; initializes controls, loads the game disk, then runs the main game loop.
+;
+; After game_main_loop returns, enters the FRAME LOOP (loc_00316):
+;   timer_wait -> poll_keyboard -> scene_update -> level_setup -> render_figures
+; Handles approach_flag [0x154] values: 2=vsync(8), 3=vsync(24), 4=vsync(22), else=vsync(1)
+; Calls cutscene_play and handles scene transitions with fade effects.
 game_init:
 	push	bp			; 00255
 	sub	sp,0x4			; 00256
@@ -47,7 +55,7 @@ loc_0029C:
 	call	check_disk_prompt	; 002B3
 	jmp	short loc_0029C		; 002B6 jmp 0x29c
 loc_002B8:
-	call	init_sound		; 002B8
+	call	load_player_anim_data	; 002B8
 	db	0x33, 0xC0		; 002BB xor ax,ax
 	mov	word [0x114],0xd	; 002BD
 	mov	[0x118],ax		; 002C3
@@ -148,6 +156,15 @@ loc_003C1:
 	jmp	0x516			; 003C4
 
 ; ---- function game_main_loop ----
+; Sets up initial game state and runs the intro sequence, then enters the
+; gameplay loop. Loads enemy animation scripts, palette, combat level 0,
+; and plays the intro (title screen, animated intro, story text).
+;
+; GAMEPLAY LOOP at loc_004F4:
+;   timer_wait -> scene_update -> level_setup -> render_figures
+;   -> handle approach_flag -> scene_transition -> game_scene
+; Loops until game_scene returns 1 (scene complete).
+; On completion, calls init_combat_state(0) and jumps to set_video_mode.
 game_main_loop:
 	push	bp			; 003C7
 	sub	sp,0x4			; 003C8
@@ -169,7 +186,7 @@ loc_003D6:
 	mov	[0x15a],ax		; 003EB
 	call	load_anim_script	; 003EE
 	db	0x8B, 0xE5		; 003F1 mov sp,bp
-	call	play_sound		; 003F3
+	call	build_enemy_anim_offsets	; 003F3
 	mov	ax,0x5dc		; 003F6
 	push	ax			; 003F9
 	mov	ax,0x41fb		; 003FA
@@ -320,6 +337,11 @@ loc_00542:
 	ret				; 00568
 
 ; ---- function game_scene ----
+; Checks if the current scene/level segment is complete.
+; Returns AX=1 if: combat_active and player anim is 0x43 (victory),
+;   OR player reached right boundary [0xBCD5] == [0x104].
+; Returns AX=0 if: player presses a key (poll returns nonzero).
+; This is the "should we transition to next scene?" check.
 game_scene:
 	push	bp			; 00569
 	sub	sp,0x2			; 0056A
@@ -356,6 +378,8 @@ loc_005A6:
 	ret				; 005AC
 
 ; ---- function load_scene ----
+; Loads a new scene: loads background image, palette, resets combat state,
+; clears screen, loads animation script from 0xBD04, then runs it.
 load_scene:
 	push	bp			; 005AD
 	db	0x8B, 0xEC		; 005AE mov bp,sp

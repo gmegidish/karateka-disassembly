@@ -1,7 +1,18 @@
-; Keyboard polling, joystick, video mode init
+; Keyboard polling, joystick, video mode init, hit detection, figure rendering
 
 
 ; ---- function poll_keyboard ----
+; Main keyboard polling function. Checks for input and handles special keys.
+;
+; Input: [bp+4] = mode (0=check joystick too, 1=keyboard only)
+; Special key handling:
+;   Ctrl+Q (via check_ctrl_q) = quit game
+;   Ctrl+R (0x12) = set input_advance flag [0xDF44]
+;   Ctrl+S (0x13) = cycle sound mode [0xD6BC] (0->1->2->0)
+;   Ctrl+V (0x16) with [0x168]=1 = debug render sprite
+;   ESC (0x1B) = read and discard next byte
+;   Extended keys (AL=0): left arrow (0x4B)->'4', right arrow (0x4D)->'6'
+; Output: AL=0 no input, AL=0xFF input pending (stored in [0xDF42]/[0xDF43])
 poll_keyboard:
 	push	bp			; 04149
 	db	0x8B, 0xEC		; 0414A mov bp,sp
@@ -100,6 +111,11 @@ loc_041F4:
 	ret				; 041FB
 
 ; ---- function wait_for_key ----
+; Blocking key read. Checks pending key buffer [0xDF42]/[0xDF43] first,
+; then falls back to INT 21h/07h for blocking read.
+; Maps arrow keys: left (0x4B)->'4', right (0x4D)->'6'.
+; Flushes keyboard buffer after reading.
+; Output: AX = key code
 wait_for_key:
 loc_041FC:
 	mov	al,[0xdf42]		; 041FC
@@ -133,6 +149,8 @@ loc_0422D:
 	ret				; 04232
 
 ; ---- function flush_keyboard ----
+; Drains all pending keystrokes by calling check_ctrl_q in a loop.
+; Clears pending key flag [0xDF43] when done.
 flush_keyboard:
 loc_04233:
 	call	check_ctrl_q		; 04233
@@ -144,6 +162,9 @@ loc_04233:
 	ret				; 04240
 
 ; ---- function consume_key ----
+; Reads and discards a keystroke with a visual delay (wait_vsync(5)).
+; Saves/restores sound mode [0xD6BC] during the wait to prevent
+; sound state corruption.
 consume_key:
 	push	word [0xd6bc]		; 04241
 	mov	byte [0xd6bc],0x0	; 04245
@@ -155,12 +176,18 @@ consume_key:
 	ret				; 04256
 
 ; ---- function noop_stub ----
+; Empty function placeholder. Single `ret` instruction.
 noop_stub:
 	ret				; 04257
 	add	[si-0x32f2],dh		; 04258
 	and	bx,ax			; 0425C
 
 ; ---- function detect_hercules_vsync ----
+; Probes a port for Hercules vsync bit transition (bit change detection).
+; Reads port repeatedly watching for the specified bit to change state.
+;
+; Input: DX = port address, BL = bit mask
+; Output: CF=0 if transition detected (Hercules present), CF=1 if timeout
 detect_hercules_vsync:
 	in	al,dx			; 0425E
 	db	0x22, 0xC3		; 0425F and al,bl
@@ -178,6 +205,13 @@ loc_04271:
 	ret				; 04272
 
 ; ---- function video_set_mode_4 ----
+; Sets CGA mode 4 (320x200, 4-color graphics).
+; Configures Hercules compatibility register (port 0x3BF),
+; sets BIOS equipment flags for CGA, calls INT 10h to set mode,
+; tests video memory with pattern 0x55AA to verify hardware.
+; Builds scanline lookup table at [0xDF59] (200 entries, CGA interleaved).
+;
+; Output: CF=0 success, CF=1 failure (no CGA hardware)
 video_set_mode_4:
 	mov	dx,0x3bf		; 04273
 	mov	al,0x0			; 04276
@@ -225,6 +259,11 @@ loc_042B1:
 	ret				; 042D0
 
 ; ---- function init_hercules_mode ----
+; Initializes Hercules graphics mode. Programs CRTC registers for graphics,
+; builds 4-bank scanline LUT (banks at +0x0000, +0x2000, +0x4000, +0x6000),
+; clears video memory, and enables display.
+;
+; Output: CF=0 success, CF=1 failure (no Hercules detected)
 init_hercules_mode:
 	mov	dx,0x3bf		; 042D1
 	mov	al,0x3			; 042D4
@@ -274,6 +313,10 @@ loc_042F3:
 	ret				; 0433D
 
 ; ---- function program_crtc_registers ----
+; Programs 12 CRTC (6845) registers from a table pointed to by SI.
+; Writes register index to port 0x3B4, then value to port 0x3B5.
+;
+; Input: SI = pointer to 12 register values, DX = 0x3B4 (CRTC index port)
 program_crtc_registers:
 	mov	dx,0x3b4		; 0433E
 	mov	cx,0xc			; 04341
@@ -289,6 +332,10 @@ program_crtc_registers:
 	ret				; 04351
 
 ; ---- function check_graphics_card ----
+; Detects available graphics adapter. Tries CGA mode 4 first, falls back
+; to Hercules. Saves equipment flags and video mode for later restore.
+;
+; Output: AX = 0 if no graphics card, or 'A'+mode if found
 check_graphics_card:
 	int	0x11			; 04352
 	mov	[0xdf4a],al		; 04354
@@ -309,6 +356,10 @@ loc_0436D:
 	ret				; 04372
 
 ; ---- function video_init ----
+; Restores original video mode and selects disk drive.
+; Called during error/exit cleanup. Clears video buffer, restores BIOS
+; equipment flags, sets original video mode via INT 10h, and selects
+; the game's disk drive via INT 21h/0Eh.
 video_init:
 	call	clear_video_buffer	; 04373
 	mov	bl,[0xdf4a]		; 04376
@@ -327,6 +378,8 @@ video_init:
 	ret				; 04395
 
 ; ---- function clear_video_buffer ----
+; Clears 32KB of video memory to zero using REP STOSW.
+; Uses the video segment stored at [0xDF48].
 clear_video_buffer:
 	push	di			; 04396
 	push	es			; 04397
@@ -340,8 +393,18 @@ clear_video_buffer:
 	pop	di			; 043A8
 	ret				; 043A9
 
-; ---- function apply_gravity ----
-apply_gravity:
+; ---- function check_hit_zone ----
+; Determines whether a combat move hits the enemy based on move type and distance.
+; Maps move index + distance to a hit result using lookup tables.
+;
+; Input:
+;   [bp+4] = move index (adjusted: +3 if <=2, -3 if >2 with distance tweak)
+;   [bp+6] = distance between player and enemy
+;   [bp+8] = direction flag (pointer to zone table base)
+; Output:
+;   AX = hit result: 0=miss, 1-4=hit types (4=out of range, 3=light hit)
+;   Heavy/medium/close/advancing/retreating hits from lookup tables
+check_hit_zone:
 	push	bp			; 043AA
 	db	0x8B, 0xEC		; 043AB mov bp,sp
 	cmp	byte [bp+0x4],0x2	; 043AD
@@ -408,8 +471,17 @@ loc_0443F:
 	pop	bp			; 0443F
 	ret				; 04440
 
-; ---- function update_position ----
-update_position:
+; ---- function add_figure_to_scene ----
+; Adds a figure entry to the scene animation list buffer at [0xBB2E].
+; Shifts existing entries up by 4 bytes, then writes a new 4-byte entry
+; containing the figure's screen X position and character code.
+;
+; Input:
+;   [bp+4] = character type (0=player, 1=enemy)
+;   [bp+6] = figure/pose index
+; Character codes: 0x61-0x62 for player, 0x63-0x64 for enemy
+; Special: scene_index 7 (level 3 boss) adjusts X by -0x23 and Y by +8
+add_figure_to_scene:
 	push	bp			; 04441
 	db	0x8B, 0xEC		; 04442 mov bp,sp
 	mov	bx,[bp+0x6]		; 04444
@@ -470,6 +542,17 @@ loc_044C3:
 	ret				; 044D2
 
 ; ---- function check_joystick ----
+; Reads joystick input and maps to key codes for combat controls.
+;
+; Input: [bp+4] = mode (0=full check with direction mapping, non-0=just read buttons)
+; Handles debug axis swaps via flags [0xE1AB]-[0xE1AE].
+; Direction+button mapping:
+;   Right+Up+Button1 = '&' (0x26, special attack)
+;   Button1+Up = 'w', Button1+Down = 'x', Button1 alone = 's'
+;   Button2+Up = 'q', Button2+Down = 'z', Button2 alone = 'a'
+;   Left = '4', Right = '6'
+;   Up alone (certain anims) = '0' or space
+; Output: AX = mapped key code, or 0 if no input
 check_joystick:
 	call	read_joystick		; 044D3
 	cmp	word [bp+0x4],0x0	; 044D6

@@ -1,15 +1,29 @@
-; Sound system: init, play, stop, music callback
+; Animation data management: enemy offset table, player data loading, data compaction
 
 
-; ---- function play_sound ----
-play_sound:
+; ---- function build_enemy_anim_offsets ----
+; Builds the frame offset lookup table for enemy animations.
+; Calls build_anim_offsets with enemy animation data base (0xCE3E)
+; and offset table (0xCDEA).
+;
+; Input: none
+; Output: populates enemy animation offset table
+build_enemy_anim_offsets:
 	lea	bx,[0xce3e]		; 019A2
 	lea	di,[0xcdea]		; 019A6
 	call	build_anim_offsets	; 019AA
 	ret				; 019AD
 
-; ---- function init_sound ----
-init_sound:
+; ---- function load_player_anim_data ----
+; Loads the player's animation script data and builds offset tables.
+; Calls load_anim_script(0xD59C, 0xC428) to load player animation script,
+; then build_anim_offsets_alt to build player animation offset tables.
+; Resets several flags ([0x172], [0x160]-[0x164], [0x15E]) to 0.
+; Finally calls load_animation(5) to load animation graphics set 5.
+;
+; Input: none
+; Output: player animation data loaded and indexed
+load_player_anim_data:
 	push	bp			; 019AE
 	sub	sp,0x4			; 019AF
 	jc	short loc_019BA		; 019B2 jc 0x19ba
@@ -40,8 +54,19 @@ loc_019BD:
 	pop	bp			; 019EC
 	ret				; 019ED
 
-; ---- function stop_sound ----
-stop_sound:
+; ---- function compact_anim_data ----
+; Compacts/reorganizes animation data by scanning animation bytecode records.
+; Processes 5-byte entries terminated by 0xFF, with 0x12 as a special sync marker.
+; Rebuilds animation parameter lookup tables.
+;
+; Input: [bp+0x10] = number of entries to process
+; Processes entries from buffer at [si-0x3EFE], building tables at:
+;   [-0x3C58] = start offsets
+;   [-0x3C4A] = sync point offsets
+;   [-0x3C3C] = end offsets
+; Final block restores animation parameters from backup tables:
+;   [0xC3A8/C3B6/C3C4] -> [0xC3A0/C3A2/C3A4]
+compact_anim_data:
 	push	bp			; 019EE
 	sub	sp,0xc			; 019EF
 	jc	short loc_019FA		; 019F2 jc 0x19fa

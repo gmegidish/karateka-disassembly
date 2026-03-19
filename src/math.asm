@@ -1,8 +1,24 @@
-; Math helpers: multiply, divide, modulo
+; Player animation selection, memory copy, sprite frame copy
 
 
-; ---- function math_multiply ----
-math_multiply:
+; ---- function player_anim_select ----
+; Selects the next animation ID for the player character.
+; Mirror of enemy_ai_decide in scene.asm but for the player.
+; Based on current player animation state, combat state, and input flags,
+; determines which animation to play next.
+;
+; Key behaviors:
+;   - scene_index==2 && anim_bg_counter==3: sets scene advance flag [0x12A]=1
+;   - combat_active: returns 0x1E (approach) or 0x1F (walk)
+;   - Player anim 0x08 (kick): plays sound via wait_vsync, clears flags
+;   - Player anim 0x44: sets combat_active=2 (victory), returns 0
+;   - Player was hit [0xFC]: knockback 8px, returns 0x1B if mid-attack else 0
+;   - [0x16C] trigger: returns rand_range(1)+0x11
+;   - Falls through to jump table at 0x2247 for pose-specific dispatch
+;
+; Input: reads globals (player_anim_id [0x10C], combat_active [0xF8], etc.)
+; Output: AX = animation table index for player
+player_anim_select:
 	push	bp			; 0205E
 	sub	sp,0x4			; 0205F
 	jc	short loc_0206A		; 02062 jc 0x206a
@@ -258,8 +274,15 @@ loc_0229A:
 	pop	bp			; 022A2
 	ret				; 022A3
 
-; ---- function math_divide ----
-math_divide:
+; ---- function memcpy_block ----
+; Copies a block of bytes from source to destination using REP MOVSB.
+;
+; Input:
+;   [bp+4] = dest pointer
+;   [bp+6] = source pointer
+;   [bp+8] = end pointer (copy count = end - source)
+; Output: none
+memcpy_block:
 	push	bp			; 022A4
 	db	0x8B, 0xEC		; 022A5 mov bp,sp
 	mov	di,[bp+0x4]		; 022A7
@@ -275,8 +298,19 @@ math_divide:
 	pop	bp			; 022BA
 	ret				; 022BB
 
-; ---- function math_modulo ----
-math_modulo:
+; ---- function copy_sprite_frame ----
+; Copies sprite frame data (two 4-byte sub-blocks) from source to dest,
+; and adds an X offset to the position words.
+;
+; Input:
+;   [bp+4] = dest pointer
+;   [bp+6] = source pointer
+;   [bp+8] = X offset to add to position words
+; Copies src[1..4] -> dst[0..3] (first sub-block)
+; Copies src[6..9] -> dst[4..7] (second sub-block)
+; Adds X offset to dst[1] (word) and dst[5] (word)
+; Output: none
+copy_sprite_frame:
 	push	bp			; 022BC
 	db	0x8B, 0xEC		; 022BD mov bp,sp
 	mov	di,[bp+0x4]		; 022BF

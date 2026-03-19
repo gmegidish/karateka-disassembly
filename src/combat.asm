@@ -11,7 +11,7 @@
 ; Behavior:
 ;   - Calls load_animation(level)
 ;   - Calls load_anim_script for levels < 4
-;   - Calls stop_sound(1) for level < 2, stop_sound(6) for level >= 2
+;   - Calls compact_anim_data(1) for level < 2, compact_anim_data(6) for level >= 2
 ;   - Calls update_score (anti-tamper check) for level 2
 ;   - Calls init_combat_state to set up initial combat state
 init_combat_level:
@@ -41,13 +41,13 @@ loc_01AD1:
 	jnl	short loc_01B05		; 01AF8 jnl 0x1b05
 	mov	ax,0x1			; 01AFA
 	push	ax			; 01AFD
-	call	stop_sound		; 01AFE
+	call	compact_anim_data		; 01AFE
 	db	0x8B, 0xE5		; 01B01 mov sp,bp
 	jmp	short loc_01B0E		; 01B03 jmp 0x1b0e
 loc_01B05:
 	mov	ax,0x6			; 01B05
 	push	ax			; 01B08
-	call	stop_sound		; 01B09
+	call	compact_anim_data		; 01B09
 	db	0x8B, 0xE5		; 01B0C mov sp,bp
 loc_01B0E:
 	cmp	word [bp+0x8],0x2	; 01B0E
