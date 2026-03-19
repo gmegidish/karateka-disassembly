@@ -27,12 +27,10 @@ fpu_status      equ 0x7c        ; word - FPU status word from FNSTSW
 dos_error_code  equ 0x80        ; word - DOS error code (used by DOS wrappers)
 requested_stack_size equ 0xe0   ; word - stack size from command line =N parameter
 
-; Error message strings (DS-relative offsets, used with INT 21h/09h)
-; Strings are '$'-terminated with CR/LF, located at 0x6D22 in code section
-err_invalid_stack_size equ 0x82 ; "Invalid stack size\r\n$"
-err_invalid_redirect   equ 0x97 ; "Invalid I/O redirection\r\n$"
-err_insufficient_memory equ 0xb1 ; "Insufficient memory\r\n$"
-err_stack_overflow     equ 0xc7 ; "*** STACK OVERFLOW ***\r\n$"
+; DS base address — DS is set to 0x6CA, so DS:0 = linear 0x6CA0.
+; Labels in the binary include the 0x200-byte MZ header, so the base is 0x6CA0 + 0x200.
+; Use (label - DS_BASE) to convert absolute labels to DS-relative offsets.
+DS_BASE equ 0x6EA0
 
 ; C runtime globals
 argc            equ 0xe43e      ; word - parsed argument count (max 32)
@@ -246,12 +244,12 @@ db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF,
 db 0x00, 0x00  ; 06D20 |..|
 
 ; --- error_strings (0x06D22-0x06D80) ---
-; Referenced via DS-relative offsets (DS=0x6CA, so DS:0x82 = linear 0x6D22)
 ; Used by startup error handlers with INT 21h/09h (print '$'-terminated string)
-db "Invalid stack size", 0x0D, 0x0A, "$"           ; 06D22 (DS:0x82) err_invalid_stack_size
-db "Invalid I/O redirection", 0x0D, 0x0A, "$"      ; 06D37 (DS:0x97) err_invalid_redirect
-db "Insufficient memory", 0x0D, 0x0A, "$"           ; 06D51 (DS:0xB1) err_insufficient_memory
-db "*** STACK OVERFLOW ***", 0x0D, 0x0A, "$"        ; 06D67 (DS:0xC7) err_stack_overflow
+; Reference in code as (label - DS_BASE) to get DS-relative offset
+err_invalid_stack_size:  db "Invalid stack size", 0x0D, 0x0A, "$"       ; 06D22
+err_invalid_redirect:    db "Invalid I/O redirection", 0x0D, 0x0A, "$"  ; 06D37
+err_insufficient_memory: db "Insufficient memory", 0x0D, 0x0A, "$"      ; 06D51
+err_stack_overflow:      db "*** STACK OVERFLOW ***", 0x0D, 0x0A, "$"   ; 06D67
 
 ; --- unknown_data_1 (0x06D80-0x06E16) ---
 db 0x2C, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  ; 06D80 |,..............|

@@ -138,7 +138,7 @@ loc_000A8:
 ; DX points to "Invalid I/O redirection\r\n$" string in data segment.
 
 loc_000AD:
-	mov	dx,err_invalid_redirect	; 000AD  ; "Invalid I/O redirection"
+	mov	dx,err_invalid_redirect - DS_BASE ; 000AD
 	jmp	0x407			; 000B0  ; jump to error_exit (0x0207 code offset)
 
 ; ---- Parse '=' stack size parameter (0x00B3-0x00EE) ----
@@ -184,7 +184,7 @@ loc_000E6:
 ; ---- Error: invalid stack size (0x00F0-0x00F5) ----
 
 loc_000F0:
-	mov	dx,err_invalid_stack_size ; 000F0  ; "Invalid stack size"
+	mov	dx,err_invalid_stack_size - DS_BASE ; 000F0
 	jmp	0x407			; 000F3  ; jump to error_exit
 
 ; ---- Memory calculation (0x00F6-0x013E) ----
@@ -224,7 +224,7 @@ loc_0012F:
 	add	bx,[0x17]		; 00133  ; add stack overflow check margin
 	jnc	short loc_0013F		; 00137 jnc 0x13f  ; ok -> proceed to stack setup
 loc_00139:
-	mov	dx,err_insufficient_memory ; 00139  ; "Insufficient memory"
+	mov	dx,err_insufficient_memory - DS_BASE ; 00139
 	jmp	0x407			; 0013C  ; jump to error_exit
 
 ; ---- Stack and heap setup (0x013F-0x0184) ----
@@ -364,7 +364,7 @@ stack_overflow_handler:
 	mov	ax,[0x15]		; 00220  ; stack_top
 	db	0x2D, 0x04, 0x00	; 00223 sub ax,0x4  ; leave room for far return address
 	db	0x8B, 0xE0		; 00226 mov sp,ax  ; reset stack pointer
-	mov	dx,err_stack_overflow	; 00228  ; "*** STACK OVERFLOW ***"
+	mov	dx,err_stack_overflow - DS_BASE ; 00228
 	mov	ah,0x9			; 0022B  ; INT 21h/09h: print string
 	int	0x21			; 0022D
 	cmp	byte [0xf],0x2		; 0022F  ; DOS version >= 2?
