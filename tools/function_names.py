@@ -77,9 +77,9 @@ FUNCTION_NAMES = {
     0x018F8: "timer_wait_3ticks",    # INT 1Ah - wait until 3 ticks since timer_mark (~165ms, ~6 FPS)
 
     # === Disk / File Operations ===
-    0x016C1: "read_disk_sector",     # INT 13h - raw disk sector read
-    0x01718: "load_game_disk",       # Load from game disk, check if present
-    0x0169C: "disk_setup",           # Disk I/O setup
+    0x016C2: "read_disk_sector",     # INT 13h - copy protection disk verification
+    0x01718: "load_game_disk",       # Verify game disk signature is present
+    0x0169C: "reset_to_game_start",  # Non-local goto (longjmp) back to game_init
     0x04B7F: "show_insert_disk",     # "make sure your karateka disk is in drive a"
     0x04FDD: "load_file",            # High-level file load (calls dos_read_file)
     0x052D8: "write_file_data",      # Write buffer to file with optional LF->CRLF translation
@@ -112,7 +112,7 @@ FUNCTION_NAMES = {
     0x00F52: "load_palette",         # Load color palette
     0x00FBB: "load_background",      # Load background image file
     0x01027: "load_animation",       # Load animation data file
-    0x0166D: "set_cga_palette",      # Set CGA palette colors
+    0x0166D: "open_file_retry",      # Open file via open_file_slot, retry on failure
     0x01277: "load_anim_script",     # Load animation script file from disk and compile to bytecode
     0x012EB: "parse_anim_command",   # Parse one text animation command line into bytecode
 

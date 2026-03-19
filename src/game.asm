@@ -39,7 +39,7 @@ loc_0029C:
 	push	ax			; 002A3
 	db	0x33, 0xC0		; 002A4 xor ax,ax
 	push	ax			; 002A6
-	call	disk_setup		; 002A7
+	call	reset_to_game_start	; 002A7
 	db	0x8B, 0xE5		; 002AA mov sp,bp
 	call	load_game_disk		; 002AC
 	test	ax,ax			; 002AF

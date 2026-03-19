@@ -1,8 +1,18 @@
-; Disk I/O, CGA palette, Ctrl+Q check, sector reading
+; Disk I/O, file retry, Ctrl+Q check, copy protection sector reading
 
 
-; ---- function set_cga_palette ----
-set_cga_palette:
+; ---- function open_file_retry ----
+; Opens a file via open_file_slot, retrying on failure.
+; If open_file_slot returns -1 (file not found / disk error), calls
+; check_disk_prompt to show the "insert disk" message, then retries
+; in a loop until the file opens successfully.
+;
+; Parameters (on stack, Lattice C convention):
+;   [bp+0x8] = filename pointer / flags (passed through to open_file_slot)
+;   [bp+0xa] = additional flags (passed through to open_file_slot)
+;
+; Returns: AX = file slot index (guaranteed valid, retries until success)
+open_file_retry:
 	push	bp			; 0166D
 	sub	sp,0x4			; 0166E
 	jc	short loc_01679		; 01671 jc 0x1679
@@ -28,14 +38,27 @@ loc_01694:
 	pop	bp			; 0169A
 	ret				; 0169B
 
-; ---- function disk_setup ----
-disk_setup:
+; ---- function reset_to_game_start ----
+; Non-local goto (longjmp) back to game_init's stack frame.
+; Restores SP from BP (which still points to game_init's frame),
+; then pushes the address of loc_002B8 (the init_sound call in
+; game_init) and returns to it. This effectively restarts the game
+; from the sound initialization point, unwinding the entire call stack.
+;
+; No parameters. Does not return to caller.
+reset_to_game_start:
 	mov	sp,bp			; 0169C
 	mov	ax,0x2b8		; 0169E
 	push	ax			; 016A1
 	ret				; 016A2
 
 ; ---- function check_ctrl_q ----
+; Non-blocking keyboard check for Ctrl+Q (0x11) via INT 21h/06h.
+; If Ctrl+Q is detected: sets video mode 3 (80x25 text), resets the
+; stack pointer from [0x15], and exits to DOS with return code 1
+; via INT 21h/4Ch. Otherwise returns normally (no-op).
+;
+; No parameters. No return value (unless Ctrl+Q exits the program).
 check_ctrl_q:
 	mov	dl,0xff			; 016A3
 	mov	ah,0x6			; 016A5
@@ -53,6 +76,25 @@ loc_016B0:
 	mov	sp,ax			; 016BB
 	mov	ax,0x4c01		; 016BD
 	int	0x21			; 016C0
+
+; ---- function read_disk_sector ----
+; Copy protection disk verification via INT 13h (BIOS disk read).
+; Reads raw disk sectors to verify the original game disk is present.
+;
+; First read: track 10, sector 7, head 0 — reads one sector into
+; the verification buffer. Retries on failure (up to DI attempts).
+;
+; Second read: track 10, sector 241 (0xF1) — reads into the read
+; buffer. If a CRC error (AH=0x10) occurs, compares 32 bytes (16
+; words) between the verification buffer and read buffer+0x8C.
+;
+; Parameters (from caller's stack frame):
+;   [bp+0x4] = drive number
+;   [bp+0x6] = verification buffer pointer
+;   [bp+0x8] = read buffer pointer
+;
+; Returns: AX = 1 if copy protection check passed, 0 if failed
+read_disk_sector:
 	add	[bp+si],ax		; 016C2
 	mov	bx,[bp+0x6]		; 016C4
 	mov	ch,0xa			; 016C7
@@ -99,6 +141,13 @@ loc_01714:
 	ret				; 01717
 
 ; ---- function load_game_disk ----
+; Verifies the game disk is present by comparing a signature string.
+; Compares bytes at [bx-0x435C] (expected signature in data section)
+; with [bx+0x7C3] (read from disk). Iterates until a null terminator
+; is found or a mismatch occurs.
+;
+; No parameters.
+; Returns: AX = 1 if signature matches (game disk present), 0 if mismatch
 load_game_disk:
 	db	0x33, 0xDB		; 01718 xor bx,bx
 	db	0x33, 0xC0		; 0171A xor ax,ax

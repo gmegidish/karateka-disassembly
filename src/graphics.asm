@@ -531,11 +531,11 @@ animate_step:
 ; Loads a palette file from disk and sets the CGA palette.
 ;
 ; Parameters (on stack, Lattice C convention):
-;   [bp+0x12] = palette index (passed to set_cga_palette)
+;   [bp+0x12] = palette index (passed to open_file_retry)
 ;   [bp+0x14] = data offset index into resource table
 ;
 ; Local variables:
-;   [bp+0x6] = file handle from set_cga_palette
+;   [bp+0x6] = file handle from open_file_retry
 ;   [bp+0x8] = total data size (high byte << 8 + low byte)
 ;
 ; Returns: AX = total data size
@@ -552,7 +552,7 @@ loc_00F61:
 	mov	ax,0x8000		; 00F63
 	push	ax			; 00F66
 	push	word [bp+0x12]		; 00F67
-	call	set_cga_palette		; 00F6A
+	call	open_file_retry		; 00F6A
 	db	0x8B, 0xE5		; 00F6D mov sp,bp
 	mov	bx,[bp+0x14]		; 00F6F
 	add	bx,0xa6d6		; 00F72
@@ -592,10 +592,10 @@ loc_00F61:
 ; and displays it.
 ;
 ; Parameters (on stack, Lattice C convention):
-;   (none visible - uses filename from set_cga_palette result)
+;   (none visible - uses filename from open_file_retry result)
 ;
 ; Local variables:
-;   [bp+0x4] = file handle from set_cga_palette
+;   [bp+0x4] = file handle from open_file_retry
 ;   [bp+0x6] = total file size
 ;
 ; Loads data to DS:0x337 (offscreen buffer), calls close_file_slot to
@@ -615,7 +615,7 @@ loc_00FCA:
 	push	ax			; 00FD2
 	mov	ax,0xbc78		; 00FD3
 	push	ax			; 00FD6
-	call	set_cga_palette		; 00FD7
+	call	open_file_retry		; 00FD7
 	db	0x8B, 0xE5		; 00FDA mov sp,bp
 	mov	bx,0x2			; 00FDC
 	push	bx			; 00FDF
@@ -661,7 +661,7 @@ loc_00FCA:
 ;
 ; Local variables:
 ;   [bp+0x0]  = temp
-;   [bp+0x8]  = file handle from set_cga_palette
+;   [bp+0x8]  = file handle from open_file_retry
 ;   [bp+0xa]  = secondary data size
 ;   [bp+0xc]  = frame offset counter (iterates by 4, up to 0x2A8)
 ;   [bp+0x10] = secondary data size copy
@@ -700,7 +700,7 @@ loc_01036:
 	push	ax			; 0105C
 	lea	ax,[bp+0x16]		; 0105D
 	push	ax			; 01060
-	call	set_cga_palette		; 01061
+	call	open_file_retry		; 01061
 	db	0x8B, 0xE5		; 01064 mov sp,bp
 	mov	bx,[0x160]		; 01066
 	add	bx,0x443c		; 0106A
@@ -776,7 +776,7 @@ loc_010FB:
 	push	ax			; 0111F
 	lea	ax,[bp+0x16]		; 01120
 	push	ax			; 01123
-	call	set_cga_palette		; 01124
+	call	open_file_retry		; 01124
 	db	0x8B, 0xE5		; 01127 mov sp,bp
 	mov	bx,[bp+0xa]		; 01129
 	mov	cx,[0x160]		; 0112C
@@ -814,7 +814,7 @@ loc_01157:
 	push	ax			; 0117B
 	lea	ax,[bp+0x16]		; 0117C
 	push	ax			; 0117F
-	call	set_cga_palette		; 01180
+	call	open_file_retry		; 01180
 	db	0x8B, 0xE5		; 01183 mov sp,bp
 	mov	bx,[0x164]		; 01185
 	add	bx,0x893a		; 01189
@@ -890,7 +890,7 @@ loc_0121A:
 	push	ax			; 0123E
 	lea	ax,[bp+0x16]		; 0123F
 	push	ax			; 01242
-	call	set_cga_palette		; 01243
+	call	open_file_retry		; 01243
 	db	0x8B, 0xE5		; 01246 mov sp,bp
 	mov	bx,[0x164]		; 01248
 	add	bx,0x893a		; 0124C
