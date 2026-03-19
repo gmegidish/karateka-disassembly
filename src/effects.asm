@@ -81,9 +81,9 @@ loc_03A99:
 	mov	ax,[0xc3a6]		; 03AAD
 	shl	ax,1			; 03AB0
 	db	0x8B, 0xF0		; 03AB2 mov si,ax
-	mov	bx,[si-0x3c58]		; 03AB4
-	mov	cx,[si-0x3c4a]		; 03AB8
-	mov	ax,[si-0x3c3c]		; 03ABC
+	mov	bx,[si+0xc3a8]		; 03AB4
+	mov	cx,[si+0xc3b6]		; 03AB8
+	mov	ax,[si+0xc3c4]		; 03ABC
 	mov	[0xc3a4],ax		; 03AC0
 	mov	[0xc3a2],cx		; 03AC3
 	mov	[0xc3a0],bx		; 03AC7
@@ -113,10 +113,10 @@ loc_03ADF:
 	mov	bx,[0x12c]		; 03AF0
 	mov	[0xc3a6],bx		; 03AF4
 	shl	bx,1			; 03AF8
-	mov	cx,[bx-0x3c58]		; 03AFA
-	mov	dx,[bx-0x3c4a]		; 03AFE
+	mov	cx,[bx+0xc3a8]		; 03AFA
+	mov	dx,[bx+0xc3b6]		; 03AFE
 	mov	[0xee],ax		; 03B02
-	mov	ax,[bx-0x3c3c]		; 03B05
+	mov	ax,[bx+0xc3c4]		; 03B05
 	mov	[0xc3a4],ax		; 03B09
 	mov	[0xc3a0],cx		; 03B0C
 	mov	[0xc3a2],dx		; 03B10
@@ -251,7 +251,7 @@ loc_03BDA:
 	out	byte 0x61,al		; 03BDE
 	dec	bx			; 03BE0
 	shl	bx,1			; 03BE1
-	jmp	word near [bx-0x2943]	; 03BE3
+	jmp	word near [bx+0xd6bd]	; 03BE3
 loc_03BE7:
 	pop	bp			; 03BE7
 	ret				; 03BE8
@@ -601,11 +601,11 @@ loc_03E57:
 	jnz	short loc_03E5F		; 03E5A jnz 0x3e5f
 	mov	bx,0x1e			; 03E5C
 loc_03E5F:
-	mov	si,[bx-0x4796]		; 03E5F
+	mov	si,[bx+0xb86a]		; 03E5F
 	mov	cx,0x9			; 03E63
-	mov	al,[si-0x4795]		; 03E66
+	mov	al,[si+0xb86b]		; 03E66
 	and	al,0xfe			; 03E6A
-	mov	[si-0x4795],al		; 03E6C
+	mov	[si+0xb86b],al		; 03E6C
 	inc	si			; 03E70
 	loop	0x3e66			; 03E71
 	add	bx,0x2			; 03E73
@@ -649,14 +649,14 @@ loc_03E96:
 	push	si			; 03E99
 	db	0x8B, 0xF3		; 03E9A mov si,bx
 	shl	bx,1			; 03E9C
-	mov	ax,[bx-0x4796]		; 03E9E
+	mov	ax,[bx+0xb86a]		; 03E9E
 	lea	bx,[0xb86a]		; 03EA2
 	db	0x03, 0xD8		; 03EA6 add bx,ax
-	mov	ch,[si-0x248c]		; 03EA8
+	mov	ch,[si+0xdb74]		; 03EA8
 	mov	[0xdbb2],ch		; 03EAC
 loc_03EB0:
 	push	di			; 03EB0
-	mov	cl,[si-0x24aa]		; 03EB1
+	mov	cl,[si+0xdb56]		; 03EB1
 	mov	[0xdbb4],cl		; 03EB5
 loc_03EB9:
 	mov	ah,[bx]			; 03EB9
@@ -684,8 +684,8 @@ loc_03EBD:
 	dec	byte [0xdbb2]		; 03EE7
 	jnz	short loc_03EB0		; 03EEB jnz 0x3eb0
 	mov	ah,[0xdbb1]		; 03EED
-	add	ah,[si-0x246e]		; 03EF1
-	mov	al,[si-0x248c]		; 03EF5
+	add	ah,[si+0xdb92]		; 03EF1
+	mov	al,[si+0xdb74]		; 03EF5
 	shl	al,1			; 03EF9
 	shl	al,1			; 03EFB
 	shl	al,1			; 03EFD
@@ -701,7 +701,7 @@ loc_03F09:
 	dec	di			; 03F0D
 	jmp	short loc_03F09		; 03F0E jmp 0x3f09
 loc_03F10:
-	mov	ah,[si-0x246e]		; 03F10
+	mov	ah,[si+0xdb92]		; 03F10
 	add	[0xdbb1],ah		; 03F14
 	and	byte [0xdbb1],0x3	; 03F18
 	jz	short loc_03F24		; 03F1D jz 0x3f24
@@ -916,8 +916,8 @@ loc_0402E:
 loc_0404F:
 	db	0x33, 0xDB		; 0404F xor bx,bx
 loc_04051:
-	mov	di,[bx-0x20a7]		; 04051
-	mov	si,[bx-0x20a5]		; 04055
+	mov	di,[bx+0xdf59]		; 04051
+	mov	si,[bx+0xdf5b]		; 04055
 	mov	cx,0x28			; 04059
 	push	ds			; 0405C
 	push	es			; 0405D
@@ -989,7 +989,7 @@ loc_040BB:
 loc_040C6:
 	mov	bx,0x14			; 040C6
 loc_040C9:
-	mov	word [bx-0x3c2e],0x0	; 040C9
+	mov	word [bx+0xc3d2],0x0	; 040C9
 	sub	bx,0x2			; 040CF
 	jnl	short loc_040C9		; 040D2 jnl 0x40c9
 	ret				; 040D4

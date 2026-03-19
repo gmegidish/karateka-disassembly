@@ -456,12 +456,12 @@ loc_02F3C:
 	inc	bx			; 02F55
 	mov	[0xc3a6],bx		; 02F56  ++anim_bg_counter
 	shl	bx,1			; 02F5A  * 2 for word index
-	mov	cx,[bx-0x3c4a]		; 02F5C  lookup table A (animation divisor)
+	mov	cx,[bx+0xc3b6]		; 02F5C  lookup table A (animation divisor)
 	mov	bx,[0xc3a6]		; 02F60  anim_bg_counter (reload)
 	shl	bx,1			; 02F64
-	mov	dx,[bx-0x3c58]		; 02F66  lookup table B
+	mov	dx,[bx+0xc3a8]		; 02F66  lookup table B
 	mov	[0x12e],ax		; 02F6A  scene_transition_pending = 1
-	mov	ax,[bx-0x3c3c]		; 02F6D  lookup table C
+	mov	ax,[bx+0xc3c4]		; 02F6D  lookup table C
 	mov	word [0x154],0x1	; 02F71  approach_flag = 1
 	mov	word [0xee],0x2		; 02F77  anim_render_mode = transition
 	mov	bx,0xffff		; 02F7D

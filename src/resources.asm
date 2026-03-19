@@ -469,7 +469,7 @@ loc_0135E:
 ;          do_scr(0x14CE), del_fig(0x14E0), set_wipe(0x1514), set_nowipe(0x1526),
 ;          wait(0x1538), init_sal(0x156C), set_pos(0x157E), inc_x(0x15BE),
 ;          loop(0x15FA), end_animation(0x162D)
-	adc	bx,[fs:bx+si-0x33ed]	; 0163E
+	adc	bx,[fs:bx+si+0xcc13]	; 0163E
 	adc	ax,[bx+0x14]		; 01643
 	into				; 01646
 	adc	al,0xe0			; 01647

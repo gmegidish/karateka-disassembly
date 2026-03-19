@@ -151,12 +151,12 @@ loc_01714:
 load_game_disk:
 	db	0x33, 0xDB		; 01718 xor bx,bx
 	db	0x33, 0xC0		; 0171A xor ax,ax
-	mov	cl,[bx-0x435c]		; 0171C
+	mov	cl,[bx+0xbca4]		; 0171C
 loc_01720:
 	cmp	cl,[bx+0x7c3]		; 01720
 	jnz	short loc_01733		; 01724 jnz 0x1733
 	inc	bx			; 01726
-	mov	cl,[bx-0x435c]		; 01727
+	mov	cl,[bx+0xbca4]		; 01727
 	cmp	cl,0x0			; 0172B
 	jnz	short loc_01720		; 0172E jnz 0x1720
 	mov	ax,0x1			; 01730

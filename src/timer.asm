@@ -41,12 +41,12 @@ run_anim_script:
 	mov	byte [0xbcd7],0x0	; 01742  relative_pos_mode = 0
 loc_01747:
 	mov	si,[0xbce6]		; 01747  si = script_pc
-	mov	bl,[si-0x42fc]		; 0174B  bl = opcode byte at [si + 0xBD04]
+	mov	bl,[si+0xbd04]		; 0174B  bl = opcode byte at [si + 0xBD04]
 	cmp	bl,0xff			; 0174F  end-of-script marker?
 	jz	short loc_0177D		; 01752 jz 0x177d
 	mov	bh,0x0			; 01754  zero-extend opcode to word
 	push	word [0xbce6]		; 01756  save script_pc on stack
-	call	word near [bx-0x4318]	; 0175A  dispatch via jump table at [bx + 0xBCE8]
+	call	word near [bx+0xbce8]	; 0175A  dispatch via jump table at [bx + 0xBCE8]
 	cmp	word [0x156],0x0	; 0175E  single_step_mode?
 	jz	short loc_0177A		; 01763 jz 0x177a
 	call	poll_keyboard		; 01765  check for keypress
@@ -69,7 +69,7 @@ loc_0177D:
 ; --- anim handler: set_tune (opcode 0x00) ---
 ; Reads 1-byte param, stores to player_sprite_cmd [0xBB30].
 ; Advances script_pc by 2 (opcode + 1 param byte).
-	mov	al,[si-0x42fb]		; 01786  al = param byte at [script_pc + 1 + 0xBD04]
+	mov	al,[si+0xbd05]		; 01786  al = param byte at [script_pc + 1 + 0xBD04]
 	mov	[0xbb30],al		; 0178A  player_sprite_cmd = param
 	add	word [0xbce6],0x2	; 0178D  script_pc += 2
 	ret				; 01792
@@ -77,7 +77,7 @@ loc_0177D:
 ; --- anim handler: set_bg (opcode 0x02) ---
 ; Reads 1-byte param, stores to anim_fig_bg [0xBB32].
 ; Advances script_pc by 2.
-	mov	al,[si-0x42fb]		; 01793  al = background index
+	mov	al,[si+0xbd05]		; 01793  al = background index
 	mov	[0xbb32],al		; 01797  anim_fig_bg = param
 	add	word [0xbce6],0x2	; 0179A  script_pc += 2
 	ret				; 0179F
@@ -89,18 +89,18 @@ loc_0177D:
 ; Writes 4-byte entry to list at [0xBB2E] offset, then advances pointer.
 ; Advances script_pc by 5.
 	mov	di,[0xbb2e]		; 017A0  di = write pointer into figure list
-	mov	al,[si-0x42fb]		; 017A4  al = figure_id
-	mov	[di-0x44d0],al		; 017A8  write figure_id to list (0xBB30 base)
-	mov	ax,[si-0x42fa]		; 017AC  ax = x_pos (word at param bytes 2-3)
+	mov	al,[si+0xbd05]		; 017A4  al = figure_id
+	mov	[di+0xbb30],al		; 017A8  write figure_id to list (0xBB30 base)
+	mov	ax,[si+0xbd06]		; 017AC  ax = x_pos (word at param bytes 2-3)
 	cmp	byte [0xbcd7],0x0	; 017B0  relative_pos_mode active?
 	jz	short loc_017BF		; 017B5 jz 0x17bf  no, use absolute position
 	dec	byte [0xbcd7]		; 017B7  decrement relative_pos_mode counter
 	add	ax,[0xbcd5]		; 017BB  add player_x for relative positioning
 loc_017BF:
-	mov	[di-0x44cf],ax		; 017BF  write x_pos to list
-	mov	al,[si-0x42f8]		; 017C3  al = y_pos (param byte 4)
-	mov	[di-0x44cd],al		; 017C7  write y_pos to list
-	mov	byte [di-0x44cc],0xff	; 017CB  write 0xFF terminator after entry
+	mov	[di+0xbb31],ax		; 017BF  write x_pos to list
+	mov	al,[si+0xbd08]		; 017C3  al = y_pos (param byte 4)
+	mov	[di+0xbb33],al		; 017C7  write y_pos to list
+	mov	byte [di+0xbb34],0xff	; 017CB  write 0xFF terminator after entry
 	add	word [0xbb2e],0x4	; 017D0  advance write pointer by 4
 	add	word [0xbce6],0x5	; 017D5  script_pc += 5
 	ret				; 017DA
@@ -110,14 +110,14 @@ loc_017BF:
 ; Reads slot index from [si+1], then 2 words of position data.
 ; Slot address = base + slot_index * 4.
 ; Advances script_pc by 6.
-	mov	bl,[si-0x42fb]		; 017DB  bl = slot index
+	mov	bl,[si+0xbd05]		; 017DB  bl = slot index
 	mov	bh,0x0			; 017DF
 	shl	bx,1			; 017E1  bx = slot_index * 2
 	shl	bx,1			; 017E3  bx = slot_index * 4
-	mov	ax,[si-0x42fa]		; 017E5  ax = new x_pos
-	mov	[bx-0x44cd],ax		; 017E9  write x_pos to figure slot
-	mov	ax,[si-0x42f8]		; 017ED  ax = new y_pos/flags
-	mov	[bx-0x44cb],ax		; 017F1  write y_pos/flags to figure slot
+	mov	ax,[si+0xbd06]		; 017E5  ax = new x_pos
+	mov	[bx+0xbb33],ax		; 017E9  write x_pos to figure slot
+	mov	ax,[si+0xbd08]		; 017ED  ax = new y_pos/flags
+	mov	[bx+0xbb35],ax		; 017F1  write y_pos/flags to figure slot
 	add	word [0xbce6],0x6	; 017F5  script_pc += 6
 	ret				; 017FA
 
@@ -147,14 +147,14 @@ loc_0180C:
 	add	bx,0x3			; 01816  bx = slot * 4 + 3 (offset into list)
 	sub	word [0xbb2e],0x4	; 01819  shrink list by one entry
 loc_0181E:
-	mov	ax,[bx-0x44cc]		; 0181E  copy next entry down
-	mov	[bx-0x44d0],ax		; 01822
-	mov	ax,[bx-0x44ca]		; 01826
-	mov	[bx-0x44ce],ax		; 0182A
+	mov	ax,[bx+0xbb34]		; 0181E  copy next entry down
+	mov	[bx+0xbb30],ax		; 01822
+	mov	ax,[bx+0xbb36]		; 01826
+	mov	[bx+0xbb32],ax		; 0182A
 	add	bx,0x4			; 0182E  advance to next slot
 	cmp	bx,[0xbb2e]		; 01831  past end of list?
 	jl	short loc_0181E		; 01835 jl 0x181e  keep shifting
-	mov	byte [bx-0x44d0],0xff	; 01837  write terminator
+	mov	byte [bx+0xbb30],0xff	; 01837  write terminator
 	add	word [0xbce6],0x2	; 0183C  script_pc += 2
 	ret				; 01841
 
@@ -177,7 +177,7 @@ loc_0181E:
 ; Advances script_pc by 2.
 	cmp	word [0xbcd8],0x0	; 01856  single_step_mode?
 	jnz	short loc_01866		; 0185B jnz 0x1866  skip delay in step mode
-	mov	al,[si-0x42fb]		; 0185D  al = tick count param
+	mov	al,[si+0xbd05]		; 0185D  al = tick count param
 	mov	ah,0x0			; 01861
 	call	delay_ticks		; 01863  wait for AX ticks (~55ms each)
 loc_01866:
@@ -221,7 +221,7 @@ loc_018A5:
 ; --- anim handler: inc_x (opcode 0x16) ---
 ; Adds signed byte param to player_x [0xBCD5].
 ; Advances script_pc by 2.
-	mov	al,[si-0x42fb]		; 018B0  al = signed offset byte
+	mov	al,[si+0xbd05]		; 018B0  al = signed offset byte
 	cbw				; 018B4  sign-extend to AX
 	add	[0xbcd5],ax		; 018B5  player_x += offset
 	add	word [0xbce6],0x2	; 018B9  script_pc += 2

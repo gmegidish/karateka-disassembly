@@ -318,7 +318,7 @@ loc_01D61:
 	jz	short loc_01D82		; 01D67 jz 0x1d82
 	shl	ax,1			; 01D69
 	db	0x8B, 0xF0		; 01D6B mov si,ax
-	mov	ax,[si-0x3c2c]		; 01D6D
+	mov	ax,[si+0xc3d4]		; 01D6D
 	mov	word [0xe6],0x1		; 01D71
 	mov	[0xc3d2],ax		; 01D77
 	mov	ax,[bp+0x2]		; 01D7A

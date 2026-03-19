@@ -39,7 +39,7 @@ loc_05966:
 	xor	ah,ah			; 0596B
 	inc	ax			; 0596D
 	db	0x8B, 0xF8		; 0596E mov di,ax
-	mov	al,[di-0x1b3c]		; 05970 - lookup ctype[char] (0xe4c4 = ctype table)
+	mov	al,[di+0xe4c4]		; 05970 - lookup ctype[char] (0xe4c4 = ctype table)
 	xor	ah,ah			; 05974
 	db	0x25, 0x08, 0x00	; 05976 and ax,0x8 - test whitespace bit
 	jz	short loc_05980		; 05979 - not whitespace, start new arg
@@ -59,7 +59,7 @@ loc_05980:
 	shl	ax,1			; 05992 - word index
 	db	0x8B, 0xF0		; 05994 mov si,ax
 	mov	ax,[bp+0x12]		; 05996
-	mov	[si-0x1bc0],ax		; 05999 - argv[i] = pointer to this arg (0xe440 = argv)
+	mov	[si+0xe440],ax		; 05999 - argv[i] = pointer to this arg (0xe440 = argv)
 loc_0599D:
 ; Scan forward to next whitespace or end of string
 	mov	si,[bp+0x12]		; 0599D
@@ -70,7 +70,7 @@ loc_0599D:
 	jz	short loc_059BE		; 059A9 - null terminator, end of arg
 	inc	ax			; 059AB
 	db	0x8B, 0xF8		; 059AC mov di,ax
-	mov	al,[di-0x1b3c]		; 059AE - lookup ctype[char]
+	mov	al,[di+0xe4c4]		; 059AE - lookup ctype[char]
 	xor	ah,ah			; 059B2
 	db	0x25, 0x08, 0x00	; 059B4 and ax,0x8 - test whitespace bit
 	jnz	short loc_059BE		; 059B7 - whitespace found, end of arg

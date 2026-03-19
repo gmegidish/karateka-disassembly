@@ -179,7 +179,7 @@ consume_key:
 ; Empty function placeholder. Single `ret` instruction.
 noop_stub:
 	ret				; 04257
-	add	[si-0x32f2],dh		; 04258
+	add	[si+0xcd0e],dh		; 04258
 	and	bx,ax			; 0425C
 
 ; ---- function detect_hercules_vsync ----
@@ -423,20 +423,20 @@ loc_043C9:
 	db	0x33, 0xDB		; 043D1 xor bx,bx
 	db	0x33, 0xD2		; 043D3 xor dx,dx
 	db	0x33, 0xC0		; 043D5 xor ax,ax
-	mov	bl,[si-0x1eee]		; 043D7
-	mov	dl,[si-0x1f08]		; 043DB
+	mov	bl,[si+0xe112]		; 043D7
+	mov	dl,[si+0xe0f8]		; 043DB
 	cmp	[bp+0x6],dx		; 043DF
 	jl	short loc_0443D		; 043E2 jl 0x443d
 	jnz	short loc_04402		; 043E4 jnz 0x4402
 loc_043E6:
 	cmp	word [bp+0x4],0x4	; 043E6
 	jng	short loc_043F2		; 043EA jng 0x43f2
-	mov	al,[bx-0x1eb6]		; 043EC
+	mov	al,[bx+0xe14a]		; 043EC
 	jmp	short loc_0443F		; 043F0 jmp 0x443f
 loc_043F2:
 	cmp	word [bp+0x4],0x3	; 043F2
 	jl	short loc_043FE		; 043F6 jl 0x43fe
-	mov	al,[bx-0x1ec0]		; 043F8
+	mov	al,[bx+0xe140]		; 043F8
 	jmp	short loc_0443F		; 043FC jmp 0x443f
 loc_043FE:
 	mov	al,0x3			; 043FE
@@ -447,12 +447,12 @@ loc_04402:
 	jg	short loc_0443F		; 04408 jg 0x443f
 	cmp	word [bp+0x4],0x1	; 0440A
 	jnz	short loc_04416		; 0440E jnz 0x4416
-	mov	al,[bx-0x1eca]		; 04410
+	mov	al,[bx+0xe136]		; 04410
 	jmp	short loc_0443F		; 04414 jmp 0x443f
 loc_04416:
 	cmp	word [bp+0x4],0x2	; 04416
 	jg	short loc_0442F		; 0441A jg 0x442f
-	mov	al,[bx-0x1ed4]		; 0441C
+	mov	al,[bx+0xe12c]		; 0441C
 	cmp	bl,0x1			; 04420
 	jnz	short loc_0443F		; 04423 jnz 0x443f
 	cmp	byte [bp+0x4],0x2	; 04425
@@ -463,7 +463,7 @@ loc_0442F:
 	sub	dx,0x4			; 0442F
 	cmp	[bp+0x6],dx		; 04432
 	jl	short loc_043E6		; 04435 jl 0x43e6
-	mov	al,[bx-0x1eac]		; 04437
+	mov	al,[bx+0xe154]		; 04437
 	jmp	short loc_0443F		; 0443B jmp 0x443f
 loc_0443D:
 	mov	al,0x4			; 0443D
@@ -515,27 +515,27 @@ loc_04483:
 	db	0x8B, 0xFE		; 04487 mov di,si
 	add	di,0x4			; 04489
 loc_0448C:
-	mov	dl,[si-0x44d0]		; 0448C
-	mov	[di-0x44d0],dl		; 04490
+	mov	dl,[si+0xbb30]		; 0448C
+	mov	[di+0xbb30],dl		; 04490
 	dec	si			; 04494
 	dec	di			; 04495
 	cmp	si,[0xd5b2]		; 04496
 	jnc	short loc_0448C		; 0449A jnc 0x448c
 	inc	si			; 0449C
-	add	ax,[bx-0x1ea2]		; 0449D
+	add	ax,[bx+0xe15e]		; 0449D
 	cmp	word [0x130],0x7	; 044A1
 	jnz	short loc_044AB		; 044A6 jnz 0x44ab
 	db	0x2D, 0x23, 0x00	; 044A8 sub ax,0x23
 loc_044AB:
-	mov	[si-0x44cf],ax		; 044AB
-	mov	[si-0x44d0],cl		; 044AF
+	mov	[si+0xbb31],ax		; 044AB
+	mov	[si+0xbb30],cl		; 044AF
 	shr	bx,1			; 044B3
-	mov	cl,[bx-0x1e7e]		; 044B5
+	mov	cl,[bx+0xe182]		; 044B5
 	cmp	word [0x130],0x7	; 044B9
 	jnz	short loc_044C3		; 044BE jnz 0x44c3
 	add	cl,0x8			; 044C0
 loc_044C3:
-	mov	[si-0x44cd],cl		; 044C3
+	mov	[si+0xbb33],cl		; 044C3
 	add	word [0xbb2e],0x4	; 044C7
 	add	word [0xd5b2],0x4	; 044CC
 	pop	bp			; 044D1

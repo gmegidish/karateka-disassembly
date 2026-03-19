@@ -53,7 +53,7 @@ scene_update:
 loc_02324:
 	mov	bx,[0xc3d2]		; 02324
 loc_02328:
-	cmp	byte [bx-0x3bd8],0xff	; 02328  ; check end-of-sequence marker
+	cmp	byte [bx+0xc428],0xff	; 02328  ; check end-of-sequence marker
 	jnz	short loc_0235C		; 0232D jnz 0x235c
 	cmp	word [0x156],0x0	; 0232F
 	jz	short loc_0233B		; 02334 jz 0x233b
@@ -68,7 +68,7 @@ loc_0233E:
 loc_02345:
 	shl	ax,1			; 02345
 	db	0x8B, 0xD8		; 02347 mov bx,ax
-	mov	ax,[bx-0x3c2c]		; 02349
+	mov	ax,[bx+0xc3d4]		; 02349
 	mov	[0xc3d2],ax		; 0234D
 	db	0x8B, 0xD8		; 02350 mov bx,ax
 	cmp	word [0xf8],0x1		; 02352
@@ -77,9 +77,9 @@ loc_02345:
 loc_0235C:
 	mov	si,[0xc3d2]		; 0235C
 	mov	ah,0x0			; 02360
-	mov	al,[si-0x3bd7]		; 02362
+	mov	al,[si+0xc429]		; 02362
 	mov	[0x10c],ax		; 02366
-	mov	al,[si-0x3bd6]		; 02369
+	mov	al,[si+0xc42a]		; 02369
 	db	0x8A, 0xC8		; 0236D mov cl,al
 	and	al,0x1			; 0236F
 	shr	cl,1			; 02371
@@ -88,7 +88,7 @@ loc_0235C:
 	mov	cx,[0xbcd5]		; 0237A
 	cmp	word [0x11a],0x0	; 0237E
 	jnz	short loc_023AE		; 02383 jnz 0x23ae
-	mov	al,[si-0x3bd4]		; 02385
+	mov	al,[si+0xc42c]		; 02385
 	cbw				; 02389
 	add	[0xbcd5],ax		; 0238A
 	mov	cx,[0xbcd5]		; 0238E
@@ -149,7 +149,7 @@ loc_02421:
 loc_0242F:
 	cmp	word [0x11a],0x0	; 0242F
 	jnz	short loc_0243D		; 02434 jnz 0x243d
-	mov	al,[si-0x3bd2]		; 02436
+	mov	al,[si+0xc42e]		; 02436
 	mov	[0xbb30],al		; 0243A
 loc_0243D:
 	push	word [0xbcd5]		; 0243D
@@ -168,7 +168,7 @@ loc_0243D:
 	jmp	0x27cd			; 02468
 loc_0246B:
 	mov	si,[0xcde8]		; 0246B
-	cmp	byte [si-0x31c2],0xff	; 0246F
+	cmp	byte [si+0xce3e],0xff	; 0246F
 	jnz	short loc_02491		; 02474 jnz 0x2491
 	call	enemy_ai_decide		; 02476
 	cmp	word [0xfa],0x1		; 02479
@@ -177,14 +177,14 @@ loc_0246B:
 loc_02483:
 	db	0x8B, 0xD8		; 02483 mov bx,ax
 	shl	bx,1			; 02485
-	mov	si,[bx-0x3216]		; 02487
+	mov	si,[bx+0xcdea]		; 02487
 	mov	[0xcde8],si		; 0248B
 	jmp	short loc_0246B		; 0248F jmp 0x246b
 loc_02491:
 	mov	ah,0x0			; 02491
-	mov	al,[si-0x31c1]		; 02493
+	mov	al,[si+0xce3f]		; 02493
 	mov	[0x110],ax		; 02497
-	mov	al,[si-0x31c0]		; 0249A
+	mov	al,[si+0xce40]		; 0249A
 	db	0x8A, 0xC8		; 0249E mov cl,al
 	shr	cl,1			; 024A0
 	mov	[0xd5b0],cl		; 024A2
@@ -194,7 +194,7 @@ loc_02491:
 	jz	short loc_024B5		; 024B0 jz 0x24b5
 	jmp	0x2738			; 024B2
 loc_024B5:
-	mov	al,[si-0x31be]		; 024B5
+	mov	al,[si+0xce42]		; 024B5
 	cbw				; 024B9
 	add	[0x10e],ax		; 024BA
 	cmp	word [0x12e],0x0	; 024BE
@@ -236,15 +236,15 @@ loc_02521:
 	jnl	short loc_0252D		; 02528 jnl 0x252d
 	mov	[0x10e],ax		; 0252A
 loc_0252D:
-	mov	al,[si-0x31bc]		; 0252D
+	mov	al,[si+0xce44]		; 0252D
 	cmp	al,0x0			; 02531
 	jz	short loc_02538		; 02533 jz 0x2538
 	mov	[0xbb30],al		; 02535
 loc_02538:
 	mov	di,[0xd5a4]		; 02538
-	mov	al,[si-0x31ba]		; 0253C
-	mov	[di-0x44cd],al		; 02540
-	mov	ax,[si-0x31b9]		; 02544
+	mov	al,[si+0xce46]		; 0253C
+	mov	[di+0xbb33],al		; 02540
+	mov	ax,[si+0xce47]		; 02544
 	cmp	word [0xf2],0x0		; 02548
 	jz	short loc_02552		; 0254D jz 0x2552
 	db	0x05, 0x04, 0x00	; 0254F add ax,0x4
@@ -260,20 +260,20 @@ loc_0255C:
 	jnz	short loc_02571		; 0256C jnz 0x2571
 	or	ax,0x4000		; 0256E  ; set flip bit (mirror sprite horizontally)
 loc_02571:
-	mov	[di-0x44cc],ax		; 02571
-	mov	al,[si-0x31b7]		; 02575
+	mov	[di+0xbb34],ax		; 02571
+	mov	al,[si+0xce49]		; 02575
 	cmp	word [0xd5aa],0x0	; 02579
 	jz	short loc_02584		; 0257E jz 0x2584
 	add	al,[0xd5ac]		; 02580
 loc_02584:
-	mov	[di-0x44ca],al		; 02584
-	mov	al,[si-0x31b5]		; 02588
+	mov	[di+0xbb36],al		; 02584
+	mov	al,[si+0xce4b]		; 02588
 	cmp	word [0xd5aa],0x0	; 0258C
 	jnz	short loc_02597		; 02591 jnz 0x2597
 	add	al,[0x158]		; 02593
 loc_02597:
-	mov	[di-0x44c9],al		; 02597
-	mov	ax,[si-0x31b4]		; 0259B
+	mov	[di+0xbb37],al		; 02597
+	mov	ax,[si+0xce4c]		; 0259B
 	cmp	word [0xf2],0x0		; 0259F
 	jz	short loc_025A9		; 025A4 jz 0x25a9
 	db	0x05, 0x04, 0x00	; 025A6 add ax,0x4
@@ -283,9 +283,9 @@ loc_025A9:
 	db	0x05, 0x0C, 0x00	; 025B0 add ax,0xc
 loc_025B3:
 	add	ax,[0x10e]		; 025B3
-	mov	[di-0x44c8],ax		; 025B7
-	mov	al,[si-0x31b2]		; 025BB
-	mov	[di-0x44c6],al		; 025BF
+	mov	[di+0xbb38],ax		; 025B7
+	mov	al,[si+0xce4e]		; 025BB
+	mov	[di+0xbb3a],al		; 025BF
 	add	word [0xd5a4],0x8	; 025C3
 	add	word [0xcde8],0x11	; 025C8  ; advance enemy frame pointer
 	push	word [0xc3a4]		; 025CD
@@ -301,7 +301,7 @@ loc_025B3:
 	add	sp,0x6			; 025ED
 	add	[0xd5a4],ax		; 025F0
 	mov	si,[0xd5a4]		; 025F4
-	mov	byte [si-0x44cd],0xff	; 025F8  ; write end marker to animation buffer
+	mov	byte [si+0xbb33],0xff	; 025F8  ; write end marker to animation buffer
 	add	si,0x3			; 025FD
 	mov	[0xbb2e],si		; 02600
 	ret				; 02604
@@ -618,7 +618,7 @@ loc_02872:
 	shl	ax,1			; 02888
 	db	0x03, 0xF0		; 0288A add si,ax
 	mov	ax,[bp+0xa]		; 0288C
-	cmp	ax,[si-0x2a4c]		; 0288F
+	cmp	ax,[si+0xd5b4]		; 0288F
 	jl	short loc_0289C		; 02893 jl 0x289c
 	db	0x33, 0xC0		; 02895 xor ax,ax
 	add	sp,0xc			; 02897
@@ -637,7 +637,7 @@ loc_0289C:
 	shl	ax,1			; 028B2
 	db	0x03, 0xF0		; 028B4 add si,ax
 	mov	ax,[bp+0xa]		; 028B6
-	cmp	ax,[si-0x2a1a]		; 028B9
+	cmp	ax,[si+0xd5e6]		; 028B9
 	jl	short loc_028DF		; 028BD jl 0x28df
 	mov	ax,[0x110]		; 028BF
 	db	0x3D, 0x08, 0x00	; 028C2 cmp ax,0x8
@@ -667,7 +667,7 @@ loc_028DF:
 	shl	ax,1			; 028F5
 	db	0x03, 0xF0		; 028F7 add si,ax
 	mov	ax,[bp+0xa]		; 028F9
-	cmp	ax,[si-0x29e8]		; 028FC
+	cmp	ax,[si+0xd618]		; 028FC
 	jl	short loc_0290A		; 02900 jl 0x290a
 	call	anim_frame_update	; 02902
 	add	sp,0xc			; 02905
@@ -985,7 +985,7 @@ loc_02B1F:
 	shl	ax,1			; 02B2B
 	db	0x8B, 0xF0		; 02B2D mov si,ax
 	mov	ax,[bp+0x8]		; 02B2F
-	cmp	ax,[si-0x2a24]		; 02B32
+	cmp	ax,[si+0xd5dc]		; 02B32
 	jl	short loc_02B45		; 02B36 jl 0x2b45
 	push	word [bp+0x4]		; 02B38
 	call	anim_command		; 02B3B
@@ -1002,7 +1002,7 @@ loc_02B45:
 	shl	ax,1			; 02B51
 	db	0x8B, 0xF0		; 02B53 mov si,ax
 	mov	ax,[bp+0x8]		; 02B55
-	cmp	ax,[si-0x29f2]		; 02B58
+	cmp	ax,[si+0xd60e]		; 02B58
 	jl	short loc_02B66		; 02B5C jl 0x2b66
 	call	anim_interpolate	; 02B5E
 	add	sp,0xa			; 02B61
@@ -1017,7 +1017,7 @@ loc_02B66:
 	shl	ax,1			; 02B72
 	db	0x8B, 0xF0		; 02B74 mov si,ax
 	mov	ax,[bp+0x8]		; 02B76
-	cmp	ax,[si-0x29c0]		; 02B79
+	cmp	ax,[si+0xd640]		; 02B79
 	jl	short loc_02B87		; 02B7D jl 0x2b87
 	call	anim_frame_update	; 02B7F
 	add	sp,0xa			; 02B82

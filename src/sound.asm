@@ -90,14 +90,14 @@ loc_01A17:
 	db	0x8B, 0xF0		; 01A19 mov si,ax
 	mov	ax,[bp+0x6]		; 01A1B
 	add	ax,0xc102		; 01A1E
-	mov	[si-0x3c58],ax		; 01A21
+	mov	[si+0xc3a8],ax		; 01A21
 loc_01A25:
 	mov	si,[bp+0x4]		; 01A25
-	mov	al,[si-0x3efe]		; 01A28
+	mov	al,[si+0xc102]		; 01A28
 	xor	ah,ah			; 01A2C
 	cmp	ax,0xff			; 01A2E
 	jz	short loc_01A8D		; 01A31 jz 0x1a8d
-	mov	al,[si-0x3efe]		; 01A33
+	mov	al,[si+0xc102]		; 01A33
 	xor	ah,ah			; 01A37
 	db	0x3D, 0x12, 0x00	; 01A39 cmp ax,0x12
 	jnz	short loc_01A52		; 01A3C jnz 0x1a52
@@ -106,11 +106,11 @@ loc_01A25:
 	db	0x8B, 0xF8		; 01A43 mov di,ax
 	mov	ax,[bp+0x6]		; 01A45
 	add	ax,0xc102		; 01A48
-	mov	[di-0x3c4a],ax		; 01A4B
+	mov	[di+0xc3b6],ax		; 01A4B
 	inc	word [bp+0x4]		; 01A4F
 loc_01A52:
 	mov	si,[bp+0x4]		; 01A52
-	mov	al,[si-0x3efe]		; 01A55
+	mov	al,[si+0xc102]		; 01A55
 	xor	ah,ah			; 01A59
 	cmp	ax,0xff			; 01A5B
 	jz	short loc_01A8D		; 01A5E jz 0x1a8d
@@ -124,8 +124,8 @@ loc_01A65:
 	mov	cx,[bp+0x4]		; 01A73
 	db	0x03, 0xC8		; 01A76 add cx,ax
 	db	0x8B, 0xF1		; 01A78 mov si,cx
-	mov	al,[si-0x3efe]		; 01A7A
-	mov	[bx-0x3efe],al		; 01A7E
+	mov	al,[si+0xc102]		; 01A7A
+	mov	[bx+0xc102],al		; 01A7E
 	inc	word [bp+0x8]		; 01A82
 	jmp	short loc_01A65		; 01A85 jmp 0x1a65
 loc_01A87:
@@ -137,7 +137,7 @@ loc_01A8D:
 	db	0x8B, 0xF0		; 01A92 mov si,ax
 	mov	ax,[bp+0x6]		; 01A94
 	add	ax,0xc102		; 01A97
-	mov	[si-0x3c3c],ax		; 01A9A
+	mov	[si+0xc3c4],ax		; 01A9A
 	inc	word [bp+0x4]		; 01A9E
 	inc	word [bp+0xa]		; 01AA1
 	jmp	0x1c0a			; 01AA4

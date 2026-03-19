@@ -68,14 +68,14 @@ loc_04666:
 ; Slow CPU: halve timing values (round up via inc before shr)
 	mov	bx,0x4			; 04681
 loc_04684:
-	inc	byte [bx-0x28f2]	; 04684  timing_table[bx]++
-	shr	byte [bx-0x28f2],1	; 04688  timing_table[bx] /= 2
+	inc	byte [bx+0xd70e]	; 04684  timing_table[bx]++
+	shr	byte [bx+0xd70e],1	; 04688  timing_table[bx] /= 2
 	dec	bx			; 0468C
 	jnl	short loc_04684		; 0468D jnl 0x4684
 ; Halve pointer-table values with special-case adjustments
 	mov	bx,0x1c			; 0468F
 loc_04692:
-	mov	si,[bx-0x28e8]		; 04692  SI = pointer to timing value
+	mov	si,[bx+0xd718]		; 04692  SI = pointer to timing value
 	shr	byte [si],1		; 04696  *SI /= 2
 	cmp	bx,0x6			; 04698
 	jc	short loc_046AD		; 0469B jc 0x46ad  ; bx < 6: no adjustment
@@ -97,7 +97,7 @@ loc_046B4:
 	ja	short loc_046D6		; 046B8 ja 0x46d6
 	mov	bx,0x1c			; 046BA
 loc_046BD:
-	mov	si,[bx-0x28e8]		; 046BD
+	mov	si,[bx+0xd718]		; 046BD
 	cmp	byte [si],0x6		; 046C1  if value >= 6, decrement
 	jc	short loc_046C8		; 046C4 jc 0x46c8
 	dec	byte [si]		; 046C6
@@ -115,12 +115,12 @@ loc_046D6:
 	jc	short loc_046F4		; 046DA jc 0x46f4  ; 13500 < speed < 20000: no adjustment
 	mov	bx,0x4			; 046DC
 loc_046DF:
-	shl	byte [bx-0x28f2],1	; 046DF  timing_table[bx] *= 2
+	shl	byte [bx+0xd70e],1	; 046DF  timing_table[bx] *= 2
 	dec	bx			; 046E3
 	jnl	short loc_046DF		; 046E4 jnl 0x46df
 	mov	bx,0x1c			; 046E6
 loc_046E9:
-	mov	si,[bx-0x28e8]		; 046E9
+	mov	si,[bx+0xd718]		; 046E9
 	shl	byte [si],1		; 046ED  *SI *= 2
 	sub	bx,0x2			; 046EF
 	jnl	short loc_046E9		; 046F2 jnl 0x46e9
@@ -1023,7 +1023,7 @@ get_file_slot:
 	mov	bx,0x2a			; 04D8A  42 bytes per entry
 	imul	bx			; 04D8D
 	db	0x8B, 0xF0		; 04D8F mov si,ax
-	mov	al,[si-0x1a32]		; 04D91  flags byte (0xe5ce - 0x1a32 offset trick)
+	mov	al,[si+0xe5ce]		; 04D91  flags byte (0xe5ce - 0x1a32 offset trick)
 	xor	ah,ah			; 04D95
 	and	ax,0x80			; 04D97  bit 7 = "slot in use"
 	jnz	short loc_04DA9		; 04D9A jnz 0x4da9  ; slot is valid
@@ -1065,7 +1065,7 @@ loc_04DC4:
 	mov	bx,0x2a			; 04DCF  42 bytes per entry
 	imul	bx			; 04DD2
 	db	0x8B, 0xF0		; 04DD4 mov si,ax
-	mov	al,[si-0x1a32]		; 04DD6  flags byte (file_table_base offset trick)
+	mov	al,[si+0xe5ce]		; 04DD6  flags byte (file_table_base offset trick)
 	xor	ah,ah			; 04DDA
 	test	ax,ax			; 04DDC  slot in use?
 	jz	short loc_04DE5		; 04DDE jz 0x4de5  ; no, found free slot
@@ -1205,7 +1205,7 @@ loc_04EC6:
 	mov	bx,0xa			; 04EE7
 	imul	bx			; 04EEA
 	db	0x8B, 0xF0		; 04EEC mov si,ax
-	mov	al,[si-0x1d38]		; 04EEE  device handle byte
+	mov	al,[si+0xe2c8]		; 04EEE  device handle byte
 	mov	di,[bp+0xa]		; 04EF2
 	mov	[di+0x1],al		; 04EF5  store device handle in file slot
 	mov	ax,[bp+0x4]		; 04EF8  return slot index

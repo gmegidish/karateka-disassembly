@@ -60,13 +60,13 @@ loc_00B95:
 	nop				; 00BA5
 loc_00BA6:
 	mov	si,[0x4220]		; 00BA6
-	mov	al,[si-0x76c6]		; 00BAA
+	mov	al,[si+0x893a]		; 00BAA
 	inc	si			; 00BAE
 	cmp	al,0x7b			; 00BAF
 	jnz	short loc_00BC4		; 00BB1 jnz 0xbc4
-	mov	al,[si-0x76c5]		; 00BB3
+	mov	al,[si+0x893b]		; 00BB3
 	mov	[0x422e],al		; 00BB7
-	mov	al,[si-0x76c6]		; 00BBA
+	mov	al,[si+0x893a]		; 00BBA
 	mov	[0x422f],al		; 00BBE
 	add	si,0x2			; 00BC1
 loc_00BC4:
@@ -96,14 +96,14 @@ render_figures:
 	call	prepare_screen_buffer	; 00BD2
 loc_00BD5:
 	mov	si,[0xbb2e]		; 00BD5
-	mov	al,[si-0x44d0]		; 00BD9
+	mov	al,[si+0xbb30]		; 00BD9
 	cmp	al,0xff			; 00BDD
 	jz	short loc_00C14		; 00BDF jz 0xc14
 	mov	ah,0x0			; 00BE1
-	mov	cl,[si-0x44cd]		; 00BE3
+	mov	cl,[si+0xbb33]		; 00BE3
 	mov	ch,0x0			; 00BE7
 	push	cx			; 00BE9
-	mov	dx,[si-0x44cf]		; 00BEA
+	mov	dx,[si+0xbb31]		; 00BEA
 	test	dx,0x8000		; 00BEE
 	jnz	short loc_00C05		; 00BF2 jnz 0xc05
 	test	dx,0x4000		; 00BF4
@@ -297,7 +297,7 @@ update_display:
 	mov	ax,0xb800		; 00D70
 	mov	es,ax			; 00D73
 loc_00D75:
-	mov	di,[bx-0x20a7]		; 00D75
+	mov	di,[bx+0xdf59]		; 00D75
 	mov	cx,0x28			; 00D79
 	rep	movsw			; 00D7C
 	add	bx,0x2			; 00D7E
@@ -335,7 +335,7 @@ loc_00DB5:
 	mov	ax,0xb800		; 00DB9
 	mov	es,ax			; 00DBC
 loc_00DBE:
-	mov	di,[bx-0x20a7]		; 00DBE
+	mov	di,[bx+0xdf59]		; 00DBE
 	mov	cx,0x28			; 00DC2
 	rep	movsw			; 00DC5
 	add	bx,0x2			; 00DC7
@@ -385,7 +385,7 @@ blit_buffer_to_vram:
 	lea	si,[0x337]		; 00DF8
 	db	0x33, 0xED		; 00DFC xor bp,bp
 	mov	cx,0x64			; 00DFE
-	mov	di,[ds:bp-0x20a7]	; 00E01
+	mov	di,[ds:bp+0xdf59]	; 00E01
 	mov	al,[bx+si]		; 00E06
 	and	al,0xc0			; 00E08
 	and	byte [es:bx+di],0x3f	; 00E0A
@@ -393,7 +393,7 @@ blit_buffer_to_vram:
 	mov	al,[bx+si+0x50]		; 00E11
 	and	al,0xc0			; 00E14
 	add	bp,0x2			; 00E16
-	mov	di,[ds:bp-0x20a7]	; 00E19
+	mov	di,[ds:bp+0xdf59]	; 00E19
 	and	byte [es:bx+di],0x3f	; 00E1E
 	or	[es:bx+di],al		; 00E22
 	add	si,0xa0			; 00E25
@@ -403,7 +403,7 @@ blit_buffer_to_vram:
 	lea	si,[0x337]		; 00E31
 	db	0x33, 0xED		; 00E35 xor bp,bp
 	mov	cx,0x64			; 00E37
-	mov	di,[ds:bp-0x20a7]	; 00E3A
+	mov	di,[ds:bp+0xdf59]	; 00E3A
 	mov	al,[bx+si]		; 00E3F
 	and	al,0x30			; 00E41
 	and	byte [es:bx+di],0xcf	; 00E43
@@ -411,7 +411,7 @@ blit_buffer_to_vram:
 	mov	al,[bx+si+0x50]		; 00E4A
 	and	al,0x30			; 00E4D
 	add	bp,0x2			; 00E4F
-	mov	di,[ds:bp-0x20a7]	; 00E52
+	mov	di,[ds:bp+0xdf59]	; 00E52
 	and	byte [es:bx+di],0xcf	; 00E57
 	or	[es:bx+di],al		; 00E5B
 	add	si,0xa0			; 00E5E
@@ -421,7 +421,7 @@ blit_buffer_to_vram:
 	lea	si,[0x337]		; 00E6A
 	db	0x33, 0xED		; 00E6E xor bp,bp
 	mov	cx,0x64			; 00E70
-	mov	di,[ds:bp-0x20a7]	; 00E73
+	mov	di,[ds:bp+0xdf59]	; 00E73
 	mov	al,[bx+si]		; 00E78
 	and	al,0xc			; 00E7A
 	and	byte [es:bx+di],0xf3	; 00E7C
@@ -429,7 +429,7 @@ blit_buffer_to_vram:
 	mov	al,[bx+si+0x50]		; 00E83
 	and	al,0xc			; 00E86
 	add	bp,0x2			; 00E88
-	mov	di,[ds:bp-0x20a7]	; 00E8B
+	mov	di,[ds:bp+0xdf59]	; 00E8B
 	and	byte [es:bx+di],0xf3	; 00E90
 	or	[es:bx+di],al		; 00E94
 	add	si,0xa0			; 00E97
@@ -439,7 +439,7 @@ blit_buffer_to_vram:
 	lea	si,[0x337]		; 00EA3
 	db	0x33, 0xED		; 00EA7 xor bp,bp
 	mov	cx,0x64			; 00EA9
-	mov	di,[ds:bp-0x20a7]	; 00EAC
+	mov	di,[ds:bp+0xdf59]	; 00EAC
 	mov	al,[bx+si]		; 00EB1
 	and	al,0x3			; 00EB3
 	and	byte [es:bx+di],0xfc	; 00EB5
@@ -447,7 +447,7 @@ blit_buffer_to_vram:
 	mov	al,[bx+si+0x50]		; 00EBC
 	and	al,0x3			; 00EBF
 	add	bp,0x2			; 00EC1
-	mov	di,[ds:bp-0x20a7]	; 00EC4
+	mov	di,[ds:bp+0xdf59]	; 00EC4
 	and	byte [es:bx+di],0xfc	; 00EC9
 	or	[es:bx+di],al		; 00ECD
 	add	si,0xa0			; 00ED0
@@ -564,11 +564,11 @@ loc_00F61:
 	call	load_file		; 00F7F
 	db	0x8B, 0xE5		; 00F82 mov sp,bp
 	mov	si,[bp+0x14]		; 00F84
-	mov	al,[si-0x5929]		; 00F87
+	mov	al,[si+0xa6d7]		; 00F87
 	xor	ah,ah			; 00F8B
 	mov	cl,0x8			; 00F8D
 	shl	ax,cl			; 00F8F
-	mov	bl,[si-0x592a]		; 00F91
+	mov	bl,[si+0xa6d6]		; 00F91
 	xor	bh,bh			; 00F95
 	db	0x03, 0xD8		; 00F97 add bx,ax
 	db	0x8B, 0xC6		; 00F99 mov ax,si
@@ -836,14 +836,14 @@ loc_011A8:
 	mov	bx,[0x164]		; 011B0
 	db	0x03, 0xC3		; 011B4 add ax,bx
 	db	0x8B, 0xF0		; 011B6 mov si,ax
-	mov	cl,[si-0x76c6]		; 011B8
+	mov	cl,[si+0x893a]		; 011B8
 	xor	ch,ch			; 011BC
-	mov	dl,[si-0x76c3]		; 011BE
+	mov	dl,[si+0x893d]		; 011BE
 	xor	dh,dh			; 011C2
 	mov	[bp+0x14],cx		; 011C4
 	mov	cl,0x8			; 011C7
 	shl	dx,cl			; 011C9
-	mov	cl,[si-0x76c4]		; 011CB
+	mov	cl,[si+0x893c]		; 011CB
 	xor	ch,ch			; 011CF
 	db	0x03, 0xCA		; 011D1 add cx,dx
 	db	0x03, 0xCB		; 011D3 add cx,bx
@@ -851,19 +851,19 @@ loc_011A8:
 	shl	bx,1			; 011D8
 	mov	[bp+0x12],cx		; 011DA
 	and	cx,0xff			; 011DD
-	mov	[bx-0x78c6],cl		; 011E1
+	mov	[bx+0x873a],cl		; 011E1
 	mov	cl,0x8			; 011E5
 	mov	dx,[bp+0x12]		; 011E7
 	sar	dx,cl			; 011EA
-	mov	[bx-0x78c5],dl		; 011EC
+	mov	[bx+0x873b],dl		; 011EC
 	cmp	word [bp+0x14],0xff	; 011F0
 	mov	[bp+0x0],ax		; 011F5
 	jnz	short loc_01214		; 011F8 jnz 0x1214
-	mov	al,[si-0x76c3]		; 011FA
+	mov	al,[si+0x893d]		; 011FA
 	xor	ah,ah			; 011FE
 	mov	cl,0x8			; 01200
 	shl	ax,cl			; 01202
-	mov	bl,[si-0x76c4]		; 01204
+	mov	bl,[si+0x893c]		; 01204
 	xor	bh,bh			; 01208
 	db	0x03, 0xD8		; 0120A add bx,ax
 	mov	word [bp+0xc],0x2a8	; 0120C

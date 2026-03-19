@@ -46,7 +46,7 @@ draw_sprite:
 	shl	si,1			; 00650
 	mov	bx,[si+0x423c]		; 00652
 	mov	[0x421e],bx		; 00656
-	mov	ax,[si-0x78c6]		; 0065A
+	mov	ax,[si+0x873a]		; 0065A
 	mov	[0x4220],ax		; 0065E
 	mov	al,[bx+0x443c]		; 00661
 	mov	[0x4222],al		; 00665
@@ -261,7 +261,7 @@ draw_sprite_mirrored:
 	shl	si,1			; 0084C
 	mov	bx,[si+0x423c]		; 0084E
 	mov	[0x421e],bx		; 00852
-	mov	ax,[si-0x78c6]		; 00856
+	mov	ax,[si+0x873a]		; 00856
 	mov	[0x4220],ax		; 0085A
 	mov	al,[bx+0x443c]		; 0085D
 	mov	[0x4222],al		; 00861

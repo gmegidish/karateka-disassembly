@@ -344,7 +344,7 @@ parse_number:
 	mov	bl,[si]			; 05E3E
 	xor	bh,bh			; 05E40
 	inc	bx			; 05E42
-	mov	cl,[bx-0x1b3c]		; 05E43
+	mov	cl,[bx+0xe4c4]		; 05E43
 	xor	ch,ch			; 05E47
 	db	0x81, 0xE1, 0x04, 0x00	; 05E49 and cx,0x4
 	mov	[bp+0xc],ax		; 05E4D
@@ -366,7 +366,7 @@ loc_05E55:
 	xor	ah,ah			; 05E75
 	inc	ax			; 05E77
 	db	0x8B, 0xF0		; 05E78 mov si,ax
-	mov	al,[si-0x1b3c]		; 05E7A
+	mov	al,[si+0xe4c4]		; 05E7A
 	xor	ah,ah			; 05E7E
 	db	0x25, 0x04, 0x00	; 05E80 and ax,0x4
 	jnz	short loc_05E55		; 05E83 jnz 0x5e55
@@ -388,7 +388,7 @@ loc_05E99:
 	jz	short loc_05EC1		; 05EA9 jz 0x5ec1
 loc_05EAB:
 	mov	si,[bp+0x8]		; 05EAB
-	mov	al,[si-0x1b3b]		; 05EAE
+	mov	al,[si+0xe4c5]		; 05EAE
 	xor	ah,ah			; 05EB2
 	db	0x25, 0x08, 0x00	; 05EB4 and ax,0x8
 	jz	short loc_05EC1		; 05EB7 jz 0x5ec1
@@ -437,7 +437,7 @@ loc_05F0A:
 	mov	[bp+0x8],ax		; 05F13
 loc_05F16:
 	mov	si,[bp+0x8]		; 05F16
-	mov	al,[si-0x1b3b]		; 05F19
+	mov	al,[si+0xe4c5]		; 05F19
 	xor	ah,ah			; 05F1D
 	db	0x25, 0x04, 0x00	; 05F1F and ax,0x4
 	jnz	short loc_05F32		; 05F22 jnz 0x5f32
@@ -476,7 +476,7 @@ loc_05F58:
 	mov	[bp+0xe],ax		; 05F6E
 	jz	short loc_05F81		; 05F71 jz 0x5f81
 	mov	si,[bp+0x8]		; 05F73
-	mov	al,[si-0x1b3b]		; 05F76
+	mov	al,[si+0xe4c5]		; 05F76
 	xor	ah,ah			; 05F7A
 	db	0x25, 0x04, 0x00	; 05F7C and ax,0x4
 	jnz	short loc_05F3C		; 05F7F jnz 0x5f3c
@@ -573,7 +573,7 @@ loc_06047:
 	mov	[si],bx			; 06055
 	jmp	0x6531			; 06057
 	mov	si,[bp+0x8]		; 0605A
-	mov	al,[si-0x1b3b]		; 0605D
+	mov	al,[si+0xe4c5]		; 0605D
 	xor	ah,ah			; 06061
 	and	ax,0x80			; 06063
 	jnz	short loc_06076		; 06066 jnz 0x6076
@@ -605,7 +605,7 @@ loc_0608E:
 loc_060A1:
 	call	word near [bp+0x24]	; 060A1
 	db	0x8B, 0xF0		; 060A4 mov si,ax
-	mov	bl,[si-0x1b3b]		; 060A6
+	mov	bl,[si+0xe4c5]		; 060A6
 	xor	bh,bh			; 060AA
 	and	bx,0x80			; 060AC
 	mov	[bp+0x8],ax		; 060B0
@@ -623,7 +623,7 @@ loc_060C1:
 	jmp	short loc_06130		; 060CE jmp 0x6130
 loc_060D0:
 	mov	si,[bp+0xa]		; 060D0
-	mov	al,[si-0x1b3b]		; 060D3
+	mov	al,[si+0xe4c5]		; 060D3
 	xor	ah,ah			; 060D7
 	db	0x25, 0x04, 0x00	; 060D9 and ax,0x4
 	jz	short loc_060F0		; 060DC jz 0x60f0
@@ -638,7 +638,7 @@ loc_060EA:
 	mov	[bp+0x14],bx		; 060ED
 loc_060F0:
 	mov	si,[bp+0xa]		; 060F0
-	mov	al,[si-0x1b3b]		; 060F3
+	mov	al,[si+0xe4c5]		; 060F3
 	xor	ah,ah			; 060F7
 	db	0x25, 0x01, 0x00	; 060F9 and ax,0x1
 	jz	short loc_06110		; 060FC jz 0x6110
@@ -653,7 +653,7 @@ loc_0610A:
 	mov	[bp+0x14],bx		; 0610D
 loc_06110:
 	mov	si,[bp+0xa]		; 06110
-	mov	al,[si-0x1b3b]		; 06113
+	mov	al,[si+0xe4c5]		; 06113
 	xor	ah,ah			; 06117
 	db	0x25, 0x02, 0x00	; 06119 and ax,0x2
 	jz	short loc_06130		; 0611C jz 0x6130
@@ -675,7 +675,7 @@ loc_06130:
 	jmp	0x63c8			; 0613B
 loc_0613E:
 	mov	si,[bp+0x8]		; 0613E
-	mov	al,[si-0x1b3b]		; 06141
+	mov	al,[si+0xe4c5]		; 06141
 	xor	ah,ah			; 06145
 	and	ax,0x80			; 06147
 	jz	short loc_061C8		; 0614A jz 0x61c8
@@ -685,7 +685,7 @@ loc_0613E:
 	shl	bx,1			; 06155
 	rcl	ax,1			; 06157
 	loop	0x6155			; 06159
-	mov	cl,[si-0x1b3b]		; 0615B
+	mov	cl,[si+0xe4c5]		; 0615B
 	xor	ch,ch			; 0615F
 	db	0x81, 0xE1, 0x04, 0x00	; 06161 and cx,0x4
 	mov	[bp+0x14],ax		; 06165
@@ -702,7 +702,7 @@ loc_06179:
 	or	[bp+0x12],cx		; 0617C
 loc_0617F:
 	mov	si,[bp+0x8]		; 0617F
-	mov	al,[si-0x1b3b]		; 06182
+	mov	al,[si+0xe4c5]		; 06182
 	xor	ah,ah			; 06186
 	db	0x25, 0x01, 0x00	; 06188 and ax,0x1
 	jz	short loc_0619F		; 0618B jz 0x619f
@@ -717,7 +717,7 @@ loc_06199:
 	or	[bp+0x12],ax		; 0619C
 loc_0619F:
 	mov	si,[bp+0x8]		; 0619F
-	mov	al,[si-0x1b3b]		; 061A2
+	mov	al,[si+0xe4c5]		; 061A2
 	xor	ah,ah			; 061A6
 	db	0x25, 0x02, 0x00	; 061A8 and ax,0x2
 	jz	short loc_061BF		; 061AB jz 0x61bf
@@ -755,7 +755,7 @@ loc_061E4:
 	mov	[si],bx			; 061F2
 	jmp	0x6531			; 061F4
 	mov	si,[bp+0x8]		; 061F7
-	mov	al,[si-0x1b3b]		; 061FA
+	mov	al,[si+0xe4c5]		; 061FA
 	xor	ah,ah			; 061FE
 	db	0x25, 0x04, 0x00	; 06200 and ax,0x4
 	jnz	short loc_06213		; 06203 jnz 0x6213
@@ -784,7 +784,7 @@ loc_06218:
 	mov	[bp+0xe],ax		; 06238
 	jz	short loc_0624B		; 0623B jz 0x624b
 	mov	si,[bp+0x8]		; 0623D
-	mov	al,[si-0x1b3b]		; 06240
+	mov	al,[si+0xe4c5]		; 06240
 	xor	ah,ah			; 06244
 	db	0x25, 0x04, 0x00	; 06246 and ax,0x4
 	jnz	short loc_06218		; 06249 jnz 0x6218
@@ -861,7 +861,7 @@ loc_062D0:
 	mov	[bp+0xe],ax		; 062DF
 	jz	short loc_062F2		; 062E2 jz 0x62f2
 	mov	si,[bp+0x8]		; 062E4
-	mov	al,[si-0x1b3b]		; 062E7
+	mov	al,[si+0xe4c5]		; 062E7
 	xor	ah,ah			; 062EB
 	db	0x25, 0x08, 0x00	; 062ED and ax,0x8
 	jz	short loc_062BC		; 062F0 jz 0x62bc

@@ -66,7 +66,7 @@ loc_05040:
 	mov	ax,[bp+0x8]		; 0504C
 	inc	word [bp+0x8]		; 0504F
 	db	0x8B, 0xF0		; 05052 mov si,ax
-	mov	al,[si-0x1c48]		; 05054
+	mov	al,[si+0xe3b8]		; 05054
 	mov	[bp+0x4],al		; 05058
 	xor	ah,ah			; 0505B
 	db	0x3D, 0x0D, 0x00	; 0505D cmp ax,0xd
@@ -227,7 +227,7 @@ loc_051A8:
 	add	[bx+di],dl		; 051BF
 	push	cx			; 051C1
 	or	al,[bx+si]		; 051C2
-	adc	[bx+di-0x42],dx		; 051C4
+	adc	[bx+di+0xffbe],dx		; 051C4
 	or	al,0x0			; 051C7
 loc_051C9:
 	cmp	ax,[cs:si+0x51b6]	; 051C9
@@ -342,7 +342,7 @@ loc_052B0:
 	pop	bp			; 052BC
 	ret				; 052BD
 	db	0xEB, 0x51		; 052BE jmp 0x5311
-	adc	dl,[bx+si-0x1c]		; 052C0
+	adc	dl,[bx+si+0xffe4]		; 052C0
 	push	cx			; 052C3
 	mov	cl,0x50			; 052C4
 	in	al,byte 0x51		; 052C6
@@ -507,7 +507,7 @@ loc_05413:
 	inc	ax			; 05419
 	mov	si,[bp+0x0]		; 0541A
 	mov	bl,[bp+0x4]		; 0541D
-	mov	[si-0x1c48],bl		; 05420
+	mov	[si+0xe3b8],bl		; 05420
 	cmp	ax,0x80			; 05424
 	mov	[bp+0xa],ax		; 05427
 	mov	[bp+0x5],bl		; 0542A
@@ -916,7 +916,7 @@ loc_05766:
 	mov	al,[si]			; 05769
 	xor	ah,ah			; 0576B
 	db	0x8B, 0xF0		; 0576D mov si,ax
-	mov	bl,[si-0x1b3b]		; 0576F
+	mov	bl,[si+0xe4c5]		; 0576F
 	xor	bh,bh			; 05773
 	db	0x81, 0xE3, 0x08, 0x00	; 05775 and bx,0x8
 	mov	[bp+0x6],ax		; 05779
@@ -937,7 +937,7 @@ loc_05792:
 	xor	ah,ah			; 0579C
 	mov	[bp+0x6],ax		; 0579E
 	mov	si,[bp+0x6]		; 057A1
-	mov	al,[si-0x1b3b]		; 057A4
+	mov	al,[si+0xe4c5]		; 057A4
 	xor	ah,ah			; 057A8
 	db	0x25, 0x08, 0x00	; 057AA and ax,0x8
 	jnz	short loc_05792		; 057AD jnz 0x5792
@@ -1010,7 +1010,7 @@ loc_0583B:
 	xor	ah,ah			; 05845
 	mov	[bp+0x8],ax		; 05847
 	mov	si,[bp+0x8]		; 0584A
-	mov	al,[si-0x1b3b]		; 0584D
+	mov	al,[si+0xe4c5]		; 0584D
 	xor	ah,ah			; 05851
 	db	0x25, 0x08, 0x00	; 05853 and ax,0x8
 	jnz	short loc_0583B		; 05856 jnz 0x583b
