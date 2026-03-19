@@ -193,7 +193,7 @@ lea ax,[0xbd04]  ; 01920
 mov [0xbce0],bp  ; 01924
 push ax  ; 01928
 push word [bp+0x4]  ; 01929
-call init_figure  ; 0192C
+call load_anim_script  ; 0192C
 add sp,0x4  ; 0192F
 mov bp,[0xbce0]  ; 01932
 push word [bp+0x6]  ; 01936

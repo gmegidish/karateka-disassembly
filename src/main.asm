@@ -13,9 +13,9 @@
 ;   [bp+0x0]  = temp: current character value
 ;   [bp+0x4]  = temp: saved character
 ;   [bp+0x5]  = device mode flags (text/binary)
-;   [bp+0x8]  = save_vectors result for stdin
-;   [bp+0xa]  = save_vectors result for stdout
-;   [bp+0xc]  = save_vectors result for stderr
+;   [bp+0x8]  = init_iob_entry result for stdin
+;   [bp+0xa]  = init_iob_entry result for stdout
+;   [bp+0xc]  = init_iob_entry result for stderr
 ;
 ; DS = DGROUP (code+data segment)
 ; ES = PSP segment (set by DOS before program start)
@@ -105,7 +105,7 @@ mov ax,0xe480  ; 059E5 - address of vector save buffer
 push ax  ; 059E8
 mov ax,0x19  ; 059E9 - INT 19h
 push ax  ; 059EC
-call save_vectors  ; 059ED - save_vectors(0x19, save_buf, iob_stdin)
+call init_iob_entry  ; 059ED - init_iob_entry(0x19, save_buf, iob_stdin)
 db 0x8B, 0xE5  ; 059F0 mov sp,bp
 
 ; Check if stdout redirect is append mode (>>)
@@ -122,7 +122,7 @@ mov ax,0xe482  ; 05A04 - address of vector save buffer
 push ax  ; 05A07
 mov ax,0x39  ; 05A08 - INT 39h
 push ax  ; 05A0B
-call save_vectors  ; 05A0C - save_vectors(0x39, save_buf, iob_stdout)
+call init_iob_entry  ; 05A0C - init_iob_entry(0x39, save_buf, iob_stdout)
 db 0x8B, 0xE5  ; 05A0F mov sp,bp
 mov [bp+0xa],ax  ; 05A11 - save stdout result
 jmp short loc_05A2A  ; 05A14 jmp 0x5a2a
@@ -135,7 +135,7 @@ mov ax,0xe484  ; 05A1A - address of vector save buffer
 push ax  ; 05A1D
 mov ax,0x3a  ; 05A1E - INT 3Ah
 push ax  ; 05A21
-call save_vectors  ; 05A22 - save_vectors(0x3a, save_buf, iob_stdout)
+call init_iob_entry  ; 05A22 - init_iob_entry(0x3a, save_buf, iob_stdout)
 db 0x8B, 0xE5  ; 05A25 mov sp,bp
 mov [bp+0xa],ax  ; 05A27 - save stdout result
 
@@ -147,7 +147,7 @@ mov ax,0xe484  ; 05A2E - address of save buffer
 push ax  ; 05A31
 mov ax,0xe486  ; 05A32 - address of save buffer 2
 push ax  ; 05A35
-call save_vectors  ; 05A36
+call init_iob_entry  ; 05A36
 db 0x8B, 0xE5  ; 05A39 mov sp,bp
 test ax,ax  ; 05A3B
 mov [bp+0xc],ax  ; 05A3D - save stderr result

@@ -167,7 +167,7 @@ push bx  ; 003E4
 mov [0xf6],ax  ; 003E5
 mov [0x15c],ax  ; 003E8
 mov [0x15a],ax  ; 003EB
-call init_figure  ; 003EE
+call load_anim_script  ; 003EE
 db 0x8B, 0xE5  ; 003F1 mov sp,bp
 call play_sound  ; 003F3
 mov ax,0x5dc  ; 003F6
@@ -229,7 +229,7 @@ mov ax,0xbd04  ; 00483
 push ax  ; 00486
 mov ax,0x420e  ; 00487
 push ax  ; 0048A
-call init_figure  ; 0048B
+call load_anim_script  ; 0048B
 db 0x8B, 0xE5  ; 0048E mov sp,bp
 mov ax,0x6  ; 00490
 push ax  ; 00493
@@ -246,7 +246,7 @@ mov ax,0xbd04  ; 004AC
 push ax  ; 004AF
 mov ax,0x4214  ; 004B0
 push ax  ; 004B3
-call init_figure  ; 004B4
+call load_anim_script  ; 004B4
 db 0x8B, 0xE5  ; 004B7 mov sp,bp
 mov ax,0x5dc  ; 004B9
 push ax  ; 004BC
@@ -378,7 +378,7 @@ mov bx,0x4214  ; 005D1
 push bx  ; 005D4
 mov [0xdf44],ax  ; 005D5
 mov [0xea],ax  ; 005D8
-call init_figure  ; 005DB
+call load_anim_script  ; 005DB
 db 0x8B, 0xE5  ; 005DE mov sp,bp
 call run_anim_script  ; 005E0
 pop bp  ; 005E3

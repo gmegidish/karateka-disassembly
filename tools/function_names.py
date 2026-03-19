@@ -88,13 +88,14 @@ FUNCTION_NAMES = {
     0x056DE: "strcpy",               # C runtime strcpy() - copy null-terminated string
     0x05741: "scanf_format_parser",  # Lattice C internal scanf format-string walker
 
-    # === Interrupt Vector Management ===
+    # === Interrupt Vector / Error Handling ===
+    0x04810: "critical_error_handler", # INT 24h handler: saves regs, calls check_disk_prompt, retries
     0x0482B: "install_handlers",     # INT 21h/25h - install critical error handler (INT 24h)
-    0x04883: "save_int_vectors",     # Save original interrupt vectors
-    0x0483C: "restore_int_vectors",  # Restore original interrupt vectors
+    0x0483C: "fopen_iob",             # Scan IOB array for free slot, open file, return IOB pointer or 0
 
     # === Memory Management ===
     0x04BCE: "heap_alloc",           # Allocate paragraph-aligned block from heap
+    0x04C73: "heap_alloc_16",        # Thin wrapper: 16-bit size heap_alloc, returns 0xFFFF on failure
 
     # === Graphics Rendering ===
     0x00B4E: "clear_screen",         # Clear offscreen buffer at DS:0x337
@@ -112,8 +113,8 @@ FUNCTION_NAMES = {
     0x00FBB: "load_background",      # Load background image file
     0x01027: "load_animation",       # Load animation data file
     0x0166D: "set_cga_palette",      # Set CGA palette colors
-    0x01277: "init_figure",          # Initialize figure/sprite data
-    0x012EB: "setup_figure_data",    # Setup figure animation data
+    0x01277: "load_anim_script",     # Load animation script file from disk and compile to bytecode
+    0x012EB: "parse_anim_command",   # Parse one text animation command line into bytecode
 
     # === Animation Script System ===
     0x01734: "run_anim_script",      # Animation script interpreter - reads bytecode commands from 0xBD04, dispatches via jump table at 0xBCE8
@@ -195,13 +196,15 @@ FUNCTION_NAMES = {
     0x04441: "update_position",      # Update actor position
     0x043AA: "apply_gravity",        # Apply gravity to actor
     0x04619: "init_controls",        # Initialize control scheme
-    0x04A37: "collision_check",      # Collision detection
-    0x04B0A: "bounds_check",         # Bounds checking
+    0x04A37: "fclose_iob",           # Flush and close an IOB file entry
+    0x04A91: "fgets_iob",            # Read line from stdin IOB until newline or EOF
+    0x04B0A: "fread_iob",            # Read N bytes from IOB stream into buffer, return bytes read
 
     # === File / Resource Management ===
-    0x04883: "save_vectors",         # Save interrupt vectors
+    0x04883: "init_iob_entry",       # Initialize IOB entry for file reading, open file and set up buffer
     0x04C99: "reset_heap",           # Reset heap pointers and free-list, optionally shrink DOS memory
     0x04DB9: "open_file_slot",       # Find free file table slot, set up flags for file operation
+    0x04FB8: "open_file_rw",         # Thin wrapper: open_file_slot with read+write+create flags
     0x04D77: "get_file_slot",        # Validate file slot index, return pointer to 42-byte file table entry
     0x05501: "seek_and_read",        # Seek to offset in file, read data block
     # 0x05356 is a call site within write_file_data, not a separate function

@@ -23,7 +23,7 @@ mov ax,0xc428  ; 019BF
 push ax  ; 019C2
 mov ax,0xd59c  ; 019C3
 push ax  ; 019C6
-call init_figure  ; 019C7
+call load_anim_script  ; 019C7
 db 0x8B, 0xE5  ; 019CA mov sp,bp
 call build_anim_offsets_alt  ; 019CC
 db 0x33, 0xC0  ; 019CF xor ax,ax

@@ -23,7 +23,7 @@ db 0x8B, 0xF0  ; 01AE5 mov si,ax
 mov ax,0xc102  ; 01AE7
 push ax  ; 01AEA
 push word [si+0x21c]  ; 01AEB
-call init_figure  ; 01AEF
+call load_anim_script  ; 01AEF
 db 0x8B, 0xE5  ; 01AF2 mov sp,bp
 cmp word [bp+0x8],0x2  ; 01AF4
 jnl short loc_01B05  ; 01AF8 jnl 0x1b05

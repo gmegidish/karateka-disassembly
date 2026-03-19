@@ -964,7 +964,7 @@ mov ax,0xce3e  ; 03550
 push ax  ; 03553
 mov ax,0xd6a2  ; 03554
 push ax  ; 03557
-call init_figure  ; 03558
+call load_anim_script  ; 03558
 db 0x8B, 0xE5  ; 0355B mov sp,bp
 call play_sound  ; 0355D
 mov word [0x130],0x6  ; 03560
@@ -1095,7 +1095,7 @@ mov ax,0xbd04  ; 036CB
 push ax  ; 036CE
 mov ax,0xd6a9  ; 036CF
 push ax  ; 036D2
-call init_figure  ; 036D3
+call load_anim_script  ; 036D3
 db 0x8B, 0xE5  ; 036D6 mov sp,bp
 mov ax,0xb  ; 036D8
 push ax  ; 036DB
@@ -1105,7 +1105,7 @@ mov ax,0xce3e  ; 036E1
 push ax  ; 036E4
 mov ax,0xd6af  ; 036E5
 push ax  ; 036E8
-call init_figure  ; 036E9
+call load_anim_script  ; 036E9
 db 0x8B, 0xE5  ; 036EC mov sp,bp
 call play_sound  ; 036EE
 mov word [0xfa],0x0  ; 036F1

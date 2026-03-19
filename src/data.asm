@@ -13,7 +13,9 @@ stack_limit     equ 0x17        ; word - stack overflow check threshold
 stdin_redir     equ 0x19        ; 32 bytes - stdin redirect filename buffer
 stdout_redir    equ 0x39        ; byte - first char of stdout redirect path
 psp_segment     equ 0x5b        ; word - PSP segment (saved from ES at entry)
+heap_base_off   equ 0x5d        ; word - heap base offset (initial heap_offset value)
 heap_start_seg  equ 0x5f        ; word - heap start segment
+heap_offset     equ 0x61        ; word - current heap allocation offset from base
 heap_current_seg equ 0x63       ; word - heap current allocation segment
 heap_size       equ 0x65        ; word - heap size in paragraphs
 heap_remainder  equ 0x67        ; word - heap remaining bytes (fractional paragraph)
@@ -44,9 +46,48 @@ file_stdin      equ 0xe5ce      ; FILE struct for fd 0 (stdin)
 file_stdout     equ 0xe5f8      ; FILE struct for fd 1 (stdout)
 file_stderr     equ 0xe622      ; FILE struct for fd 2 (stderr)
 
+; Joystick/input state (written by init_controls, read_joystick, read_joystick_buttons)
+joystick_present equ 0xe196     ; byte - 1 if joystick detected at port 0x201
+joy_x_lo_thresh  equ 0xe197     ; word - joystick X axis low threshold (left)
+joy_x_hi_thresh  equ 0xe199     ; word - joystick X axis high threshold (right)
+joy_y_lo_thresh  equ 0xe19b     ; word - joystick Y axis low threshold (up)
+joy_y_hi_thresh  equ 0xe19d     ; word - joystick Y axis high threshold (down)
+joy_button_state equ 0xe19f     ; word - combined direction+button bitmask
+joy_axis_left    equ 0xe1a1     ; byte - 1 if joystick left
+joy_axis_right   equ 0xe1a2     ; byte - 1 if joystick right
+joy_axis_up      equ 0xe1a3     ; byte - 1 if joystick up
+joy_axis_down    equ 0xe1a4     ; byte - 1 if joystick down
+joy_btn_2        equ 0xe1a5     ; byte - 1 if button 2 pressed
+joy_btn_1        equ 0xe1a6     ; byte - 1 if button 1 pressed
+cpu_speed_count  equ 0xe1a7     ; word - CPU speed measurement (loop iterations per 7 timer ticks)
+
+; File I/O state (used by open_file_slot, get_file_slot, show_insert_disk)
+file_slot_count  equ 0xe5cc     ; word - number of file table slots allocated
+file_table_base  equ 0xe5ce     ; start of file table (42 bytes per slot)
+file_error_code  equ 0xe4be     ; word - last file operation error code
+
+; Heap free-list pointers (used by reset_heap)
+heap_free_head_a equ 0xe4b6     ; word - heap free-list head pointer A
+heap_free_head_b equ 0xe4b8     ; word - heap free-list head pointer B
+heap_free_head_c equ 0xe4ba     ; word - heap free-list head pointer C
+heap_free_head_d equ 0xe4bc     ; word - heap free-list head pointer D
+
+; Heap memory pool tracking (used by reset_heap on DOS 2+)
+heap_pool_lo     equ 0xe4c0     ; word - heap pool size low word
+heap_pool_hi     equ 0xe4c2     ; word - heap pool size high word
+
 ; Game state variables
 input_advance   equ 0xdf44      ; word - input advance/skip flag (cleared on shutdown)
 rand_temp       equ 0x421a      ; word - temporary storage for rand_range calculation
+
+; Animation script compiler (used by load_anim_script / parse_anim_command)
+anim_cmd_table  equ 0x1e8       ; word[14] - pointers to animation command name strings
+anim_script_buf equ 0xbc83      ; buffer - animation script text read buffer
+anim_fmt_int    equ 0xbc85      ; string - scanf format "%d"
+anim_fmt_2int   equ 0xbc88      ; string - scanf format "%d %d"
+anim_fmt_str    equ 0xbc91      ; string - scanf format for chg_fig params
+anim_fmt_pos    equ 0xbc9d      ; string - scanf format for set_pos params
+anim_script_size equ 0xbd02     ; word - total bytecode size from last load_anim_script call
 
 ; Camera/viewport
 camera_x         equ 0xe4       ; word - camera scroll X position
