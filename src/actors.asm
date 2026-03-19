@@ -1,8 +1,43 @@
-; Actor/character initialization and management
+; Sprite rendering: draws sprites to offscreen buffer at DS:0x337
+; (CGA 320x200, 80 bytes per scanline)
+;
+; Three entry points handle different clipping cases:
+;   draw_sprite          — normal case + right-edge clipping
+;   draw_sprite_mirrored — left-edge entry (sprite X < camera)
+;   draw_sprite_rightedge — right-edge clipping (sprite X + width > 320)
 
 
-; ---- function init_actor ----
-init_actor:
+; ---- function draw_sprite ----
+; Renders a single sprite to the offscreen buffer.
+;   1. Looks up sprite data from frame pointer table [si+0x423C]
+;      and alternate data [si-0x78C6]
+;   2. Reads dimensions: width in columns [bx+0x443C], height [bx+0x443D]
+;   3. Adjusts X relative to camera [0xE4], computes sub-pixel offset (0-3)
+;   4. Clips sprite to screen bounds (0-320 pixels)
+;   5. For each column: reads pixel data via advance_anim_frame,
+;      applies bit rotation for sub-pixel alignment, masks+ORs into buffer
+;
+; Parameters:
+;   [bp+0x4] = sprite/figure index (word)
+;   [bp+0x6] = X position on screen (word)
+;   [bp+0x8] = Y position (adjusted by sprite height, word)
+;
+; Key variables:
+;   [0x421E] = current frame data pointer
+;   [0x4220] = alternate frame data pointer
+;   [0x4222] = remaining columns to draw (byte)
+;   [0x4223] = height per column in pixels (byte)
+;   [0x4224] = sprite width in pixels (height * 4)
+;   [0x4226] = sub-pixel X offset (0-3, byte)
+;   [0x4227] = bit shift amount (sub-pixel * 2, byte)
+;   [0x4228] = left-edge clipping flag (word)
+;   [0x422A] = row counter per column (byte)
+;   [0x422B] = stride multiplier (byte)
+;   [0x4230] = buffer Y offset (word)
+;   [0x4232] = current buffer write position (word)
+;
+; Output: renders sprite into offscreen buffer at DS:0x337
+draw_sprite:
 	push	bp			; 00640
 	db	0x8B, 0xEC		; 00641 mov bp,sp
 	mov	byte [0x422c],0x0	; 00643
@@ -207,8 +242,17 @@ loc_0083A:
 	pop	bp			; 0083A
 	ret				; 0083B
 
-; ---- function process_animation ----
-process_animation:
+; ---- function draw_sprite_mirrored ----
+; Handles sprites entering from the LEFT side of screen (X < camera).
+; Same sprite data format and rendering approach as draw_sprite, but
+; clips/mirrors from the left edge. Values >= 0xC8 in [bp+0x4] use
+; a fast path that skips bit rotation.
+;
+; Parameters: same as draw_sprite
+;   [bp+0x4] = sprite/figure index (word, >= 0xC8 uses fast path)
+;   [bp+0x6] = X position (negative = entering from left)
+;   [bp+0x8] = Y position
+draw_sprite_mirrored:
 	push	bp			; 0083C
 	db	0x8B, 0xEC		; 0083D mov bp,sp
 	mov	byte [0x422c],0x0	; 0083F
@@ -313,8 +357,13 @@ loc_00936:
 	jnz	short loc_0094C		; 00947 jnz 0x94c
 	jmp	0xc69			; 00949
 
-; ---- function run_cutscene ----
-run_cutscene:
+; ---- function draw_sprite_rightedge ----
+; Handles sprites extending past the RIGHT edge of screen (X + width > 320).
+; Also reached as fall-through from draw_sprite when the sprite needs
+; right-edge clipping. Continues using bp from draw_sprite's frame.
+;
+; Parameters: same as draw_sprite (continues draw_sprite's stack frame)
+draw_sprite_rightedge:
 loc_0094C:
 	mov	al,[0x4222]		; 0094C
 	cbw				; 0094F
@@ -430,6 +479,9 @@ loc_00A60:
 loc_00A69:
 	pop	bp			; 00A69
 	ret				; 00A6A
+; Fast-path renderers: reached via jumps when [bp+0x4] >= 0xC8.
+; These skip the bit rotation loop and write sprite data directly,
+; which is faster for large/aligned sprites.
 	mov	si,[0x421e]		; 00A6B
 loc_00A6F:
 	mov	dl,[si+0x443c]		; 00A6F

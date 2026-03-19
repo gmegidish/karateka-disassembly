@@ -1,8 +1,20 @@
-; Combat system: update, hit detection, damage, AI
+; Combat system: level init, state setup, player input, move resolution
 
 
-; ---- function combat_update ----
-combat_update:
+; ---- function init_combat_level ----
+; Initializes a new combat encounter/level. Loads animation data and
+; scripts for the given level.
+;
+; Parameters:
+;   [bp+0x8] = level number (0-4)
+;
+; Behavior:
+;   - Calls load_animation(level)
+;   - Calls load_anim_script for levels < 4
+;   - Calls stop_sound(1) for level < 2, stop_sound(6) for level >= 2
+;   - Calls update_score (anti-tamper check) for level 2
+;   - Calls init_combat_state to set up initial combat state
+init_combat_level:
 	push	bp			; 01AC2
 	sub	sp,0x4			; 01AC3
 	jc	short loc_01ACE		; 01AC6 jc 0x1ace
@@ -43,15 +55,27 @@ loc_01B0E:
 	call	update_score		; 01B14
 loc_01B17:
 	push	word [bp+0x8]		; 01B17
-	call	combat_check_hit	; 01B1A
+	call	init_combat_state	; 01B1A
 	db	0x8B, 0xE5		; 01B1D mov sp,bp
 	call	flush_keyboard		; 01B1F
 	add	sp,0x4			; 01B22
 	pop	bp			; 01B25
 	ret				; 01B26
 
-; ---- function combat_check_hit ----
-combat_check_hit:
+; ---- function init_combat_state ----
+; Initializes all combat state variables for a new encounter.
+;
+; Parameters:
+;   [bp+0xa] = level number
+;
+; Behavior:
+;   - Sets player position from level tables at [si+0x2E6], [si+0x2F0], etc.
+;   - Sets camera bounds [0x108], player bounds [0x100]-[0x104]
+;   - Calls spawn_enemy to position the enemy
+;   - For level 3: sets up special scene slot flags [0x132]-[0x144]
+;   - Sets enemy health: 13 (level < 2), 12 (level 2), 10 (level 3)
+;   - Resets combat_active, hit regen timers, etc.
+init_combat_state:
 	push	bp			; 01B27
 	sub	sp,0x6			; 01B28
 	jc	short loc_01B33		; 01B2B jc 0x1b33
@@ -92,7 +116,7 @@ loc_01B59:
 	mov	[0x106],dx		; 01B96
 	mov	[0x104],dx		; 01B9A
 	mov	[0x10a],bx		; 01B9E
-	call	combat_apply_damage	; 01BA2
+	call	spawn_enemy		; 01BA2
 	db	0x8B, 0xE5		; 01BA5 mov sp,bp
 	cmp	word [bp+0xa],0x3	; 01BA7
 	jnz	short loc_01BED		; 01BAB jnz 0x1bed
@@ -155,8 +179,20 @@ loc_01C53:
 	pop	bp			; 01C56
 	ret				; 01C57
 
-; ---- function combat_apply_damage ----
-combat_apply_damage:
+; ---- function spawn_enemy ----
+; Spawns/positions the enemy for a new encounter.
+;
+; Parameters:
+;   [bp+0x6] = level number
+;
+; Behavior:
+;   - Sets enemy X from table at [bx+0x2DC]
+;   - Sets enemy animation (0x41 idle for level < 2, 0x01 walk for level >= 2)
+;   - Sets enemy_atk_freq (0x78 for level < 2, 0xA0 for level >= 2)
+;   - Sets initial combat_hits_left from health calculation
+;   - Resets hit exchange counter, regen timers
+;   - Increments player_y_off [0x158] (up to max 4)
+spawn_enemy:
 	push	bp			; 01C58
 	sub	sp,0x2			; 01C59
 	jc	short loc_01C64		; 01C5C jc 0x1c64
@@ -221,8 +257,21 @@ loc_01D02:
 	pop	bp			; 01D05
 	ret				; 01D06
 
-; ---- function combat_ai ----
-combat_ai:
+; ---- function read_player_input ----
+; Reads the player's keyboard/joystick input and translates to a combat move.
+;
+; Parameters: none (reads keyboard)
+; Output: AX = animation index, or -1 (0xFFFF) if no valid input
+;
+; Behavior:
+;   1. If [0x16E] > 0 (input suppressed), return -1
+;   2. Call poll_keyboard(0) to check for input
+;   3. If key available: call get_pending_key, then key_to_move to translate
+;   4. If valid move: call combat_resolve_move to validate against current pose
+;   5. If move rejected: store key in [0xDF42]/[0xDF43] for later
+;   6. If accepted: look up animation from table at [si-0x3C2C],
+;      set [0xE6]=1, update player frame pointer
+read_player_input:
 	push	bp			; 01D07
 	sub	sp,0x6			; 01D08
 	jc	short loc_01D13		; 01D0B jc 0x1d13
@@ -283,6 +332,12 @@ loc_01D82:
 	ret				; 01D89
 
 ; ---- function get_pending_key ----
+; Reads the latest keystroke, draining any buffered repeats in joystick mode.
+;   - If joystick mode [0xDF46]=1: loops reading keys until buffer empty, returns last
+;   - If keyboard mode: reads one key, returns it
+;
+; Input: none
+; Output: AX = key code, or 0 if none
 get_pending_key:
 	push	bp			; 01D8A
 	sub	sp,0x4			; 01D8B
@@ -322,6 +377,23 @@ loc_01DCD:
 	ret				; 01DD4
 
 ; ---- function key_to_move ----
+; Translates a raw key code to a combat move index (1-11).
+;
+; Input: [bp+0xa] = key code
+; Output: AX = move index (1-11), or -1 if not a combat key
+;
+; Key mappings:
+;   'j' (0x6A) = toggle joystick off, return -1
+;   'k' (0x6B) = toggle joystick on, return -1
+;   Ctrl+R (0x12) = set restart flag [0x16A]=1
+;   Ctrl+S (0x13) = toggle sound [0xD6BC]
+;   Ctrl+X (0x18) = toggle debug [0xE1AC]
+;   Ctrl+Y (0x19) = toggle debug [0xE1AB]
+;   Ctrl+E (0x05) = toggle debug [0xE1AD]
+;   Ctrl+B (0x02) = toggle debug [0xE1AE]
+;   Ctrl+N (0x0E) = clear all debug flags
+;   '&' (0x26) = force player anim to 0x41 if < 0x40, return move 8
+;   Space/printable (>= 0x20): look up in 11-entry move table at [si+0x322]
 key_to_move:
 	push	bp			; 01DD5
 	sub	sp,0x6			; 01DD6
@@ -490,6 +562,17 @@ loc_01F45:
 	ret				; 01F4D
 
 ; ---- function combat_resolve_move ----
+; Validates a combat move against the player's current animation pose
+; and remaps to the actual animation ID.
+;
+; Input:
+;   [bp+0x6] = move index from key_to_move
+;   [bp+0x8] = raw key code
+; Output: AX = animation ID to play, or -1 if move invalid for current state
+;
+; Uses jump table at 0x200A (14 entries) indexed by current player
+; animation state [0x10C]. Each handler checks the move index and
+; returns an animation ID or -1 (reject).
 combat_resolve_move:
 	push	bp			; 01F4E
 	sub	sp,0x2			; 01F4F

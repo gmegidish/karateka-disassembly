@@ -178,7 +178,7 @@ loc_003D6:
 	db	0x8B, 0xE5		; 00401 mov sp,bp
 	mov	word [0xea],0x0		; 00403
 	push	word [0xea]		; 00409
-	call	combat_update		; 0040D
+	call	init_combat_level	; 0040D
 	db	0x8B, 0xE5		; 00410 mov sp,bp
 	mov	word [0xdf44],0x0	; 00412
 	mov	ax,0xd			; 00418
@@ -256,7 +256,7 @@ loc_004A6:
 	db	0x8B, 0xE5		; 004C4 mov sp,bp
 	db	0x33, 0xC0		; 004C6 xor ax,ax
 	push	ax			; 004C8
-	call	combat_update		; 004C9
+	call	init_combat_level	; 004C9
 	db	0x8B, 0xE5		; 004CC mov sp,bp
 	call	run_anim_script		; 004CE
 	test	ax,ax			; 004D1
@@ -301,7 +301,7 @@ loc_0052C:
 loc_00537:
 	db	0x33, 0xC0		; 00537 xor ax,ax
 	push	ax			; 00539
-	call	combat_check_hit	; 0053A
+	call	init_combat_state	; 0053A
 	db	0x8B, 0xE5		; 0053D mov sp,bp
 	jmp	0x612			; 0053F
 loc_00542:
@@ -368,7 +368,7 @@ load_scene:
 	db	0x8B, 0xE5		; 005BE mov sp,bp
 	db	0x33, 0xC0		; 005C0 xor ax,ax
 	push	ax			; 005C2
-	call	combat_update		; 005C3
+	call	init_combat_level	; 005C3
 	db	0x8B, 0xE5		; 005C6 mov sp,bp
 	call	clear_screen		; 005C8
 	db	0x33, 0xC0		; 005CB xor ax,ax

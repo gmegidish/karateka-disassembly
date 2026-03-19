@@ -2,6 +2,9 @@
 
 
 ; ---- function crt_realloc_down ----
+; INT 21h/4Ah — shrink DOS memory block.
+; Input: [bp+4] = new paragraph count
+; Output: AX = 0 on success, 0xFFFF on failure
 crt_realloc_down:
 	push	bp			; 05C12
 	db	0x8B, 0xEC		; 05C13 mov bp,sp
@@ -37,6 +40,9 @@ loc_05C51:
 	ret				; 05C56
 
 ; ---- function crt_realloc_up ----
+; INT 21h/4Ah — grow DOS memory block.
+; Input: [bp+4] = additional paragraphs to allocate
+; Output: AX = 0 on success, 0xFFFF on failure
 crt_realloc_up:
 	push	bp			; 05C57
 	db	0x8B, 0xEC		; 05C58 mov bp,sp
@@ -72,6 +78,9 @@ loc_05C95:
 	ret				; 05C9A
 
 ; ---- function dos_create_file ----
+; INT 21h/3Ch — create file.
+; Input: [bp+4] = filename pointer, [bp+6] = attributes
+; Output: AX = file handle (error code stored at [0x80] on failure)
 dos_create_file:
 	push	bp			; 05C9B
 	db	0x8B, 0xEC		; 05C9C mov bp,sp
@@ -87,6 +96,9 @@ loc_05CB3:
 	ret				; 05CB4
 
 ; ---- function dos_open_file ----
+; INT 21h/3Dh — open file.
+; Input: [bp+4] = filename pointer, [bp+6] = access mode
+; Output: AX = file handle (error code stored at [0x80] on failure)
 dos_open_file:
 	push	bp			; 05CB5
 	db	0x8B, 0xEC		; 05CB6 mov bp,sp
@@ -102,6 +114,8 @@ loc_05CCD:
 	ret				; 05CCE
 
 ; ---- function dos_close_file ----
+; INT 21h/3Eh — close file.
+; Input: [bp+4] = file handle
 dos_close_file:
 	push	bp			; 05CCF
 	db	0x8B, 0xEC		; 05CD0 mov bp,sp
@@ -116,6 +130,9 @@ loc_05CE4:
 	ret				; 05CE5
 
 ; ---- function dos_read_file ----
+; INT 21h/3Fh — read from file.
+; Input: [bp+4] = handle, [bp+6] = buffer pointer, [bp+8] = byte count
+; Output: AX = bytes read
 dos_read_file:
 	push	bp			; 05CE6
 	db	0x8B, 0xEC		; 05CE7 mov bp,sp
@@ -133,6 +150,9 @@ loc_05D03:
 	ret				; 05D04
 
 ; ---- function dos_write_file ----
+; INT 21h/40h — write to file.
+; Input: [bp+4] = handle, [bp+6] = buffer pointer, [bp+8] = byte count
+; Output: AX = bytes written
 dos_write_file:
 	push	bp			; 05D05
 	db	0x8B, 0xEC		; 05D06 mov bp,sp
@@ -150,6 +170,9 @@ loc_05D22:
 	ret				; 05D23
 
 ; ---- function dos_seek_file ----
+; INT 21h/42h — seek within file.
+; Input: [bp+4] = handle, [bp+6:8] = 32-bit offset, [bp+A] = origin mode
+; Output: DX:AX = new file position
 dos_seek_file:
 	push	bp			; 05D24
 	db	0x8B, 0xEC		; 05D25 mov bp,sp
@@ -169,6 +192,8 @@ loc_05D42:
 	ret				; 05D47
 
 ; ---- function dos_delete_file ----
+; INT 21h/41h — delete file.
+; Input: [bp+4] = filename pointer
 dos_delete_file:
 	push	bp			; 05D48
 	db	0x8B, 0xEC		; 05D49 mov bp,sp
@@ -197,6 +222,8 @@ loc_05D7A:
 	ret				; 05D7D
 
 ; ---- function dos_ioctl ----
+; INT 21h/44h — I/O control for devices.
+; Input: [bp+4] = handle, [bp+6] = sub-function
 dos_ioctl:
 	push	bp			; 05D7E
 	db	0x8B, 0xEC		; 05D7F mov bp,sp
@@ -208,6 +235,8 @@ dos_ioctl:
 	ret				; 05D8C
 
 ; ---- function dos_rename_file ----
+; INT 21h/56h — rename file.
+; Input: [bp+4] = old filename, [bp+6] = new filename
 dos_rename_file:
 	push	bp			; 05D8D
 	db	0x8B, 0xEC		; 05D8E mov bp,sp
@@ -226,6 +255,8 @@ loc_05DA7:
 	ret				; 05DAA
 
 ; ---- function crt_init_io ----
+; Initializes all FILE structs and IOB entries.
+; Called at startup and after disk swap.
 crt_init_io:
 	push	bp			; 05DAB
 	db	0x8B, 0xEC		; 05DAC mov bp,sp
@@ -257,6 +288,8 @@ crt_init_io:
 	ret				; 05DE2
 
 ; ---- function dos_putchar ----
+; INT 21h/02h — write single character to stdout.
+; Input: [bp+4] = character
 dos_putchar:
 	push	bp			; 05DE3
 	db	0x8B, 0xEC		; 05DE4 mov bp,sp
@@ -300,6 +333,8 @@ dos_putchar:
 	ret				; 05E32
 
 ; ---- function parse_number ----
+; scanf-style decimal/octal/hex number parser from string.
+; Handles %d, %o, %x format conversions with optional sign.
 parse_number:
 	push	bp			; 05E33
 	sub	sp,0x1e			; 05E34
@@ -875,6 +910,9 @@ loc_06331:
 	ret				; 06341
 
 ; ---- function crt_file_read_byte ----
+; Refills FILE buffer from disk, returns next byte (getc implementation).
+; Input: IOB pointer on stack
+; Output: AX = next byte, or -1 (0xFFFF) on EOF
 crt_file_read_byte:
 	push	bp			; 06342
 	sub	sp,0x8			; 06343
@@ -999,6 +1037,8 @@ loc_06447:
 	ret				; 0644D
 
 ; ---- function crt_file_write_byte ----
+; Writes byte to FILE buffer, flushes to disk if full (putc implementation).
+; Input: IOB pointer and byte on stack
 crt_file_write_byte:
 	push	bp			; 0644E
 	sub	sp,0xc			; 0644F
@@ -1233,6 +1273,7 @@ loc_0664D:
 	ret				; 06654
 
 ; ---- function crt_alloc_file_buffer ----
+; Allocates a dynamic I/O buffer for a FILE struct via crt_malloc.
 crt_alloc_file_buffer:
 	push	bp			; 06655
 	sub	sp,0x2			; 06656
@@ -1278,6 +1319,9 @@ loc_06698:
 	ret				; 066B8
 
 ; ---- function strlen ----
+; Returns length of null-terminated string.
+; Input: [bp+4] = string pointer
+; Output: AX = length (not counting null terminator)
 strlen:
 	push	bp			; 066B9
 	sub	sp,0x4			; 066BA
@@ -1299,6 +1343,8 @@ loc_066D7:
 	ret				; 066DE
 
 ; ---- function format_string ----
+; printf-like string formatter (internal Lattice C runtime).
+; Handles %d, %s, %x, %o, %c, %ld format specifiers.
 format_string:
 	push	bp			; 066DF
 	sub	sp,0x2			; 066E0
@@ -1332,6 +1378,7 @@ loc_066FA:
 	ret				; 06724
 
 ; ---- function dos_read_line ----
+; INT 21h/0Ah — buffered line input from stdin.
 dos_read_line:
 	push	bp			; 06725
 	db	0x8B, 0xEC		; 06726 mov bp,sp
@@ -1342,6 +1389,8 @@ dos_read_line:
 	ret				; 06730
 
 ; ---- function heap_init_free_list ----
+; Initializes heap free-list head node. Sets up the sentinel
+; node that anchors the circular free list.
 heap_init_free_list:
 	push	bp			; 06731
 	sub	sp,0x2			; 06732
@@ -1378,6 +1427,8 @@ loc_06751:
 	ret				; 06778
 
 ; ---- function heap_expand ----
+; Grows heap by N blocks of 0x400 bytes each.
+; Calls crt_realloc_up to get more memory from DOS.
 heap_expand:
 	push	bp			; 06779
 	sub	sp,0x6			; 0677A
@@ -1449,6 +1500,8 @@ loc_067EB:
 	ret				; 0680F
 
 ; ---- function string_copy ----
+; Copies null-terminated string.
+; Input: [bp+4] = destination, [bp+6] = source
 string_copy:
 	push	bp			; 06810
 	sub	sp,0x8			; 06811
@@ -1466,6 +1519,9 @@ string_copy:
 	ret				; 0682C
 
 ; ---- function crt_malloc ----
+; Free-list malloc implementation.
+; Input: [bp+4] = size in bytes
+; Output: AX = pointer to allocated block, or 0 on failure
 crt_malloc:
 	push	bp			; 0682D
 	sub	sp,0x10			; 0682E
@@ -1597,6 +1653,8 @@ loc_0694D:
 	ret				; 06953
 
 ; ---- function crt_free_small ----
+; 16-bit free wrapper. Zero-extends the pointer and calls crt_free.
+; Input: [bp+4] = 16-bit pointer to free
 crt_free_small:
 	push	bp			; 06954
 	sub	sp,0x8			; 06955
@@ -1615,6 +1673,9 @@ crt_free_small:
 	ret				; 06973
 
 ; ---- function crt_free ----
+; Free-list free with block coalescing.
+; Merges adjacent free blocks to reduce fragmentation.
+; Input: [bp+4] = pointer to block to free
 crt_free:
 	push	bp			; 06974
 	sub	sp,0x14			; 06975
@@ -1783,6 +1844,9 @@ loc_06AC3:
 	ret				; 06AF3
 
 ; ---- function crt_strcmp ----
+; String comparison (C runtime strcmp).
+; Input: [bp+4] = string1, [bp+6] = string2
+; Output: AX = 0 if equal, <0 if s1<s2, >0 if s1>s2
 crt_strcmp:
 	push	bp			; 06AF4
 	sub	sp,0x4			; 06AF5
@@ -1822,6 +1886,8 @@ loc_06B23:
 	ret				; 06B39
 
 ; ---- function crt_cmp_long ----
+; Signed 32-bit comparison: AX:BX vs CX:DX.
+; Output: CPU flags set for signed comparison result.
 crt_cmp_long:
 	push	ax			; 06B3A
 	db	0x33, 0xC1		; 06B3B xor ax,cx
@@ -1844,6 +1910,8 @@ loc_06B53:
 	ret				; 06B56
 
 ; ---- function crt_mul_long ----
+; Unsigned 32-bit multiply: AX:BX * CX:DX.
+; Result in AX:BX (low 32 bits).
 crt_mul_long:
 	push	si			; 06B57
 	push	di			; 06B58
@@ -1876,6 +1944,7 @@ loc_06B70:
 	jmp	short loc_06B6D		; 06B82 jmp 0x6b6d
 
 ; ---- function dos_int21 ----
+; Generic INT 21h wrapper. Loads registers from stack and issues INT 21h.
 dos_int21:
 	push	bp			; 06B84
 	db	0x8B, 0xEC		; 06B85 mov bp,sp
@@ -1888,6 +1957,7 @@ dos_int21:
 	ret				; 06B95
 
 ; ---- function crt_file_reset_buffer ----
+; Free FILE buffer and reset to inline (unbuffered) mode.
 crt_file_reset_buffer:
 	push	bp			; 06B96
 	sub	sp,0x2			; 06B97
@@ -1931,6 +2001,7 @@ loc_06BCE:
 	ret				; 06BF4
 
 ; ---- function crt_long_multiply ----
+; 32-bit multiply helper used by compiler-generated code.
 crt_long_multiply:
 	push	bp			; 06BF5
 	sub	sp,0x4			; 06BF6

@@ -103,7 +103,7 @@ loc_02130:
 loc_02145:
 	mov	ax,[0x10c]		; 02145
 	jmp	0x248b			; 02148
-	call	combat_ai		; 0214B
+	call	read_player_input	; 0214B
 	mov	[bp+0x2],ax		; 0214E
 	inc	ax			; 02151
 	jnz	short loc_02159		; 02152 jnz 0x2159
@@ -113,7 +113,7 @@ loc_02159:
 	add	sp,0x4			; 0215C
 	pop	bp			; 0215F
 	ret				; 02160
-	call	combat_ai		; 02161
+	call	read_player_input	; 02161
 	mov	[bp+0x2],ax		; 02164
 	inc	ax			; 02167
 	jnz	short loc_02171		; 02168 jnz 0x2171
@@ -126,7 +126,7 @@ loc_02175:
 	add	sp,0x4			; 02178
 	pop	bp			; 0217B
 	ret				; 0217C
-	call	combat_ai		; 0217D
+	call	read_player_input	; 0217D
 	mov	[bp+0x2],ax		; 02180
 	inc	ax			; 02183
 	jnz	short loc_0218D		; 02184 jnz 0x218d
@@ -139,7 +139,7 @@ loc_02191:
 	add	sp,0x4			; 02194
 	pop	bp			; 02197
 	ret				; 02198
-	call	combat_ai		; 02199
+	call	read_player_input	; 02199
 	db	0x3D, 0x17, 0x00	; 0219C cmp ax,0x17
 	mov	[bp+0x2],ax		; 0219F
 	jng	short loc_021C2		; 021A2 jng 0x21c2
@@ -164,7 +164,7 @@ loc_021D3:
 	add	sp,0x4			; 021D6
 	pop	bp			; 021D9
 	ret				; 021DA
-	call	combat_ai		; 021DB
+	call	read_player_input	; 021DB
 	db	0x3D, 0x0C, 0x00	; 021DE cmp ax,0xc
 	mov	[bp+0x2],ax		; 021E1
 	jnz	short loc_021F5		; 021E4 jnz 0x21f5
@@ -192,7 +192,7 @@ loc_0220A:
 	add	sp,0x4			; 02213
 	pop	bp			; 02216
 	ret				; 02217
-	call	combat_ai		; 02218
+	call	read_player_input	; 02218
 	mov	[bp+0x2],ax		; 0221B
 	inc	ax			; 0221E
 	jnz	short loc_02229		; 0221F jnz 0x2229
@@ -205,7 +205,7 @@ loc_02229:
 	add	sp,0x4			; 0222C
 	pop	bp			; 0222F
 	ret				; 02230
-	call	combat_ai		; 02231
+	call	read_player_input	; 02231
 	mov	[bp+0x2],ax		; 02234
 	inc	ax			; 02237
 	jnz	short loc_0223F		; 02238 jnz 0x223f

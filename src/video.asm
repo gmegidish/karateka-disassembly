@@ -19,7 +19,7 @@ game_shutdown:
 	db	0x8B, 0xE5		; 005F3 mov sp,bp
 	db	0x33, 0xC0		; 005F5 xor ax,ax
 	push	ax			; 005F7
-	call	combat_update		; 005F8  ; combat_update(0) — final cleanup pass
+	call	init_combat_level	; 005F8  ; init_combat_level(0) — final cleanup pass
 	db	0x8B, 0xE5		; 005FB mov sp,bp
 	call	clear_screen		; 005FD
 	mov	word [0xdf44],0x0	; 00600  ; clear input_advance flag

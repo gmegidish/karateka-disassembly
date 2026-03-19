@@ -80,7 +80,7 @@ loc_00BC8:
 ;
 ; Iterates 4-byte slots starting at index 3 in the figure list.
 ; Each slot: [slot+0]=figure_id (0xFF=end), [slot+1..2]=position, [slot+3]=flags.
-; Calls init_actor or process_animation for each figure, then
+; Calls draw_sprite or draw_sprite_mirrored for each figure, then
 ; transfers to screen via update_display, draw_background, or blit_buffer_to_vram
 ; depending on render mode [0xbb31].
 ;
@@ -88,12 +88,12 @@ loc_00BC8:
 ;   [0xbb2e] = current slot index (starts at 3)
 ;   [0xbb30] = vsync wait count
 ;   [0xbb31] = render mode (0=normal, nonzero=blit)
-;   [0xbb32] = first figure ID (passed to draw_sprite)
+;   [0xbb32] = first figure ID (passed to prepare_screen_buffer)
 ;   [0xee]   = display mode (0=background copy, nonzero=buffer copy)
 render_figures:
 	mov	word [0xbb2e],0x3	; 00BC9
 	mov	al,[0xbb32]		; 00BCF
-	call	draw_sprite		; 00BD2
+	call	prepare_screen_buffer	; 00BD2
 loc_00BD5:
 	mov	si,[0xbb2e]		; 00BD5
 	mov	al,[si-0x44d0]		; 00BD9
@@ -111,12 +111,12 @@ loc_00BD5:
 	xor	dx,0x4000		; 00BFA
 	push	dx			; 00BFE
 	push	ax			; 00BFF
-	call	init_actor		; 00C00
+	call	draw_sprite		; 00C00
 	jmp	short loc_00C0A		; 00C03 jmp 0xc0a
 loc_00C05:
 	push	dx			; 00C05
 	push	ax			; 00C06
-	call	process_animation	; 00C07
+	call	draw_sprite_mirrored	; 00C07
 loc_00C0A:
 	add	sp,0x6			; 00C0A
 	add	word [0xbb2e],0x4	; 00C0D
@@ -150,7 +150,7 @@ loc_00C42:
 	add	sp,0x2			; 00C4E
 	ret				; 00C51
 
-; ---- function draw_sprite ----
+; ---- function prepare_screen_buffer ----
 ; Prepares the offscreen buffer and background for the current scene.
 ; Dispatches rendering based on scene state [0xea].
 ;
@@ -164,7 +164,7 @@ loc_00C42:
 ;   [0xbcd0] = scene transition pending flag
 ;
 ; ES = DS on entry (set internally). Preserves ES on exit.
-draw_sprite:
+prepare_screen_buffer:
 	push	es			; 00C52
 	push	ds			; 00C53
 	pop	es			; 00C54
@@ -496,7 +496,7 @@ animate_figure:
 	push	ax			; 00F11
 	mov	ax,0x5c			; 00F12
 	push	ax			; 00F15
-	call	process_animation	; 00F16
+	call	draw_sprite_mirrored	; 00F16
 	add	sp,0x6			; 00F19
 	call	update_display		; 00F1C
 	mov	ax,0x48			; 00F1F
@@ -518,7 +518,7 @@ animate_step:
 	push	ax			; 00F31
 	mov	ax,0x5b			; 00F32
 	push	ax			; 00F35
-	call	process_animation	; 00F36
+	call	draw_sprite_mirrored	; 00F36
 	add	sp,0x6			; 00F39
 	call	update_display		; 00F3C
 	mov	word [0x168],0x1	; 00F3F

@@ -63,7 +63,7 @@ loc_041A7:
 	push	ax			; 041BC
 	mov	ax,0x5d			; 041BD
 	push	ax			; 041C0
-	call	process_animation	; 041C1
+	call	draw_sprite_mirrored	; 041C1
 	add	sp,0x6			; 041C4
 	call	update_display		; 041C7
 	db	0x33, 0xC0		; 041CA xor ax,ax

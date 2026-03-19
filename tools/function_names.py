@@ -101,7 +101,7 @@ FUNCTION_NAMES = {
     0x00B4E: "clear_screen",         # Clear offscreen buffer at DS:0x337
     0x00B5E: "advance_anim_frame",   # Reads animation frame data from two streams, handles RLE repeat markers
     0x00BC9: "render_figures",       # Draw all active figures from figure slot list to screen
-    0x00C52: "draw_sprite",          # Prepare offscreen buffer + background, dispatch by render_mode/scene_state
+    0x00C52: "prepare_screen_buffer", # Prepare offscreen buffer + background, dispatch by render_mode/scene_state
     0x00D68: "update_display",       # Copy offscreen buffer (DS:0x337) to CGA VRAM (B800:0) via scanline LUT
     0x00D89: "draw_background",      # Copy background region directly to CGA VRAM
     0x00DD0: "scroll_screen",        # Clear scroll region of offscreen buffer
@@ -135,15 +135,15 @@ FUNCTION_NAMES = {
     0x00569: "game_scene",           # Scene management
     0x005AD: "load_scene",           # Load a new scene
     0x00629: "rand_range",            # Random integer in [0, max_value]
-    0x00640: "init_actor",           # Initialize actor/character data
-    0x0083C: "process_animation",    # Process animation sequence
-    0x0094C: "run_cutscene",         # Cutscene/scripted sequence (entry point, not called)
+    0x00640: "draw_sprite",           # Render sprite to offscreen buffer (normal case)
+    0x0083C: "draw_sprite_mirrored", # Render sprite entering from left (X < camera)
+    0x0094C: "draw_sprite_rightedge", # Render sprite clipped at right edge (X + width > 320)
 
     # === Combat System ===
-    0x01AC2: "combat_update",        # Combat state update (called 9x)
-    0x01B27: "combat_check_hit",     # Check for hit/collision
-    0x01C58: "combat_apply_damage",  # Apply damage to actor
-    0x01D07: "combat_ai",            # Enemy AI decision making
+    0x01AC2: "init_combat_level",     # Initialize new combat encounter/level
+    0x01B27: "init_combat_state",    # Initialize all combat state variables for encounter
+    0x01C58: "spawn_enemy",          # Spawn/position enemy for new encounter
+    0x01D07: "read_player_input",    # Read keyboard/joystick input, translate to combat move
     0x01D8A: "get_pending_key",      # Read pending keystroke, drain repeats in joystick mode
     0x01DD5: "key_to_move",          # Translate key code to combat move index (1-11)
     0x01F4E: "combat_resolve_move",  # Validate move against current pose, remap to animation ID

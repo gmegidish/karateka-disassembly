@@ -1051,7 +1051,7 @@ loc_033CB:
 	inc	ax			; 033DE
 	push	ax			; 033DF  arg: level 3
 	mov	[0xea],ax		; 033E0  current_level = 3
-	call	combat_update		; 033E3  initialize combat for level 3
+	call	init_combat_level	; 033E3  initialize combat for level 3
 	db	0x8B, 0xE5		; 033E6 mov sp,bp
 ; Set up scene 6 with gate open
 	mov	ax,0x6			; 033E8
@@ -1092,7 +1092,7 @@ loc_03410:
 	inc	ax			; 03436
 	push	ax			; 03437
 	mov	[0xea],ax		; 03438
-	call	combat_update		; 0343B  setup combat for next level
+	call	init_combat_level	; 0343B  setup combat for next level
 	db	0x8B, 0xE5		; 0343E mov sp,bp
 ; Load palette and set up frozen enemy
 	mov	ax,0x5dc		; 03440  palette offset
@@ -1122,7 +1122,7 @@ loc_03410:
 	inc	ax			; 0347C
 	push	ax			; 0347D
 	mov	[0xea],ax		; 0347E
-	call	combat_update		; 03481
+	call	init_combat_level	; 03481
 	db	0x8B, 0xE5		; 03484 mov sp,bp
 	mov	ax,0x5dc		; 03486
 	push	ax			; 03489
@@ -1163,7 +1163,7 @@ loc_034BF:
 	push	bx			; 034DA
 	mov	[0x130],ax		; 034DB  scene_index = 1
 	mov	[0xea],bx		; 034DE  ++current_level
-	call	combat_update		; 034E2
+	call	init_combat_level	; 034E2
 	db	0x8B, 0xE5		; 034E5 mov sp,bp
 ; Initialize level 3 state
 	mov	ax,[0xbcd5]		; 034E7  player_x
@@ -1216,7 +1216,7 @@ loc_03536:
 	inc	ax			; 03546
 	push	ax			; 03547
 	mov	[0xea],ax		; 03548
-	call	combat_update		; 0354B
+	call	init_combat_level	; 0354B
 	db	0x8B, 0xE5		; 0354E mov sp,bp
 
 ; Load animation script for final boss intro
@@ -1295,7 +1295,7 @@ loc_035EA:
 	cmp	word [si+0x132],0x0	; 03609  damage pending for this scene?
 	jng	short loc_03626		; 0360E jng 0x3626
 	push	word [0xea]		; 03610  apply damage for current level
-	call	combat_apply_damage	; 03614
+	call	spawn_enemy		; 03614
 	db	0x8B, 0xE5		; 03617 mov sp,bp
 	mov	ax,[0x130]		; 03619
 	shl	ax,1			; 0361C
@@ -1548,7 +1548,7 @@ loc_037EE:
 	call	load_palette		; 0381A
 	db	0x8B, 0xE5		; 0381D mov sp,bp
 	push	word [0xea]		; 0381F
-	call	combat_apply_damage	; 03823
+	call	spawn_enemy		; 03823
 	db	0x8B, 0xE5		; 03826 mov sp,bp
 ; Reset enemy to frozen state
 	mov	word [0x118],0x20	; 03828  enemy_frozen = 32
@@ -1597,7 +1597,7 @@ loc_03851:
 loc_0389C:
 ; Apply combat damage and reset state
 	push	word [0xea]		; 0389C
-	call	combat_apply_damage	; 038A0
+	call	spawn_enemy		; 038A0
 	db	0x8B, 0xE5		; 038A3 mov sp,bp
 	mov	word [0xd676],0x0	; 038A5  eagle_active = 0
 	cmp	word [0xea],0x2		; 038AB  level 2?
@@ -1627,7 +1627,7 @@ loc_038D7:
 	db	0x3D, 0x1E, 0x00	; 038DE cmp ax,0x1e  distance > 30?
 	jng	short loc_038EC		; 038E1 jng 0x38ec
 	push	word [0xea]		; 038E3
-	call	combat_apply_damage	; 038E7
+	call	spawn_enemy		; 038E7
 	db	0x8B, 0xE5		; 038EA mov sp,bp
 
 loc_038EC:
