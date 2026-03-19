@@ -17,14 +17,14 @@
 ; Real entry at CS:IP = 0000:0002. Sets DS to data segment (0x6CA),
 ; SS:SP to 0x155C:0x0080 (initial stack), then enables interrupts.
 
-add [bx+si],al  ; 00000
-cli  ; 00002
-mov ax,0x6ca  ; 00003
-mov ds,ax  ; 00006
-mov ax,0x155c  ; 00008
-mov ss,ax  ; 0000B
-mov sp,0x80  ; 0000D
-sti  ; 00010
+	add	[bx+si],al		; 00000
+	cli				; 00002
+	mov	ax,0x6ca		; 00003
+	mov	ds,ax			; 00006
+	mov	ax,0x155c		; 00008
+	mov	ss,ax			; 0000B
+	mov	sp,0x80			; 0000D
+	sti				; 00010
 
 ; ---- DOS version detection & environment setup (0x0011-0x0050) ----
 ; INT 21h/30h returns DOS version (AL=major, AH=minor).
@@ -34,35 +34,35 @@ sti  ; 00010
 ; (environment strings are null-terminated, block ends with double null),
 ; then skip 2-byte count word to find the program name string.
 
-mov ah,0x30  ; 00011
-int 0x21  ; 00013
-db 0x0A, 0xC0  ; 00015 or al,al
-jnz short loc_0001C  ; 00017 jnz 0x1c
-mov ax,0x1  ; 00019
+	mov	ah,0x30			; 00011
+	int	0x21			; 00013
+	db	0x0A, 0xC0		; 00015 or al,al
+	jnz	short loc_0001C		; 00017 jnz 0x1c
+	mov	ax,0x1			; 00019
 loc_0001C:
-mov [0xf],ax  ; 0001C
-mov word [0x5b],es  ; 0001F
-cmp byte [0xf],0x2  ; 00023
-jl short loc_00051  ; 00028 jl 0x51
-mov ax,[es:0x2c]  ; 0002A
-mov [0x6d],ax  ; 0002E
-db 0x0B, 0xC0  ; 00031 or ax,ax
-jz short loc_00051  ; 00033 jz 0x51
-push es  ; 00035
-cld  ; 00036
-les di,word [0x6b]  ; 00037  ; load environment segment:offset
-db 0x33, 0xC0  ; 0003B xor ax,ax
-mov cx,0x7fff  ; 0003D
+	mov	[0xf],ax		; 0001C
+	mov	word [0x5b],es		; 0001F
+	cmp	byte [0xf],0x2		; 00023
+	jl	short loc_00051		; 00028 jl 0x51
+	mov	ax,[es:0x2c]		; 0002A
+	mov	[0x6d],ax		; 0002E
+	db	0x0B, 0xC0		; 00031 or ax,ax
+	jz	short loc_00051		; 00033 jz 0x51
+	push	es			; 00035
+	cld				; 00036
+	les	di,word [0x6b]		; 00037  ; load environment segment:offset
+	db	0x33, 0xC0		; 0003B xor ax,ax
+	mov	cx,0x7fff		; 0003D
 loc_00040:
-repne scasb  ; 00040  ; scan for null byte
-jnz short loc_00050  ; 00042 jnz 0x50
-scasb  ; 00044  ; check next byte (double null = end of env)
-jnz short loc_00040  ; 00045 jnz 0x40  ; not double null, keep scanning
-inc di  ; 00047  ; skip 2-byte string count
-db 0x81, 0xE7, 0xFE, 0xFF  ; 00048 and di,0xfffe  ; word-align
-mov [0x6f],di  ; 0004C  ; save program name offset
+	repne	scasb			; 00040  ; scan for null byte
+	jnz	short loc_00050		; 00042 jnz 0x50
+	scasb				; 00044  ; check next byte (double null = end of env)
+	jnz	short loc_00040		; 00045 jnz 0x40  ; not double null, keep scanning
+	inc	di			; 00047  ; skip 2-byte string count
+	db	0x81, 0xE7, 0xFE, 0xFF	; 00048 and di,0xfffe  ; word-align
+	mov	[0x6f],di		; 0004C  ; save program name offset
 loc_00050:
-pop es  ; 00050
+	pop	es			; 00050
 
 ; ---- Command line parsing loop (0x0051-0x007F) ----
 ; PSP:0x80 = command tail length, PSP:0x81+ = command tail text.
@@ -74,33 +74,33 @@ pop es  ; 00050
 ;   other char -> end of parsing, jump to memory setup
 
 loc_00051:
-mov si,0x80  ; 00051  ; SI = offset of command tail length in PSP
-mov cl,[es:si]  ; 00054  ; CL = command tail length
-db 0x32, 0xED  ; 00057 xor ch,ch
-jcxz short loc_0007F  ; 00059 jcxz 0x7f  ; empty command line, skip
+	mov	si,0x80			; 00051  ; SI = offset of command tail length in PSP
+	mov	cl,[es:si]		; 00054  ; CL = command tail length
+	db	0x32, 0xED		; 00057 xor ch,ch
+	jcxz	short loc_0007F		; 00059 jcxz 0x7f  ; empty command line, skip
 loc_0005B:
-inc si  ; 0005B
-mov al,[es:si]  ; 0005C  ; get next command line character
-cmp byte [0xf],0x2  ; 0005F
-jnl short loc_0006E  ; 00064 jnl 0x6e  ; DOS 2+ skips '<' '>' handling
-cmp al,0x3c  ; 00066  ; '<' - stdin redirect
-jz short loc_00082  ; 00068 jz 0x82
-cmp al,0x3e  ; 0006A  ; '>' - stdout redirect
-jz short loc_00088  ; 0006C jz 0x88
+	inc	si			; 0005B
+	mov	al,[es:si]		; 0005C  ; get next command line character
+	cmp	byte [0xf],0x2		; 0005F
+	jnl	short loc_0006E		; 00064 jnl 0x6e  ; DOS 2+ skips '<' '>' handling
+	cmp	al,0x3c			; 00066  ; '<' - stdin redirect
+	jz	short loc_00082		; 00068 jz 0x82
+	cmp	al,0x3e			; 0006A  ; '>' - stdout redirect
+	jz	short loc_00088		; 0006C jz 0x88
 loc_0006E:
-cmp al,0x3d  ; 0006E  ; '=' - stack size parameter
-jz short loc_000B3  ; 00070 jz 0xb3
-cmp al,0x20  ; 00072  ; space
-jz short loc_0007A  ; 00074 jz 0x7a
-cmp al,0x9  ; 00076  ; tab
-jnz short loc_0007F  ; 00078 jnz 0x7f  ; non-whitespace = done parsing
+	cmp	al,0x3d			; 0006E  ; '=' - stack size parameter
+	jz	short loc_000B3		; 00070 jz 0xb3
+	cmp	al,0x20			; 00072  ; space
+	jz	short loc_0007A		; 00074 jz 0x7a
+	cmp	al,0x9			; 00076  ; tab
+	jnz	short loc_0007F		; 00078 jnz 0x7f  ; non-whitespace = done parsing
 loc_0007A:
-dec cx  ; 0007A
-jg short loc_0005B  ; 0007B jg 0x5b  ; more chars to parse
-db 0x33, 0xC9  ; 0007D xor cx,cx
+	dec	cx			; 0007A
+	jg	short loc_0005B		; 0007B jg 0x5b  ; more chars to parse
+	db	0x33, 0xC9		; 0007D xor cx,cx
 loc_0007F:
-jmp short loc_000F6  ; 0007F jmp 0xf6  ; jump to memory calculation
-nop  ; 00081
+	jmp	short loc_000F6		; 0007F jmp 0xf6  ; jump to memory calculation
+	nop				; 00081
 
 ; ---- I/O redirection handler (0x0082-0x00AC) ----
 ; '<' sets DI to stdin_redir buffer (0x19), '>' sets DI to stdout_redir (0x39).
@@ -108,38 +108,38 @@ nop  ; 00081
 ; Max 32 chars (AH counts); if exceeded, jumps to "Invalid I/O redirection" error.
 
 loc_00082:
-mov di,0x19  ; 00082  ; DI = stdin redirect filename buffer
-jmp short loc_0008B  ; 00085 jmp 0x8b
-nop  ; 00087
+	mov	di,0x19			; 00082  ; DI = stdin redirect filename buffer
+	jmp	short loc_0008B		; 00085 jmp 0x8b
+	nop				; 00087
 loc_00088:
-mov di,0x39  ; 00088  ; DI = stdout redirect filename buffer
+	mov	di,0x39			; 00088  ; DI = stdout redirect filename buffer
 loc_0008B:
-db 0x32, 0xE4  ; 0008B xor ah,ah  ; AH = character counter
+	db	0x32, 0xE4		; 0008B xor ah,ah  ; AH = character counter
 loc_0008D:
-dec cx  ; 0008D
-jz short loc_000A8  ; 0008E jz 0xa8  ; end of command line
-inc si  ; 00090
-mov al,[es:si]  ; 00091
-cmp al,0x20  ; 00094  ; space = end of filename
-jz short loc_000A8  ; 00096 jz 0xa8
-cmp al,0x9  ; 00098  ; tab = end of filename
-jz short loc_000A8  ; 0009A jz 0xa8
-mov [di],al  ; 0009C  ; store filename character
-inc di  ; 0009E
-inc ah  ; 0009F
-cmp ah,0x20  ; 000A1  ; max 32 characters
-jz short loc_000AD  ; 000A4 jz 0xad  ; too long -> error
-jmp short loc_0008D  ; 000A6 jmp 0x8d
+	dec	cx			; 0008D
+	jz	short loc_000A8		; 0008E jz 0xa8  ; end of command line
+	inc	si			; 00090
+	mov	al,[es:si]		; 00091
+	cmp	al,0x20			; 00094  ; space = end of filename
+	jz	short loc_000A8		; 00096 jz 0xa8
+	cmp	al,0x9			; 00098  ; tab = end of filename
+	jz	short loc_000A8		; 0009A jz 0xa8
+	mov	[di],al			; 0009C  ; store filename character
+	inc	di			; 0009E
+	inc	ah			; 0009F
+	cmp	ah,0x20			; 000A1  ; max 32 characters
+	jz	short loc_000AD		; 000A4 jz 0xad  ; too long -> error
+	jmp	short loc_0008D		; 000A6 jmp 0x8d
 loc_000A8:
-mov byte [di],0x0  ; 000A8  ; null-terminate filename
-jmp short loc_0007A  ; 000AB jmp 0x7a  ; continue parsing
+	mov	byte [di],0x0		; 000A8  ; null-terminate filename
+	jmp	short loc_0007A		; 000AB jmp 0x7a  ; continue parsing
 
 ; ---- Error: redirect filename too long (0x00AD-0x00B2) ----
 ; DX points to "Invalid I/O redirection\r\n$" string in data segment.
 
 loc_000AD:
-mov dx,0x97  ; 000AD  ; "Invalid I/O redirection"
-jmp 0x407  ; 000B0  ; jump to error_exit (0x0207 code offset)
+	mov	dx,0x97			; 000AD  ; "Invalid I/O redirection"
+	jmp	0x407			; 000B0  ; jump to error_exit (0x0207 code offset)
 
 ; ---- Parse '=' stack size parameter (0x00B3-0x00EE) ----
 ; Converts decimal ASCII digits to binary in BX using multiply-by-10:
@@ -148,44 +148,44 @@ jmp 0x407  ; 000B0  ; jump to error_exit (0x0207 code offset)
 ; If result is 0 or non-digit found -> "Invalid stack size" error.
 
 loc_000B3:
-db 0x33, 0xDB  ; 000B3 xor bx,bx  ; accumulator = 0
+	db	0x33, 0xDB		; 000B3 xor bx,bx  ; accumulator = 0
 loc_000B5:
-dec cx  ; 000B5
-jz short loc_000E6  ; 000B6 jz 0xe6  ; end of input -> done
-inc si  ; 000B8
-mov al,[es:si]  ; 000B9
-cmp al,0x20  ; 000BC  ; space = end of number
-jz short loc_000E6  ; 000BE jz 0xe6
-cmp al,0x9  ; 000C0  ; tab = end of number
-jz short loc_000E6  ; 000C2 jz 0xe6
-sub al,0x30  ; 000C4  ; convert ASCII '0'-'9' to 0-9
-jl short loc_000F0  ; 000C6 jl 0xf0  ; below '0' -> error
-cmp al,0x9  ; 000C8
-jg short loc_000F0  ; 000CA jg 0xf0  ; above '9' -> error
-db 0x03, 0xDB  ; 000CC add bx,bx  ; bx *= 2
-jc short loc_000F0  ; 000CE jc 0xf0  ; overflow -> error
-db 0x8B, 0xD3  ; 000D0 mov dx,bx  ; save bx*2
-db 0x03, 0xDB  ; 000D2 add bx,bx  ; bx *= 4
-jc short loc_000F0  ; 000D4 jc 0xf0
-db 0x03, 0xDB  ; 000D6 add bx,bx  ; bx *= 8
-jc short loc_000F0  ; 000D8 jc 0xf0
-db 0x03, 0xDA  ; 000DA add bx,dx  ; bx = bx*8 + bx*2 = bx*10
-jc short loc_000F0  ; 000DC jc 0xf0
-db 0x32, 0xE4  ; 000DE xor ah,ah  ; clear high byte of digit
-db 0x03, 0xD8  ; 000E0 add bx,ax  ; bx = bx*10 + digit
-jc short loc_000F0  ; 000E2 jc 0xf0
-jmp short loc_000B5  ; 000E4 jmp 0xb5  ; next digit
+	dec	cx			; 000B5
+	jz	short loc_000E6		; 000B6 jz 0xe6  ; end of input -> done
+	inc	si			; 000B8
+	mov	al,[es:si]		; 000B9
+	cmp	al,0x20			; 000BC  ; space = end of number
+	jz	short loc_000E6		; 000BE jz 0xe6
+	cmp	al,0x9			; 000C0  ; tab = end of number
+	jz	short loc_000E6		; 000C2 jz 0xe6
+	sub	al,0x30			; 000C4  ; convert ASCII '0'-'9' to 0-9
+	jl	short loc_000F0		; 000C6 jl 0xf0  ; below '0' -> error
+	cmp	al,0x9			; 000C8
+	jg	short loc_000F0		; 000CA jg 0xf0  ; above '9' -> error
+	db	0x03, 0xDB		; 000CC add bx,bx  ; bx *= 2
+	jc	short loc_000F0		; 000CE jc 0xf0  ; overflow -> error
+	db	0x8B, 0xD3		; 000D0 mov dx,bx  ; save bx*2
+	db	0x03, 0xDB		; 000D2 add bx,bx  ; bx *= 4
+	jc	short loc_000F0		; 000D4 jc 0xf0
+	db	0x03, 0xDB		; 000D6 add bx,bx  ; bx *= 8
+	jc	short loc_000F0		; 000D8 jc 0xf0
+	db	0x03, 0xDA		; 000DA add bx,dx  ; bx = bx*8 + bx*2 = bx*10
+	jc	short loc_000F0		; 000DC jc 0xf0
+	db	0x32, 0xE4		; 000DE xor ah,ah  ; clear high byte of digit
+	db	0x03, 0xD8		; 000E0 add bx,ax  ; bx = bx*10 + digit
+	jc	short loc_000F0		; 000E2 jc 0xf0
+	jmp	short loc_000B5		; 000E4 jmp 0xb5  ; next digit
 loc_000E6:
-db 0x0B, 0xDB  ; 000E6 or bx,bx
-jz short loc_000F0  ; 000E8 jz 0xf0  ; zero is invalid
-mov [0xe0],bx  ; 000EA  ; store requested stack size
-jmp short loc_0007A  ; 000EE jmp 0x7a  ; continue command line parsing
+	db	0x0B, 0xDB		; 000E6 or bx,bx
+	jz	short loc_000F0		; 000E8 jz 0xf0  ; zero is invalid
+	mov	[0xe0],bx		; 000EA  ; store requested stack size
+	jmp	short loc_0007A		; 000EE jmp 0x7a  ; continue command line parsing
 
 ; ---- Error: invalid stack size (0x00F0-0x00F5) ----
 
 loc_000F0:
-mov dx,0x82  ; 000F0  ; "Invalid stack size"
-jmp 0x407  ; 000F3  ; jump to error_exit
+	mov	dx,0x82			; 000F0  ; "Invalid stack size"
+	jmp	0x407			; 000F3  ; jump to error_exit
 
 ; ---- Memory calculation (0x00F6-0x013E) ----
 ; Ensures stack size >= 512 bytes (0x200). Calculates total memory needed
@@ -194,38 +194,38 @@ jmp 0x407  ; 000F3  ; jump to error_exit
 ; Available bytes = (top_segment - SS) * 16, capped at 0xFFF0 if > 64KB.
 
 loc_000F6:
-mov ax,[0x6f]  ; 000F6  ; program name size
-mov bx,[0xe0]  ; 000F9  ; requested stack size
-shr bx,1  ; 000FD  ; round down to even
-db 0x03, 0xDB  ; 000FF add bx,bx  ; (effectively bx & 0xFFFE)
-cmp bx,0x200  ; 00101  ; minimum 512 bytes
-ja short loc_0010E  ; 00105 ja 0x10e
-mov bx,0x200  ; 00107  ; enforce minimum
-mov [0xe0],bx  ; 0010A
+	mov	ax,[0x6f]		; 000F6  ; program name size
+	mov	bx,[0xe0]		; 000F9  ; requested stack size
+	shr	bx,1			; 000FD  ; round down to even
+	db	0x03, 0xDB		; 000FF add bx,bx  ; (effectively bx & 0xFFFE)
+	cmp	bx,0x200		; 00101  ; minimum 512 bytes
+	ja	short loc_0010E		; 00105 ja 0x10e
+	mov	bx,0x200		; 00107  ; enforce minimum
+	mov	[0xe0],bx		; 0010A
 loc_0010E:
-db 0x03, 0xD8  ; 0010E add bx,ax  ; total = stack + program name
-jc short loc_00139  ; 00110 jc 0x139  ; overflow -> insufficient memory
-mov dx,[es:0x2]  ; 00112  ; PSP:0x02 = top of memory segment
-mov ax,ss  ; 00117
-db 0x2B, 0xD0  ; 00119 sub dx,ax  ; dx = segments available
-test dx,0xf000  ; 0011B  ; more than 64KB available?
-jnz short loc_0012C  ; 0011F jnz 0x12c  ; yes -> cap at 0xFFF0
-shl dx,1  ; 00121  ; convert segments to bytes (*16)
-shl dx,1  ; 00123
-shl dx,1  ; 00125
-shl dx,1  ; 00127
-jmp short loc_0012F  ; 00129 jmp 0x12f
-nop  ; 0012B
+	db	0x03, 0xD8		; 0010E add bx,ax  ; total = stack + program name
+	jc	short loc_00139		; 00110 jc 0x139  ; overflow -> insufficient memory
+	mov	dx,[es:0x2]		; 00112  ; PSP:0x02 = top of memory segment
+	mov	ax,ss			; 00117
+	db	0x2B, 0xD0		; 00119 sub dx,ax  ; dx = segments available
+	test	dx,0xf000		; 0011B  ; more than 64KB available?
+	jnz	short loc_0012C		; 0011F jnz 0x12c  ; yes -> cap at 0xFFF0
+	shl	dx,1			; 00121  ; convert segments to bytes (*16)
+	shl	dx,1			; 00123
+	shl	dx,1			; 00125
+	shl	dx,1			; 00127
+	jmp	short loc_0012F		; 00129 jmp 0x12f
+	nop				; 0012B
 loc_0012C:
-mov dx,0xfff0  ; 0012C  ; cap at 64KB - 16
+	mov	dx,0xfff0		; 0012C  ; cap at 64KB - 16
 loc_0012F:
-db 0x3B, 0xD3  ; 0012F cmp dx,bx  ; enough memory?
-jc short loc_00139  ; 00131 jc 0x139  ; no -> error
-add bx,[0x17]  ; 00133  ; add stack overflow check margin
-jnc short loc_0013F  ; 00137 jnc 0x13f  ; ok -> proceed to stack setup
+	db	0x3B, 0xD3		; 0012F cmp dx,bx  ; enough memory?
+	jc	short loc_00139		; 00131 jc 0x139  ; no -> error
+	add	bx,[0x17]		; 00133  ; add stack overflow check margin
+	jnc	short loc_0013F		; 00137 jnc 0x13f  ; ok -> proceed to stack setup
 loc_00139:
-mov dx,0xb1  ; 00139  ; "Insufficient memory"
-jmp 0x407  ; 0013C  ; jump to error_exit
+	mov	dx,0xb1			; 00139  ; "Insufficient memory"
+	jmp	0x407			; 0013C  ; jump to error_exit
 
 ; ---- Stack and heap setup (0x013F-0x0184) ----
 ; CLI, set final SP and SS (DS=SS for Lattice C small model).
@@ -234,34 +234,34 @@ jmp 0x407  ; 0013C  ; jump to error_exit
 ; STI when done.
 
 loc_0013F:
-cli  ; 0013F
-mov [0x15],bx  ; 00140  ; save stack top
-db 0x8B, 0xE3  ; 00144 mov sp,bx  ; set stack pointer
-mov ax,ds  ; 00146
-mov ss,ax  ; 00148  ; SS = DS (Lattice C small model)
-mov word [0x11],ss  ; 0014A  ; save SS
-sti  ; 0014E
-push cx  ; 0014F  ; save remaining command line length
-add bx,0xf  ; 00150
-mov cl,0x4  ; 00153
-shr bx,cl  ; 00155  ; bx = stack paragraphs (ceil)
-mov ax,ss  ; 00157
-db 0x03, 0xC3  ; 00159 add ax,bx
-mov [0x5f],ax  ; 0015B  ; heap start segment
-mov [0x63],ax  ; 0015E  ; heap current segment
-mov bx,[es:0x2]  ; 00161  ; top of memory
-db 0x2B, 0xD8  ; 00166 sub bx,ax  ; remaining segments
-jna short loc_00139  ; 00168 jna 0x139  ; no memory left -> error
-mov cl,0x4  ; 0016A
-rol bx,cl  ; 0016C  ; convert to paragraphs + remainder
-db 0x8B, 0xC3  ; 0016E mov ax,bx
-db 0x25, 0x0F, 0x00  ; 00170 and ax,0xf  ; remainder (fractional paragraph bytes)
-db 0x81, 0xE3, 0xF0, 0xFF  ; 00173 and bx,0xfff0  ; whole paragraphs
-mov [0x65],bx  ; 00177  ; heap size in paragraphs
-mov [0x67],ax  ; 0017B  ; heap remainder
-call reset_heap  ; 0017E
-db 0x0B, 0xC0  ; 00181 or ax,ax  ; check return value
-jnz short loc_00139  ; 00183 jnz 0x139  ; nonzero = error
+	cli				; 0013F
+	mov	[0x15],bx		; 00140  ; save stack top
+	db	0x8B, 0xE3		; 00144 mov sp,bx  ; set stack pointer
+	mov	ax,ds			; 00146
+	mov	ss,ax			; 00148  ; SS = DS (Lattice C small model)
+	mov	word [0x11],ss		; 0014A  ; save SS
+	sti				; 0014E
+	push	cx			; 0014F  ; save remaining command line length
+	add	bx,0xf			; 00150
+	mov	cl,0x4			; 00153
+	shr	bx,cl			; 00155  ; bx = stack paragraphs (ceil)
+	mov	ax,ss			; 00157
+	db	0x03, 0xC3		; 00159 add ax,bx
+	mov	[0x5f],ax		; 0015B  ; heap start segment
+	mov	[0x63],ax		; 0015E  ; heap current segment
+	mov	bx,[es:0x2]		; 00161  ; top of memory
+	db	0x2B, 0xD8		; 00166 sub bx,ax  ; remaining segments
+	jna	short loc_00139		; 00168 jna 0x139  ; no memory left -> error
+	mov	cl,0x4			; 0016A
+	rol	bx,cl			; 0016C  ; convert to paragraphs + remainder
+	db	0x8B, 0xC3		; 0016E mov ax,bx
+	db	0x25, 0x0F, 0x00	; 00170 and ax,0xf  ; remainder (fractional paragraph bytes)
+	db	0x81, 0xE3, 0xF0, 0xFF	; 00173 and bx,0xfff0  ; whole paragraphs
+	mov	[0x65],bx		; 00177  ; heap size in paragraphs
+	mov	[0x67],ax		; 0017B  ; heap remainder
+	call	reset_heap		; 0017E
+	db	0x0B, 0xC0		; 00181 or ax,ax  ; check return value
+	jnz	short loc_00139		; 00183 jnz 0x139  ; nonzero = error
 
 ; ---- Build argv[] and detect FPU (0x0185-0x01F4) ----
 ; Push program name onto stack as argv[0] (word-by-word, back to front).
@@ -270,68 +270,68 @@ jnz short loc_00139  ; 00183 jnz 0x139  ; nonzero = error
 ; If status bits 0xB8BF are clear -> FPU present, set [fpu_present] = 1.
 ; Save final SP to [initial_sp].
 
-pop dx  ; 00185  ; restore command line length (CX from earlier)
-push es  ; 00186
-db 0x33, 0xC0  ; 00187 xor ax,ax
-push ax  ; 00189  ; push 0 (argv terminator / return address)
-db 0x8B, 0xEC  ; 0018A mov bp,sp  ; save frame pointer for DOS 1.x exit
-les di,word [0x6b]  ; 0018C  ; load env pointer
-mov di,[0x6f]  ; 00190  ; program name offset
+	pop	dx			; 00185  ; restore command line length (CX from earlier)
+	push	es			; 00186
+	db	0x33, 0xC0		; 00187 xor ax,ax
+	push	ax			; 00189  ; push 0 (argv terminator / return address)
+	db	0x8B, 0xEC		; 0018A mov bp,sp  ; save frame pointer for DOS 1.x exit
+	les	di,word [0x6b]		; 0018C  ; load env pointer
+	mov	di,[0x6f]		; 00190  ; program name offset
 loc_00194:
-sub di,0x2  ; 00194  ; push program name word-by-word (back to front)
-jl short loc_0019E  ; 00197 jl 0x19e  ; done when DI < 0
-push word [es:di]  ; 00199
-jmp short loc_00194  ; 0019C jmp 0x194
+	sub	di,0x2			; 00194  ; push program name word-by-word (back to front)
+	jl	short loc_0019E		; 00197 jl 0x19e  ; done when DI < 0
+	push	word [es:di]		; 00199
+	jmp	short loc_00194		; 0019C jmp 0x194
 loc_0019E:
-mov es,word [0x5b]  ; 0019E  ; restore ES = PSP segment
-mov [0x6b],sp  ; 001A2  ; env_string_off now points to program name on stack
-mov word [0x6d],ss  ; 001A6  ; env_segment = SS (program name is on stack now)
-db 0x8B, 0xDA  ; 001AA mov bx,dx  ; BX = command tail length
-db 0x8B, 0xCA  ; 001AC mov cx,dx  ; CX = command tail length
-add bx,0x4  ; 001AE  ; add space for prefix + null + alignment
-db 0x81, 0xE3, 0xFE, 0xFF  ; 001B1 and bx,0xfffe  ; word-align
-db 0x2B, 0xE3  ; 001B5 sub sp,bx  ; allocate space on stack
-db 0x8B, 0xFC  ; 001B7 mov di,sp  ; DI = start of allocated buffer
-mov byte [ss:di],0x63  ; 001B9  ; prefix byte 'c' (placeholder for argv[1])
-inc di  ; 001BD
-jcxz short loc_001CF  ; 001BE jcxz 0x1cf  ; empty command tail -> skip copy
-mov byte [ss:di],0x20  ; 001C0  ; space separator
-inc di  ; 001C4
-mov al,[es:si]  ; 001C5  ; copy command tail byte
-mov [ss:di],al  ; 001C8
-inc si  ; 001CB
-inc di  ; 001CC
-loop 0x1c5  ; 001CD  ; loop until all bytes copied
+	mov	es,word [0x5b]		; 0019E  ; restore ES = PSP segment
+	mov	[0x6b],sp		; 001A2  ; env_string_off now points to program name on stack
+	mov	word [0x6d],ss		; 001A6  ; env_segment = SS (program name is on stack now)
+	db	0x8B, 0xDA		; 001AA mov bx,dx  ; BX = command tail length
+	db	0x8B, 0xCA		; 001AC mov cx,dx  ; CX = command tail length
+	add	bx,0x4			; 001AE  ; add space for prefix + null + alignment
+	db	0x81, 0xE3, 0xFE, 0xFF	; 001B1 and bx,0xfffe  ; word-align
+	db	0x2B, 0xE3		; 001B5 sub sp,bx  ; allocate space on stack
+	db	0x8B, 0xFC		; 001B7 mov di,sp  ; DI = start of allocated buffer
+	mov	byte [ss:di],0x63	; 001B9  ; prefix byte 'c' (placeholder for argv[1])
+	inc	di			; 001BD
+	jcxz	short loc_001CF		; 001BE jcxz 0x1cf  ; empty command tail -> skip copy
+	mov	byte [ss:di],0x20	; 001C0  ; space separator
+	inc	di			; 001C4
+	mov	al,[es:si]		; 001C5  ; copy command tail byte
+	mov	[ss:di],al		; 001C8
+	inc	si			; 001CB
+	inc	di			; 001CC
+	loop	0x1c5			; 001CD  ; loop until all bytes copied
 loc_001CF:
-mov byte [ss:di],0x0  ; 001CF  ; null-terminate
-fninit  ; 001D3  ; initialize FPU
-fnstsw [0x7c]  ; 001D5  ; store FPU status word
-mov ax,0x64  ; 001D9  ; 100 decimal
-db 0x8B, 0xD0  ; 001DC mov dx,ax
-imul dx  ; 001DE  ; 100 * 100 = 10000 (exercise the FPU)
-test word [0x7c],0xb8bf  ; 001E0  ; check FPU status bits
-jnz short loc_001EC  ; 001E6 jnz 0x1ec  ; bits set -> no FPU
-inc byte [0x7b]  ; 001E8  ; fpu_present = 1
+	mov	byte [ss:di],0x0	; 001CF  ; null-terminate
+	fninit				; 001D3  ; initialize FPU
+	fnstsw	[0x7c]			; 001D5  ; store FPU status word
+	mov	ax,0x64			; 001D9  ; 100 decimal
+	db	0x8B, 0xD0		; 001DC mov dx,ax
+	imul	dx			; 001DE  ; 100 * 100 = 10000 (exercise the FPU)
+	test	word [0x7c],0xb8bf	; 001E0  ; check FPU status bits
+	jnz	short loc_001EC		; 001E6 jnz 0x1ec  ; bits set -> no FPU
+	inc	byte [0x7b]		; 001E8  ; fpu_present = 1
 loc_001EC:
-mov [0x13],sp  ; 001EC  ; save initial SP
-db 0x8B, 0xC4  ; 001F0 mov ax,sp
+	mov	[0x13],sp		; 001EC  ; save initial SP
+	db	0x8B, 0xC4		; 001F0 mov ax,sp
 
 ; ---- Call main() and exit (0x01F5-0x0206) ----
 ; Push SP as parameter (pointer to argv area), set ES=DS, call main().
 ; On return: DOS 2+ exits via INT 21h/4Ch (exit code 0).
 ; DOS 1.x restores SP from BP (saved frame) and does RETF to PSP:0000.
 
-push ax  ; 001F2  ; push argv pointer as parameter to main()
-push ds  ; 001F3
-pop es  ; 001F4  ; ES = DS
-call main  ; 001F5
-cmp byte [0xf],0x2  ; 001F8  ; DOS version >= 2?
-jl short loc_00204  ; 001FD jl 0x204  ; DOS 1.x -> use RETF
-mov ax,0x4c00  ; 001FF  ; INT 21h/4Ch: exit with code 0
-int 0x21  ; 00202
+	push	ax			; 001F2  ; push argv pointer as parameter to main()
+	push	ds			; 001F3
+	pop	es			; 001F4  ; ES = DS
+	call	main			; 001F5
+	cmp	byte [0xf],0x2		; 001F8  ; DOS version >= 2?
+	jl	short loc_00204		; 001FD jl 0x204  ; DOS 1.x -> use RETF
+	mov	ax,0x4c00		; 001FF  ; INT 21h/4Ch: exit with code 0
+	int	0x21			; 00202
 loc_00204:
-db 0x8B, 0xE5  ; 00204 mov sp,bp  ; DOS 1.x: restore SP from saved frame
-retf  ; 00206  ; return to PSP:0000 (INT 20h)
+	db	0x8B, 0xE5		; 00204 mov sp,bp  ; DOS 1.x: restore SP from saved frame
+	retf				; 00206  ; return to PSP:0000 (INT 20h)
 
 ; ---- error_exit (0x0207-0x021F) ----
 ; Prints a '$'-terminated error message and exits with code 1.
@@ -339,18 +339,18 @@ retf  ; 00206  ; return to PSP:0000 (INT 20h)
 ; Output: does not return (exits to DOS or PSP)
 
 error_exit:
-mov ah,0x9  ; 00207  ; INT 21h/09h: print string
-int 0x21  ; 00209
-mov es,word [0x5b]  ; 0020B  ; restore ES = PSP segment
-cmp byte [0xf],0x2  ; 0020F  ; DOS version >= 2?
-jl short loc_0021B  ; 00214 jl 0x21b  ; DOS 1.x -> RETF exit
-mov ax,0x4c01  ; 00216  ; INT 21h/4Ch: exit with code 1
-int 0x21  ; 00219
+	mov	ah,0x9			; 00207  ; INT 21h/09h: print string
+	int	0x21			; 00209
+	mov	es,word [0x5b]		; 0020B  ; restore ES = PSP segment
+	cmp	byte [0xf],0x2		; 0020F  ; DOS version >= 2?
+	jl	short loc_0021B		; 00214 jl 0x21b  ; DOS 1.x -> RETF exit
+	mov	ax,0x4c01		; 00216  ; INT 21h/4Ch: exit with code 1
+	int	0x21			; 00219
 loc_0021B:
-push es  ; 0021B  ; DOS 1.x exit:
-db 0x33, 0xC0  ; 0021C xor ax,ax  ; push PSP:0000
-push ax  ; 0021E
-retf  ; 0021F  ; far return to PSP:0000 (triggers INT 20h)
+	push	es			; 0021B  ; DOS 1.x exit:
+	db	0x33, 0xC0		; 0021C xor ax,ax  ; push PSP:0000
+	push	ax			; 0021E
+	retf				; 0021F  ; far return to PSP:0000 (triggers INT 20h)
 
 ; ---- stack_overflow_handler (0x0220-0x023B) ----
 ; Target of "jmp 0x420" (file offset) in function prologues.
@@ -361,18 +361,18 @@ retf  ; 0021F  ; far return to PSP:0000 (triggers INT 20h)
 ; Output: does not return (exits to DOS or PSP)
 
 stack_overflow_handler:
-mov ax,[0x15]  ; 00220  ; stack_top
-db 0x2D, 0x04, 0x00  ; 00223 sub ax,0x4  ; leave room for far return address
-db 0x8B, 0xE0  ; 00226 mov sp,ax  ; reset stack pointer
-mov dx,0xc7  ; 00228  ; "*** STACK OVERFLOW ***"
-mov ah,0x9  ; 0022B  ; INT 21h/09h: print string
-int 0x21  ; 0022D
-cmp byte [0xf],0x2  ; 0022F  ; DOS version >= 2?
-jl short loc_0023B  ; 00234 jl 0x23b
-mov ax,0x4c01  ; 00236  ; INT 21h/4Ch: exit with code 1
-int 0x21  ; 00239
+	mov	ax,[0x15]		; 00220  ; stack_top
+	db	0x2D, 0x04, 0x00	; 00223 sub ax,0x4  ; leave room for far return address
+	db	0x8B, 0xE0		; 00226 mov sp,ax  ; reset stack pointer
+	mov	dx,0xc7			; 00228  ; "*** STACK OVERFLOW ***"
+	mov	ah,0x9			; 0022B  ; INT 21h/09h: print string
+	int	0x21			; 0022D
+	cmp	byte [0xf],0x2		; 0022F  ; DOS version >= 2?
+	jl	short loc_0023B		; 00234 jl 0x23b
+	mov	ax,0x4c01		; 00236  ; INT 21h/4Ch: exit with code 1
+	int	0x21			; 00239
 loc_0023B:
-retf  ; 0023B  ; DOS 1.x: far return to PSP:0000
+	retf				; 0023B  ; DOS 1.x: far return to PSP:0000
 
 ; ---- crt_exit (0x023C-0x0254) ----
 ; C-callable function to terminate the program.
@@ -381,14 +381,14 @@ retf  ; 0023B  ; DOS 1.x: far return to PSP:0000
 ; Output: does not return (exits to DOS or PSP)
 
 crt_exit:
-cmp byte [0xf],0x2  ; 0023C  ; DOS version >= 2?
-jl short loc_0024C  ; 00241 jl 0x24c  ; DOS 1.x -> RETF exit
-db 0x8B, 0xEC  ; 00243 mov bp,sp
-mov ax,[bp+0x2]  ; 00245  ; get exit code from stack
-mov ah,0x4c  ; 00248  ; INT 21h/4Ch: terminate with return code
-int 0x21  ; 0024A
+	cmp	byte [0xf],0x2		; 0023C  ; DOS version >= 2?
+	jl	short loc_0024C		; 00241 jl 0x24c  ; DOS 1.x -> RETF exit
+	db	0x8B, 0xEC		; 00243 mov bp,sp
+	mov	ax,[bp+0x2]		; 00245  ; get exit code from stack
+	mov	ah,0x4c			; 00248  ; INT 21h/4Ch: terminate with return code
+	int	0x21			; 0024A
 loc_0024C:
-mov ax,[0x15]  ; 0024C  ; stack_top
-db 0x2D, 0x04, 0x00  ; 0024F sub ax,0x4
-db 0x8B, 0xE0  ; 00252 mov sp,ax  ; reset SP for far return
-retf  ; 00254  ; DOS 1.x: return to PSP:0000
+	mov	ax,[0x15]		; 0024C  ; stack_top
+	db	0x2D, 0x04, 0x00	; 0024F sub ax,0x4
+	db	0x8B, 0xE0		; 00252 mov sp,ax  ; reset SP for far return
+	retf				; 00254  ; DOS 1.x: return to PSP:0000
