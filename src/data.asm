@@ -6,8 +6,24 @@
 
 ; Lattice C runtime variables (low memory, within code segment)
 dos_version     equ 0x0f        ; byte - DOS major version (from INT 21h/30h)
+saved_ss        equ 0x11        ; word - saved SS register value
+initial_sp      equ 0x13        ; word - initial SP after setup
+stack_top       equ 0x15        ; word - top of stack (for overflow handler)
 stack_limit     equ 0x17        ; word - stack overflow check threshold
+stdin_redir     equ 0x19        ; 32 bytes - stdin redirect filename buffer
 stdout_redir    equ 0x39        ; byte - first char of stdout redirect path
+psp_segment     equ 0x5b        ; word - PSP segment (saved from ES at entry)
+heap_start_seg  equ 0x5f        ; word - heap start segment
+heap_current_seg equ 0x63       ; word - heap current allocation segment
+heap_size       equ 0x65        ; word - heap size in paragraphs
+heap_remainder  equ 0x67        ; word - heap remaining bytes (fractional paragraph)
+env_string_off  equ 0x6b        ; word - environment string pointer (offset)
+env_segment     equ 0x6d        ; word - environment segment
+program_name_off equ 0x6f       ; word - program name pointer offset in environment
+fpu_present     equ 0x7b        ; byte - 1 if FPU (8087) detected, 0 otherwise
+fpu_status      equ 0x7c        ; word - FPU status word from FNSTSW
+dos_error_code  equ 0x80        ; word - DOS error code (used by DOS wrappers)
+requested_stack_size equ 0xe0   ; word - stack size from command line =N parameter
 
 ; C runtime globals
 argc            equ 0xe43e      ; word - parsed argument count (max 32)
@@ -27,6 +43,70 @@ stdio_mode      equ 0xe5ca      ; word - mode flags
 file_stdin      equ 0xe5ce      ; FILE struct for fd 0 (stdin)
 file_stdout     equ 0xe5f8      ; FILE struct for fd 1 (stdout)
 file_stderr     equ 0xe622      ; FILE struct for fd 2 (stderr)
+
+; Game state variables
+input_advance   equ 0xdf44      ; word - input advance/skip flag (cleared on shutdown)
+rand_temp       equ 0x421a      ; word - temporary storage for rand_range calculation
+
+; Camera/viewport
+camera_x         equ 0xe4       ; word - camera scroll X position
+camera_x_min     equ 0x108      ; word - camera X minimum bound
+camera_x_max     equ 0x10a      ; word - camera X maximum bound
+
+; Level/scene state
+current_level    equ 0xea       ; word - current level/area (0-3)
+player_facing    equ 0xec       ; word - player facing direction (bit 0: 0=left, 1=right)
+game_mode        equ 0xf0       ; word - game mode (0=normal, 1=special)
+player_faces_right equ 0xf2     ; word - 1 if player faces right
+enemy_atk_freq   equ 0xf4       ; word - enemy attack frequency threshold (0-255)
+enemy_aggressive equ 0xf6       ; word - 1 if enemy is in aggressive mode
+combat_active    equ 0xf8       ; word - >1 when combat ends/transitions
+combat_phase     equ 0xfa       ; word - 0=normal, 1=approach, 2=retreat
+player_was_hit   equ 0xfc       ; word - 1 if player was just hit
+enemy_was_hit    equ 0xfe       ; word - 1 if enemy was just hit
+enemy_x_min      equ 0x100      ; word - enemy X minimum bound
+player_x_min     equ 0x102      ; word - player X left boundary
+player_x_max     equ 0x104      ; word - player X right boundary
+player_anim_id   equ 0x10c      ; word - player current animation ID
+enemy_x          equ 0x10e      ; word - enemy X position
+enemy_anim_id    equ 0x110      ; word - enemy current animation ID
+enemy_facing     equ 0x112      ; word - enemy facing direction
+enemy_health     equ 0x116      ; word - enemy health points (max 9)
+enemy_frozen     equ 0x118      ; word - 1 if enemy is frozen/disabled
+scene_locked     equ 0x11a      ; word - 1 if scene is locked (cutscene)
+enemy_health_regen equ 0x124    ; word - enemy health recovery amount
+game_state_12e   equ 0x12e      ; word - game state flag
+anim_mode        equ 0x156      ; word - animation processing mode
+player_y_off     equ 0x158      ; word - player Y offset
+combat_counter_a equ 0x16c      ; word - combat counter
+combat_counter_b equ 0x16e      ; word - combat counter
+
+; Player animation state
+player_sprite_cmd equ 0xbb30    ; byte - player sprite update command
+player_anim_ctr  equ 0xbb31     ; word - player animation counter
+player_anim_buf  equ 0xbb33     ; buffer - player animation data
+player_anim_end  equ 0xbb2e     ; word - player animation end pointer
+player_x         equ 0xbcd5     ; word - player X position
+player_anim_div_a equ 0xc3a0    ; word - player animation divisor
+player_anim_div_b equ 0xc3a2    ; word - player animation dividend
+player_frame_ptr equ 0xc3d2     ; word - player animation frame pointer
+player_frame_bak equ 0xc3d4     ; word - player animation frame backup
+
+; Enemy animation state
+enemy_frame_ptr  equ 0xcde8     ; word - enemy animation frame pointer
+enemy_frame_bak  equ 0xcdea     ; word - enemy animation frame backup
+
+; Animation working variables
+anim_write_off   equ 0xd5a4     ; word - animation data write offset
+anim_temp_ptr    equ 0xd5a8     ; word - animation data temp pointer
+enemy_active     equ 0xd5aa     ; word - 0=no enemy, 1=enemy present
+enemy_y_off      equ 0xd5ac     ; word - enemy Y offset
+player_dir_flag  equ 0xd5ae     ; byte - player direction flag
+enemy_dir_flag   equ 0xd5b0     ; byte - enemy direction flag
+anim_data_limit  equ 0xd5b2     ; word - animation data limit
+enemy_defeated   equ 0xd64c     ; word - 1 if enemy defeated
+combat_state_d652 equ 0xd652    ; word - combat state variable
+anim_state_bb2a  equ 0xbb2a     ; word - animation state variable
 
 ; Character type table (used for whitespace detection in argv parsing)
 ; ctype_table   equ 0xe4c4    ; byte[256] - bit 3 = whitespace

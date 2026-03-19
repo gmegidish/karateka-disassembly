@@ -2,16 +2,43 @@
 
 
 ; ---- function scene_update ----
+; Main scene state update — called once per game frame.
+; Processes both player (character 1) and enemy (character 2) animation frames.
+;
+; Algorithm:
+;   1. Reset sprite update flags
+;   2. Align player_x and enemy_x to 4-pixel boundaries
+;   3. Compute animation write offset via math_divide
+;   4. If combat_active > 1, skip to end (combat transition)
+;   5. PLAYER LOOP: Walk the player animation frame table:
+;      - If end marker (0xFF), call anim_process or math_multiply to get next anim ID
+;      - Look up new frame pointer from animation table
+;      - Extract anim ID, direction, facing from frame data
+;      - Apply X velocity (signed byte), clamp to [player_x_min, player_x_max]
+;      - Push-back: if player would overlap enemy, reduce player_x
+;      - Camera follow: camera_x = player_x - 150 (or enemy_x - 170 if locked)
+;      - Clamp camera to [camera_x_min, camera_x_max]
+;      - Write sprite data to animation buffer
+;      - Advance frame pointer by 0x11 (17 bytes per frame entry)
+;   6. ENEMY LOOP: Similar processing for enemy animation frames
+;      - If end marker, call enemy_ai_decide to get next animation
+;      - Apply velocity, clamp to boundaries
+;      - Write sprite data to buffer
+;   7. Finalize: write end marker, compute total buffer size
+;
+; Input: none (reads global state)
+; Output: updates player/enemy positions, animation buffers, camera
+; Clobbers: AX, BX, CX, DX, SI, DI
 scene_update:
-mov byte [0xbb30],0x0  ; 022E1
-mov word [0xbb31],0x0  ; 022E6
+mov byte [0xbb30],0x0  ; 022E1  ; reset player sprite command
+mov word [0xbb31],0x0  ; 022E6  ; reset player animation counter
 mov ax,[0xbcd5]  ; 022EC
 db 0x05, 0x03, 0x00  ; 022EF add ax,0x3
-db 0x25, 0xFC, 0xFF  ; 022F2 and ax,0xfffc
+db 0x25, 0xFC, 0xFF  ; 022F2 and ax,0xfffc  ; align to 4-pixel boundary
 mov [0xbcd5],ax  ; 022F5
 mov ax,[0x10e]  ; 022F8
 db 0x05, 0x03, 0x00  ; 022FB add ax,0x3
-db 0x25, 0xFC, 0xFF  ; 022FE and ax,0xfffc
+db 0x25, 0xFC, 0xFF  ; 022FE and ax,0xfffc  ; align to 4-pixel boundary
 mov [0x10e],ax  ; 02301
 push word [0xc3a2]  ; 02304
 push word [0xc3a0]  ; 02308
@@ -20,13 +47,13 @@ push ax  ; 02310
 call math_divide  ; 02311
 add sp,0x6  ; 02314
 mov [0xd5a4],ax  ; 02317
-cmp word [0xf8],0x1  ; 0231A
+cmp word [0xf8],0x1  ; 0231A  ; if combat_active > 1, skip animation
 jng short loc_02324  ; 0231F jng 0x2324
 jmp 0x2661  ; 02321
 loc_02324:
 mov bx,[0xc3d2]  ; 02324
 loc_02328:
-cmp byte [bx-0x3bd8],0xff  ; 02328
+cmp byte [bx-0x3bd8],0xff  ; 02328  ; check end-of-sequence marker
 jnz short loc_0235C  ; 0232D jnz 0x235c
 cmp word [0x156],0x0  ; 0232F
 jz short loc_0233B  ; 02334 jz 0x233b
@@ -135,7 +162,7 @@ push ax  ; 02450
 call math_modulo  ; 02451
 add sp,0x6  ; 02454
 add word [0xd5a4],0x8  ; 02457
-add word [0xc3d2],0x11  ; 0245C
+add word [0xc3d2],0x11  ; 0245C  ; advance to next frame (17 bytes per entry)
 cmp word [0xfa],0x1  ; 02461
 jng short loc_0246B  ; 02466 jng 0x246b
 jmp 0x27cd  ; 02468
@@ -143,7 +170,7 @@ loc_0246B:
 mov si,[0xcde8]  ; 0246B
 cmp byte [si-0x31c2],0xff  ; 0246F
 jnz short loc_02491  ; 02474 jnz 0x2491
-call math_random  ; 02476
+call enemy_ai_decide  ; 02476
 cmp word [0xfa],0x1  ; 02479
 jng short loc_02483  ; 0247E jng 0x2483
 jmp 0x27cd  ; 02480
@@ -231,7 +258,7 @@ cmp word [0xf2],0x0  ; 02560
 jnz short loc_02571  ; 02565 jnz 0x2571
 cmp word [0xd5aa],0x0  ; 02567
 jnz short loc_02571  ; 0256C jnz 0x2571
-or ax,0x4000  ; 0256E
+or ax,0x4000  ; 0256E  ; set flip bit (mirror sprite horizontally)
 loc_02571:
 mov [di-0x44cc],ax  ; 02571
 mov al,[si-0x31b7]  ; 02575
@@ -260,7 +287,7 @@ mov [di-0x44c8],ax  ; 025B7
 mov al,[si-0x31b2]  ; 025BB
 mov [di-0x44c6],al  ; 025BF
 add word [0xd5a4],0x8  ; 025C3
-add word [0xcde8],0x11  ; 025C8
+add word [0xcde8],0x11  ; 025C8  ; advance enemy frame pointer
 push word [0xc3a4]  ; 025CD
 push word [0xc3a2]  ; 025D1
 mov ax,[0xd5a4]  ; 025D5
@@ -274,13 +301,47 @@ call math_divide  ; 025EA
 add sp,0x6  ; 025ED
 add [0xd5a4],ax  ; 025F0
 mov si,[0xd5a4]  ; 025F4
-mov byte [si-0x44cd],0xff  ; 025F8
+mov byte [si-0x44cd],0xff  ; 025F8  ; write end marker to animation buffer
 add si,0x3  ; 025FD
 mov [0xbb2e],si  ; 02600
 ret  ; 02604
 
-; ---- function math_random ----
-math_random:
+; ---- function enemy_ai_decide ----
+; Enemy AI decision function — selects the next animation/action for the enemy.
+; Despite its old name "math_random", this is the core enemy AI.
+;
+; Returns an animation table index in AX. Key return values:
+;   0x00 = idle/stand          0x01 = advance/walk
+;   0x02 = close advance       0x05 = retreat step
+;   0x07 = attack (far)        0x08 = kick
+;   0x09 = strong attack       0x0B = charge
+;   0x0C = kick (far)          0x0D = counter-attack
+;   0x0E = flee/run away       0x0F = block
+;   0x13 = special attack      0x1B = recoil from hit
+;   0x1E = approach walk       0x1F = walk (slow)
+;   0x20 = stand               0x21 = transition stand
+;
+; Decision tree:
+;   1. If enemy anim is 0x46 (death): return 0x0E (flee) if scene locked, 0 if frozen
+;   2. Compute distance = enemy_x - player_x -> [bp+6]
+;   3. If anim 0x1C: set combat counters
+;   4. If game_mode == 1: special logic (return 0 if anim 2, advance/retreat based on distance)
+;   5. If combat_phase == 1 (approach): return 0x1E
+;   6. If enemy_active (enemy present):
+;      a. If enemy anim 0x22: enemy defeated — set retreat, calculate health regen
+;      b. If enemy_was_hit: clear flag, return 0x20 (stand)
+;      c. Walking logic (anim 0x1F/0x21)
+;      d. Level 3 boss: special teleport/retreat at distance > 300
+;      e. Distance > 240: teleport enemy to 1920, set approach
+;      f. Combat active: return special attacks (0x13, 0x09)
+;      g. Enemy was hit in combat: knockback + recoil
+;      h. Aggressive mode: attack decision via probability tables
+;   7. Not aggressive: distance-based logic, set aggressive when close
+;
+; Input: none (reads global state)
+; Output: AX = animation table index
+; Local: [bp+6] = distance between enemy and player
+enemy_ai_decide:
 push bp  ; 02605
 sub sp,0xc  ; 02606
 jc short loc_02611  ; 02609 jc 0x2611
@@ -290,7 +351,7 @@ loc_02611:
 jmp 0x420  ; 02611
 loc_02614:
 db 0x8B, 0xEC  ; 02614 mov bp,sp
-cmp word [0x110],0x46  ; 02616
+cmp word [0x110],0x46  ; 02616  ; enemy anim 0x46 = death animation
 jnz short loc_0263A  ; 0261B jnz 0x263a
 cmp word [0x11a],0x0  ; 0261D
 jng short loc_0262C  ; 02622 jng 0x262c
@@ -358,12 +419,12 @@ cmp word [0xd5aa],0x1  ; 026AA
 jz short loc_026B4  ; 026AF jz 0x26b4
 jmp 0x29b3  ; 026B1
 loc_026B4:
-cmp word [0x110],0x22  ; 026B4
+cmp word [0x110],0x22  ; 026B4  ; enemy anim 0x22 = defeated/fallen
 jnz short loc_02701  ; 026B9 jnz 0x2701
 db 0x33, 0xC0  ; 026BB xor ax,ax
-mov word [0xfa],0x2  ; 026BD
+mov word [0xfa],0x2  ; 026BD  ; set combat_phase = retreat
 mov bx,0xffff  ; 026C3
-mov word [0xd64c],0x1  ; 026C6
+mov word [0xd64c],0x1  ; 026C6  ; set enemy_defeated flag
 cmp word [0x116],0x9  ; 026CC
 mov [0xd5aa],ax  ; 026D1
 mov [0xd652],bx  ; 026D4
@@ -414,7 +475,7 @@ add sp,0xc  ; 0273D
 pop bp  ; 02740
 ret  ; 02741
 loc_02742:
-cmp word [0xea],0x3  ; 02742
+cmp word [0xea],0x3  ; 02742  ; level 3 (final boss)
 jnz short loc_02789  ; 02747 jnz 0x2789
 cmp word [0x10e],0x12c  ; 02749
 jng short loc_02781  ; 0274F jng 0x2781
@@ -429,7 +490,7 @@ ret  ; 02767
 loc_02768:
 mov ax,0x2  ; 02768
 push ax  ; 0276B
-call calc_screen_offset  ; 0276C
+call rand_range  ; 0276C
 db 0x8B, 0xE5  ; 0276F mov sp,bp
 mov bx,0xc  ; 02771
 imul bx  ; 02774
@@ -453,7 +514,7 @@ add sp,0xc  ; 02798
 pop bp  ; 0279B
 ret  ; 0279C
 loc_0279D:
-mov word [0x10e],0x780  ; 0279D
+mov word [0x10e],0x780  ; 0279D  ; teleport enemy to X=1920 (offscreen right)
 db 0x33, 0xC0  ; 027A3 xor ax,ax
 mov word [0xfa],0x1  ; 027A5
 mov [0xd5aa],ax  ; 027AB
@@ -538,7 +599,7 @@ ret  ; 0285A
 loc_0285B:
 mov ax,0xff  ; 0285B
 push ax  ; 0285E
-call calc_screen_offset  ; 0285F
+call rand_range  ; 0285F
 db 0x8B, 0xE5  ; 02862 mov sp,bp
 cmp word [bp+0x6],0x1c  ; 02864
 mov [bp+0xa],ax  ; 02868
@@ -640,6 +701,20 @@ pop bp  ; 0293F
 ret  ; 02940
 
 ; ---- function combat_pick_far_attack ----
+; Selects an attack animation when enemy is far from player.
+; Uses random probability check against enemy_atk_freq.
+;
+; Input: [bp+0xa] = distance between enemy and player
+; Output: AX = animation index (0=idle, 7=attack, 0xC=kick, 0xE=flee)
+;
+; Logic:
+;   - Distance > 300: return 0x0E (flee)
+;   - Distance > 75: threshold = enemy_atk_freq
+;   - Distance <= 75: threshold = enemy_atk_freq * 3/4
+;   - Random(255) > threshold -> return 0 (no attack)
+;   - Level 0 boundary checks: don't attack near edges
+;   - If enemy anim is 7 or 0xA and distance > 28: return 0x0C (kick)
+;   - Default: return 0x07 (standard attack)
 combat_pick_far_attack:
 push bp  ; 02941
 sub sp,0x6  ; 02942
@@ -673,7 +748,7 @@ mov [bp+0x4],ax  ; 0297D
 loc_02980:
 mov ax,0xff  ; 02980
 push ax  ; 02983
-call calc_screen_offset  ; 02984
+call rand_range  ; 02984
 db 0x8B, 0xE5  ; 02987 mov sp,bp
 cmp ax,[bp+0x4]  ; 02989
 jng short loc_02995  ; 0298C jng 0x2995
@@ -723,6 +798,9 @@ pop bp  ; 029E7
 ret  ; 029E8
 
 ; ---- function anim_frame_update ----
+; Returns a small random frame offset for animation variation.
+; Input: none
+; Output: AX = rand_range(2) + 2, i.e. random value in {2, 3, 4}
 anim_frame_update:
 push bp  ; 029E9
 sub sp,0x2  ; 029EA
@@ -735,7 +813,7 @@ loc_029F8:
 db 0x8B, 0xEC  ; 029F8 mov bp,sp
 mov ax,0x2  ; 029FA
 push ax  ; 029FD
-call calc_screen_offset  ; 029FE
+call rand_range  ; 029FE
 db 0x8B, 0xE5  ; 02A01 mov sp,bp
 inc ax  ; 02A03
 inc ax  ; 02A04
@@ -748,6 +826,11 @@ pop bp  ; 02A0D
 ret  ; 02A0E
 
 ; ---- function anim_interpolate ----
+; Returns a random interpolation offset for smooth animation transitions.
+; Input: none
+; Output: AX = rand_range(1 or 2) + 4
+;   If player_faces_right: range [4, 5] (smoother)
+;   Else: range [4, 5, 6]
 anim_interpolate:
 push bp  ; 02A0F
 sub sp,0x2  ; 02A10
@@ -762,7 +845,7 @@ cmp word [0xf2],0x1  ; 02A20
 jnz short loc_02A38  ; 02A25 jnz 0x2a38
 mov ax,0x1  ; 02A27
 push ax  ; 02A2A
-call calc_screen_offset  ; 02A2B
+call rand_range  ; 02A2B
 db 0x8B, 0xE5  ; 02A2E mov sp,bp
 db 0x05, 0x04, 0x00  ; 02A30 add ax,0x4
 add sp,0x2  ; 02A33
@@ -771,7 +854,7 @@ ret  ; 02A37
 loc_02A38:
 mov ax,0x2  ; 02A38
 push ax  ; 02A3B
-call calc_screen_offset  ; 02A3C
+call rand_range  ; 02A3C
 db 0x8B, 0xE5  ; 02A3F mov sp,bp
 db 0x05, 0x04, 0x00  ; 02A41 add ax,0x4
 add sp,0x2  ; 02A44
@@ -779,6 +862,26 @@ pop bp  ; 02A47
 ret  ; 02A48
 
 ; ---- function anim_process ----
+; Player-side animation state machine — decides what player anim to use.
+; Mirror of enemy_ai_decide but for the player character.
+;
+; Input: none (reads global state)
+; Output: AX = animation table index for player
+; Local: [bp+4] = distance (enemy_x - player_x)
+;        [bp+8] = random value
+;
+; Logic:
+;   - combat_active: return 0x1E (approach walk)
+;   - If player anim 0x08 (kick): play sound, return 0x0F (block)
+;   - If combat_phase == 1 and anim < 0x3F and enemy anim 0x43: random counter
+;   - combat_phase == 1: return 0x0F
+;   - player_was_hit: knockback 4px, recoil if mid-attack
+;   - Distance > 44: call anim_command
+;   - Distance <= 44: probability table lookup (3 tiers per level)
+;     - Tier 1: idle
+;     - Tier 2: interpolate (mid-attack -> +0x14 offset)
+;     - Tier 3: anim_frame_update
+;     - Tier 4: combat_pick_far_attack (fallback)
 anim_process:
 push bp  ; 02A49
 sub sp,0xa  ; 02A4A
@@ -818,7 +921,7 @@ cmp word [0x110],0x43  ; 02A99
 jnz short loc_02AB1  ; 02A9E jnz 0x2ab1
 mov ax,0x1  ; 02AA0
 push ax  ; 02AA3
-call calc_screen_offset  ; 02AA4
+call rand_range  ; 02AA4
 db 0x8B, 0xE5  ; 02AA7 mov sp,bp
 db 0x05, 0x11, 0x00  ; 02AA9 add ax,0x11
 add sp,0xa  ; 02AAC
@@ -867,7 +970,7 @@ ret  ; 02B07
 loc_02B08:
 mov ax,0xff  ; 02B08
 push ax  ; 02B0B
-call calc_screen_offset  ; 02B0C
+call rand_range  ; 02B0C
 db 0x8B, 0xE5  ; 02B0F mov sp,bp
 cmp word [bp+0x4],0x1c  ; 02B11
 mov [bp+0x8],ax  ; 02B15
@@ -929,6 +1032,15 @@ pop bp  ; 02B92
 ret  ; 02B93
 
 ; ---- function anim_command ----
+; Final attack/advance decision for player when close to enemy.
+;
+; Input: [bp+6] = distance between player and enemy
+; Output: AX = animation index
+;
+; Logic:
+;   - Random(255) > 50 and distance < 75: return 0 (hesitate)
+;   - If player anim is 8 (kick) or 0xB (charge): return 0x0D (counter)
+;   - Default: return 0x08 (kick)
 anim_command:
 push bp  ; 02B94
 sub sp,0x2  ; 02B95
@@ -941,7 +1053,7 @@ loc_02BA3:
 db 0x8B, 0xEC  ; 02BA3 mov bp,sp
 mov ax,0xff  ; 02BA5
 push ax  ; 02BA8
-call calc_screen_offset  ; 02BA9
+call rand_range  ; 02BA9
 db 0x8B, 0xE5  ; 02BAC mov sp,bp
 db 0x3D, 0x32, 0x00  ; 02BAE cmp ax,0x32
 jng short loc_02BC0  ; 02BB1 jng 0x2bc0

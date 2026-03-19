@@ -85,7 +85,7 @@ jnz short loc_02130  ; 02117 jnz 0x2130
 mov word [0x16c],0x0  ; 02119
 mov ax,0x1  ; 0211F
 push ax  ; 02122
-call calc_screen_offset  ; 02123
+call rand_range  ; 02123
 db 0x8B, 0xE5  ; 02126 mov sp,bp
 db 0x05, 0x11, 0x00  ; 02128 add ax,0x11
 add sp,0x4  ; 0212B

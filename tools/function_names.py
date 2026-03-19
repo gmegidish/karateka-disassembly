@@ -133,7 +133,7 @@ FUNCTION_NAMES = {
     0x003C7: "game_main_loop",       # Main game loop (24 callees!)
     0x00569: "game_scene",           # Scene management
     0x005AD: "load_scene",           # Load a new scene
-    0x00629: "calc_screen_offset",   # Calculate screen memory offset
+    0x00629: "rand_range",            # Random integer in [0, max_value]
     0x00640: "init_actor",           # Initialize actor/character data
     0x0083C: "process_animation",    # Process animation sequence
     0x0094C: "run_cutscene",         # Cutscene/scripted sequence (entry point, not called)
@@ -213,5 +213,5 @@ FUNCTION_NAMES = {
     0x0205E: "math_multiply",        # Multiplication helper
     0x022A4: "math_divide",          # Division helper
     0x022BC: "math_modulo",          # Modulo helper
-    0x02605: "math_random",          # Random number generator
+    0x02605: "enemy_ai_decide",      # Enemy AI decision function
 }

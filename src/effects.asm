@@ -128,7 +128,7 @@ ret  ; 03B18
 ; Initializes a rightward screen scroll transition.
 ; No explicit parameters. Uses [0xce28] for position calculation.
 ;
-; Sets [0xd5aa]=1, [0x110]=0x1F, calls calc_screen_offset(2) to
+; Sets [0xd5aa]=1, [0x110]=0x1F, calls rand_range(2) to
 ; compute scroll base address, then clears [0xfa] and [0xd650].
 effect_scroll_right:
 push bp  ; 03B19
@@ -146,7 +146,7 @@ mov ax,[0xce28]  ; 03B36
 mov bx,0x2  ; 03B39
 push bx  ; 03B3C
 mov [0xcde8],ax  ; 03B3D
-call calc_screen_offset  ; 03B40
+call rand_range  ; 03B40
 db 0x8B, 0xE5  ; 03B43 mov sp,bp
 mov bx,0xc  ; 03B45
 imul bx  ; 03B48
