@@ -30,19 +30,19 @@ Requires: `nasm`, `ndisasm` (both installed via homebrew).
 | 0x0000-0x0254 | ~600B | C runtime startup, error handlers |
 | 0x0255-0x05E4 | ~900B | Game init, main loop, scene mgmt |
 | 0x05E5-0x063F | ~90B | Video mode, cursor |
-| 0x0640-0x0B4D | ~1.2KB | Actor/character management |
-| 0x0B4E-0x1276 | ~1.8KB | Graphics rendering (screen, sprites, backgrounds) |
-| 0x1277-0x166C | ~1KB | Resource loading (figures, palettes) |
-| 0x166D-0x1733 | ~200B | CGA palette, Ctrl+Q, disk sector read |
-| 0x1734-0x19A1 | ~620B | Screen setup, timer/delay |
-| 0x19A2-0x1AC1 | ~290B | Sound system |
-| 0x1AC2-0x205D | ~1.4KB | Combat system (update, hit, damage, AI) |
-| 0x205E-0x22E0 | ~640B | Math helpers (multiply, divide, modulo) |
-| 0x22E1-0x2BDC | ~2.3KB | Scene update, animation processing |
+| 0x0640-0x0B4D | ~1.2KB | Sprite rendering (draw_sprite, mirrored, right-edge clipping) |
+| 0x0B4E-0x1276 | ~1.8KB | Graphics rendering (screen buffer, backgrounds, animation display) |
+| 0x1277-0x166C | ~1KB | Animation script loading and bytecode compilation |
+| 0x166D-0x1733 | ~200B | File open retry, Ctrl+Q quit, copy protection disk read |
+| 0x1734-0x19A1 | ~620B | Animation script interpreter, timer/delay, music playback |
+| 0x19A2-0x1AC1 | ~290B | Animation data loading (enemy offsets, player data, compaction) |
+| 0x1AC2-0x205D | ~1.4KB | Combat init, state setup, enemy spawn, player input |
+| 0x205E-0x22E0 | ~640B | Player animation select, memcpy, sprite frame copy |
+| 0x22E1-0x2BDC | ~2.3KB | Scene update, enemy AI, animation processing |
 | 0x2BDD-0x3A2C | ~3.6KB | Level setup, cutscenes, transitions |
 | 0x3A2D-0x4148 | ~1.8KB | Screen effects, vsync, double buffer, UI |
-| 0x4149-0x4618 | ~1.2KB | Keyboard/joystick input |
-| 0x4619-0x4FDC | ~2.5KB | System (controls, interrupts, collision) |
+| 0x4149-0x4618 | ~1.2KB | Keyboard/joystick input, video init, hit zone check |
+| 0x4619-0x4FDC | ~2.5KB | Controls, interrupt handlers, file I/O (fopen/fclose/fread IOB), heap |
 | 0x4FDD-0x5952 | ~2.4KB | File loading, resource management |
 | 0x5953-0x5C11 | ~700B | C main() |
 | 0x5C12-0x6C9C | ~4.2KB | C runtime (DOS wrappers, memory, strings) |
@@ -83,14 +83,24 @@ Requires: `nasm`, `ndisasm` (both installed via homebrew).
 - Return values in AX
 - DOS error code stored at `[0x80]` by all DOS wrapper functions
 
-### Key Functions (120+ named)
+### Key Functions (172 named)
 See `tools/function_names.py` for the complete mapping. Highlights:
-- **game_init** (0x0255): Main initialization — checks graphics card, sets up screen buffers, installs interrupt handlers, initializes controls
-- **game_main_loop** (0x03C7): Main game loop — 24 callees covering input, combat, animation, display
-- **poll_keyboard** (0x4149): Keyboard input — handles Ctrl+Q (quit), Ctrl+R, Ctrl+S (speed), special keys
-- **combat_update** (0x1AC2): Combat state machine — hit detection, damage, enemy AI
-- **wait_vsync** (0x3BAE): Vertical sync wait — called 21 times, critical for frame timing
-- **load_file** (0x4FDD): High-level file loader — reads from game disk
+- **game_init** (0x0255): Master initialization — checks graphics card, installs handlers, loads game disk, enters main loop
+- **game_main_loop** (0x03C7): Plays intro sequence, then enters gameplay loop (24 callees)
+- **poll_keyboard** (0x4149): Keyboard input — handles Ctrl+Q (quit), Ctrl+R (restart), Ctrl+S (sound mode cycle), arrow key mapping
+- **init_combat_level** (0x1AC2): Initializes a combat encounter — loads animation data, scripts, sets up state
+- **init_combat_state** (0x1B27): Sets player/enemy positions, camera bounds, health for a new encounter
+- **read_player_input** (0x1D07): Reads keyboard/joystick, translates to combat move via key_to_move → combat_resolve_move
+- **scene_update** (0x22E1): Per-frame update — processes player and enemy animation frames, camera follow, sprite buffers
+- **enemy_ai_decide** (0x2605): Enemy AI decision function — returns animation index based on distance, health, combat phase
+- **player_anim_select** (0x205E): Player animation state machine — selects next animation based on combat state
+- **level_setup** (0x2BDD): Combat encounter management — hit detection, health regen, enemy spawn/despawn
+- **cutscene_play** (0x31AA): Level transition state machine — gate openings, boss introductions, endgame
+- **wait_vsync** (0x3BAE): Sound/sync dispatcher — 21 callers, handles music playback and frame timing
+- **draw_sprite** (0x0640): Renders sprite to offscreen buffer with sub-pixel alignment and CGA bit rotation
+- **load_anim_script** (0x1277): Loads animation script file, compiles text commands to bytecode
+- **run_anim_script** (0x1734): Bytecode interpreter for animation scripts (14 opcodes)
+- **fopen_iob** (0x483C): Lattice C fopen — scans IOB array for free slot, opens file
 - All DOS wrappers: dos_open_file, dos_read_file, dos_close_file, dos_write_file, dos_seek_file, dos_delete_file, dos_ioctl, dos_rename_file
 
 ### Video
@@ -100,15 +110,17 @@ See `tools/function_names.py` for the complete mapping. Highlights:
 - Screen effects: wipe, fade, scroll left/right, dissolve
 
 ### Sound
-- PC speaker via direct port I/O
-- Music via timer interrupt callback (set_music_callback)
-- Sound effects through play_sound, managed by init_sound/stop_sound
+- PC speaker via direct port I/O (toggle_speaker, play_speaker_data)
+- Music playback embedded in wait_vsync — 15 music data pointers, two-channel tone generator with vibrato
+- Music sequences triggered via play_music_sequence (saves/restores scene state, plays animation+music, returns)
 
 ### Input
 - INT 21h/06h for non-blocking keyboard check (check_ctrl_q)
 - INT 21h/07h for blocking keyboard read (wait_for_key)
-- Joystick support via check_joystick (0x44D3)
-- Ctrl+Q = quit, Ctrl+S = cycle speed, Ctrl+R = unknown
+- Joystick support via check_joystick (0x44D3) — maps directions+buttons to key codes
+- Ctrl+Q = quit, Ctrl+S = cycle sound mode (0/1/2), Ctrl+R = restart game
+- Debug keys: Ctrl+X/Y/E/B toggle axis swaps and button swaps, Ctrl+N clears all
+- Arrow keys mapped to '4'/'6', joystick combos to combat key codes ('w','x','s','q','z','a')
 
 ### File I/O
 - Game resources loaded from disk: .bcg (backgrounds), animation data (bal, cal, gal, pal, val files)
@@ -148,7 +160,7 @@ These produce different byte sequences than the original Lattice C compiler:
 - `src/karateka.asm` — Master file with %include directives
 - `src/*.asm` — 21 module files split by purpose
 - `tools/convert.py` — Converter script (regenerates all src/ from binary + ndisasm)
-- `tools/function_names.py` — 120+ function name mappings
+- `tools/function_names.py` — 172 function name mappings
 - `tools/file_modules.py` — Module split definitions
 - `reference/karateka.dis` — ndisasm reference output (40,336 lines)
 - `disk/KARATEKA.EXE` — Original binary (never modified)
@@ -159,11 +171,20 @@ PYTHONPATH=tools python3 tools/convert.py && make
 ```
 This regenerates all `src/*.asm` files from the binary and verifies the build.
 
+## What's Been Done
+- **172 functions named and documented** with input/output parameters, algorithm descriptions
+- **176 EQU variable definitions** in data.asm covering CRT runtime, game state, combat, animation, joystick, file I/O, heap
+- **Animation script system fully documented** — 14 opcodes, bytecode compiler (parse_anim_command), interpreter (run_anim_script)
+- **Combat system decoded** — player input chain (read_player_input → key_to_move → combat_resolve_move), enemy AI (enemy_ai_decide), hit detection (check_hit_zone), health regen timers
+- **Sprite renderer documented** — three-function pipeline (draw_sprite, draw_sprite_mirrored, draw_sprite_rightedge) with CGA sub-pixel bit rotation
+- **Lattice C runtime identified** — fopen_iob, fclose_iob, fread_iob, fgets_iob, heap_alloc, crt_malloc/free, 25 CRT functions documented
+- **All code reformatted** with consistent tab indentation
+- **Copy protection identified** — read_disk_sector uses INT 13h to read specific tracks and verify CRC error patterns
+
 ## What's Left To Do
-1. Name the remaining ~46 unnamed functions (sub_XXXXX)
-2. Identify game variables at memory addresses (e.g., [0xdf46] = joystick_enabled?)
-3. Identify data structures (animation sequences, sprite tables, level layouts)
-4. Understand the animation command system (set_tune, set_bg, set_fig, etc.)
-5. Map out the game's state machine (scenes, combat states, cutscene sequences)
-6. Decode the graphics data format (.bcg files, sprite encoding)
-7. Understand the copy protection / disk sector read mechanism (INT 13h calls)
+1. Name the remaining ~20 unnamed code blocks (unlabeled sections within larger functions)
+2. Document the remaining graphics.asm and effects.asm functions in detail
+3. Decode the graphics data format (.bcg files, sprite encoding, RLE compression)
+4. Map the animation data tables (0x6FD7-0xAE57, 0xAEBB-0x12918) — frame data, sequence definitions
+5. Document the level layout tables — per-level position/boundary data at [si+0x2E6], [si+0x2DC], etc.
+6. Understand the game's scene/encounter progression fully (scene_index values 1-7 per level)
