@@ -87,11 +87,6 @@ rand_temp       equ 0x421a      ; word - temporary storage for rand_range calcul
 
 ; Animation script compiler (used by load_anim_script / parse_anim_command)
 anim_cmd_table  equ 0x1e8       ; word[14] - pointers to animation command name strings
-anim_script_buf equ 0xbc83      ; buffer - animation script text read buffer
-anim_fmt_int    equ 0xbc85      ; string - scanf format "%d"
-anim_fmt_2int   equ 0xbc88      ; string - scanf format "%d %d"
-anim_fmt_str    equ 0xbc91      ; string - scanf format for chg_fig params
-anim_fmt_pos    equ 0xbc9d      ; string - scanf format for set_pos params
 anim_script_size equ 0xbd02     ; word - total bytecode size from last load_anim_script call
 
 ; Camera/viewport

@@ -1084,7 +1084,7 @@ loc_03410:
 ; --- Scene 1: first gate music ---
 	mov	ax,0x7			; 03426  animation data index
 	push	ax			; 03429
-	mov	ax,0xd680		; 0342A  script filename pointer
+	mov	ax,str_cal07a - DS_BASE		; 0342A  script filename pointer
 	push	ax			; 0342D
 	call	play_music_sequence	; 0342E  play gate-opening music
 	db	0x8B, 0xE5		; 03431 mov sp,bp
@@ -1097,7 +1097,7 @@ loc_03410:
 ; Load palette and set up frozen enemy
 	mov	ax,0x5dc		; 03440  palette offset
 	push	ax			; 03443
-	mov	ax,0xd687		; 03444  palette filename
+	mov	ax,str_fuji_bcg2 - DS_BASE	; 03444  palette filename
 	push	ax			; 03447
 	call	load_palette		; 03448
 	db	0x8B, 0xE5		; 0344B mov sp,bp
@@ -1114,7 +1114,7 @@ loc_03410:
 ; --- Scene 2: second gate music ---
 	mov	ax,0x8			; 0346C
 	push	ax			; 0346F
-	mov	ax,0xd690		; 03470  script filename
+	mov	ax,str_cal04 - DS_BASE		; 03470  script filename
 	push	ax			; 03473
 	call	play_music_sequence	; 03474
 	db	0x8B, 0xE5		; 03477 mov sp,bp
@@ -1126,7 +1126,7 @@ loc_03410:
 	db	0x8B, 0xE5		; 03484 mov sp,bp
 	mov	ax,0x5dc		; 03486
 	push	ax			; 03489
-	mov	ax,0xd687		; 0348A
+	mov	ax,str_fuji_bcg2 - DS_BASE	; 0348A
 	push	ax			; 0348D
 	call	load_palette		; 0348E
 	db	0x8B, 0xE5		; 03491 mov sp,bp
@@ -1152,7 +1152,7 @@ loc_034BF:
 ; --- Scene 3 continued: music and level 3 transition ---
 	mov	ax,0xa			; 034BF  animation data index
 	push	ax			; 034C2
-	mov	ax,0xd696		; 034C3  script filename
+	mov	ax,str_cal05 - DS_BASE		; 034C3  script filename
 	push	ax			; 034C6
 	call	play_music_sequence	; 034C7
 	db	0x8B, 0xE5		; 034CA mov sp,bp
@@ -1208,7 +1208,7 @@ loc_03536:
 ; --- Scene 7: Final boss entry music ---
 	mov	ax,0xc			; 03536  animation data index
 	push	ax			; 03539
-	mov	ax,0xd69c		; 0353A  script filename
+	mov	ax,str_cal06 - DS_BASE		; 0353A  script filename
 	push	ax			; 0353D
 	call	play_music_sequence	; 0353E
 	db	0x8B, 0xE5		; 03541 mov sp,bp
@@ -1222,7 +1222,7 @@ loc_03536:
 ; Load animation script for final boss intro
 	mov	ax,0xce3e		; 03550  destination buffer
 	push	ax			; 03553
-	mov	ax,0xd6a2		; 03554  script filename
+	mov	ax,str_allval - DS_BASE		; 03554  script filename
 	push	ax			; 03557
 	call	load_anim_script	; 03558
 	db	0x8B, 0xE5		; 0355B mov sp,bp
@@ -1388,7 +1388,7 @@ loc_036A7:
 ; Load animation scripts for endgame
 	mov	ax,0xbd04		; 036CB  destination buffer
 	push	ax			; 036CE
-	mov	ax,0xd6a9		; 036CF  script filename
+	mov	ax,str_cal03 - DS_BASE		; 036CF  script filename
 	push	ax			; 036D2
 	call	load_anim_script	; 036D3
 	db	0x8B, 0xE5		; 036D6 mov sp,bp
@@ -1398,7 +1398,7 @@ loc_036A7:
 	db	0x8B, 0xE5		; 036DF mov sp,bp
 	mov	ax,0xce3e		; 036E1  second script buffer
 	push	ax			; 036E4
-	mov	ax,0xd6af		; 036E5  second script filename
+	mov	ax,str_prngal - DS_BASE		; 036E5  second script filename
 	push	ax			; 036E8
 	call	load_anim_script	; 036E9
 	db	0x8B, 0xE5		; 036EC mov sp,bp
@@ -1533,7 +1533,7 @@ loc_037EE:
 ; Play special encounter music and set up boss
 	mov	ax,0x9			; 037FC  animation data index
 	push	ax			; 037FF
-	mov	ax,0xd6b6		; 03800  script filename
+	mov	ax,str_cal07 - DS_BASE		; 03800  script filename
 	push	ax			; 03803
 	call	play_music_sequence	; 03804
 	db	0x8B, 0xE5		; 03807 mov sp,bp
@@ -1543,7 +1543,7 @@ loc_037EE:
 	db	0x8B, 0xE5		; 03810 mov sp,bp
 	mov	ax,0x5dc		; 03812  palette offset
 	push	ax			; 03815
-	mov	ax,0xd687		; 03816
+	mov	ax,str_fuji_bcg2 - DS_BASE	; 03816
 	push	ax			; 03819
 	call	load_palette		; 0381A
 	db	0x8B, 0xE5		; 0381D mov sp,bp

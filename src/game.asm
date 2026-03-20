@@ -25,7 +25,7 @@ loc_00264:
 	call	check_graphics_card	; 0026E
 	test	ax,ax			; 00271
 	jnz	short loc_00281		; 00273 jnz 0x281
-	mov	ax,0x41b7		; 00275
+	mov	ax,str_no_graphics - DS_BASE	; 00275
 	push	ax			; 00278
 	call	print_error		; 00279
 	db	0x8B, 0xE5		; 0027C mov sp,bp
@@ -179,7 +179,7 @@ loc_003D6:
 	db	0x33, 0xC0		; 003DB xor ax,ax
 	mov	bx,0xce3e		; 003DD
 	push	bx			; 003E0
-	mov	bx,0x41f4		; 003E1
+	mov	bx,str_allgal - DS_BASE		; 003E1
 	push	bx			; 003E4
 	mov	[0xf6],ax		; 003E5
 	mov	[0x15c],ax		; 003E8
@@ -189,7 +189,7 @@ loc_003D6:
 	call	build_enemy_anim_offsets	; 003F3
 	mov	ax,0x5dc		; 003F6
 	push	ax			; 003F9
-	mov	ax,0x41fb		; 003FA
+	mov	ax,str_fuji_bcg - DS_BASE	; 003FA
 	push	ax			; 003FD
 	call	load_palette		; 003FE
 	db	0x8B, 0xE5		; 00401 mov sp,bp
@@ -210,7 +210,7 @@ loc_003D6:
 loc_0042E:
 	db	0x33, 0xC0		; 0042E xor ax,ax
 	push	ax			; 00430
-	mov	ax,0x4204		; 00431
+	mov	ax,str_title_bcg - DS_BASE	; 00431
 	push	ax			; 00434
 	call	load_palette		; 00435
 	db	0x8B, 0xE5		; 00438 mov sp,bp
@@ -244,7 +244,7 @@ loc_0046E:
 	mov	word [0xea],0x4		; 0047D
 	mov	ax,0xbd04		; 00483
 	push	ax			; 00486
-	mov	ax,0x420e		; 00487
+	mov	ax,str_cal00 - DS_BASE		; 00487
 	push	ax			; 0048A
 	call	load_anim_script	; 0048B
 	db	0x8B, 0xE5		; 0048E mov sp,bp
@@ -261,13 +261,13 @@ loc_004A6:
 	mov	word [0xea],0x0		; 004A6
 	mov	ax,0xbd04		; 004AC
 	push	ax			; 004AF
-	mov	ax,0x4214		; 004B0
+	mov	ax,str_cal01 - DS_BASE		; 004B0
 	push	ax			; 004B3
 	call	load_anim_script	; 004B4
 	db	0x8B, 0xE5		; 004B7 mov sp,bp
 	mov	ax,0x5dc		; 004B9
 	push	ax			; 004BC
-	mov	ax,0x41fb		; 004BD
+	mov	ax,str_fuji_bcg - DS_BASE	; 004BD
 	push	ax			; 004C0
 	call	load_palette		; 004C1
 	db	0x8B, 0xE5		; 004C4 mov sp,bp
@@ -386,7 +386,7 @@ load_scene:
 	call	load_background		; 005B0
 	mov	ax,0x5dc		; 005B3
 	push	ax			; 005B6
-	mov	ax,0x41fb		; 005B7
+	mov	ax,str_fuji_bcg - DS_BASE	; 005B7
 	push	ax			; 005BA
 	call	load_palette		; 005BB
 	db	0x8B, 0xE5		; 005BE mov sp,bp
@@ -398,7 +398,7 @@ load_scene:
 	db	0x33, 0xC0		; 005CB xor ax,ax
 	mov	bx,0xbd04		; 005CD
 	push	bx			; 005D0
-	mov	bx,0x4214		; 005D1
+	mov	bx,str_cal01 - DS_BASE		; 005D1
 	push	bx			; 005D4
 	mov	[0xdf44],ax		; 005D5
 	mov	[0xea],ax		; 005D8

@@ -26,7 +26,7 @@ loc_01286:
 	mov	[bp+0x5e],ax		; 0128A
 	mov	[bp+0x5a],ax		; 0128D
 loc_01290:
-	mov	ax,0xbc83		; 01290 ; anim_script_buf
+	mov	ax,str_fmt_r - DS_BASE		; 01290 ; fopen mode "r"
 	push	ax			; 01293
 	push	word [bp+0x6a]		; 01294 ; filename
 	call	fopen_iob		; 01297 ; open script file, returns IOB pointer
@@ -151,7 +151,7 @@ loc_0135E:
 	inc	word [si]		; 01386
 	db	0x03, 0xD8		; 01388 add bx,ax
 	push	bx			; 0138A
-	mov	ax,0xbc85		; 0138B
+	mov	ax,str_fmt_1int - DS_BASE	; 0138B
 	push	ax			; 0138E
 	push	dx			; 0138F
 	call	scanf_format_parser	; 01390
@@ -175,7 +175,7 @@ loc_0135E:
 	inc	word [si]		; 013BA
 	db	0x03, 0xD8		; 013BC add bx,ax
 	push	bx			; 013BE
-	mov	ax,0xbc85		; 013BF
+	mov	ax,str_fmt_1int - DS_BASE	; 013BF
 	push	ax			; 013C2
 	push	dx			; 013C3
 	call	scanf_format_parser	; 013C4
@@ -203,7 +203,7 @@ loc_0135E:
 	lea	ax,[bp+0xc]		; 013F6
 	push	ax			; 013F9
 	push	bx			; 013FA
-	mov	ax,0xbc88		; 013FB
+	mov	ax,str_fmt_3int - DS_BASE	; 013FB
 	push	ax			; 013FE
 	push	dx			; 013FF
 	call	scanf_format_parser	; 01400
@@ -263,7 +263,7 @@ loc_0135E:
 	push	ax			; 0147F
 	push	bx			; 01480
 	push	cx			; 01481
-	mov	ax,0xbc91		; 01482
+	mov	ax,str_fmt_4int - DS_BASE	; 01482
 	push	ax			; 01485
 	push	dx			; 01486
 	call	scanf_format_parser	; 01487
@@ -321,7 +321,7 @@ loc_0135E:
 	inc	word [si]		; 01502
 	db	0x03, 0xD8		; 01504 add bx,ax
 	push	bx			; 01506
-	mov	ax,0xbc85		; 01507
+	mov	ax,str_fmt_1int - DS_BASE	; 01507
 	push	ax			; 0150A
 	push	dx			; 0150B
 	call	scanf_format_parser	; 0150C
@@ -361,7 +361,7 @@ loc_0135E:
 	inc	word [si]		; 0155A
 	db	0x03, 0xD8		; 0155C add bx,ax
 	push	bx			; 0155E
-	mov	ax,0xbc85		; 0155F
+	mov	ax,str_fmt_1int - DS_BASE	; 0155F
 	push	ax			; 01562
 	push	dx			; 01563
 	call	scanf_format_parser	; 01564
@@ -399,7 +399,7 @@ loc_0135E:
 	db	0x03, 0xD8		; 015AD add bx,ax
 	push	bx			; 015AF
 	push	cx			; 015B0
-	mov	ax,0xbc9d		; 015B1
+	mov	ax,str_fmt_2int - DS_BASE	; 015B1
 	push	ax			; 015B4
 	push	dx			; 015B5
 	call	scanf_format_parser	; 015B6
@@ -418,7 +418,7 @@ loc_0135E:
 	db	0x03, 0xD8		; 015D4 add bx,ax
 	lea	ax,[bp+0xc]		; 015D6
 	push	ax			; 015D9
-	mov	ax,0xbc85		; 015DA
+	mov	ax,str_fmt_1int - DS_BASE	; 015DA
 	push	ax			; 015DD
 	push	bx			; 015DE
 	call	scanf_format_parser	; 015DF
@@ -450,7 +450,7 @@ loc_0135E:
 	inc	word [si]		; 0161C
 	db	0x03, 0xD8		; 0161E add bx,ax
 	push	bx			; 01620
-	mov	ax,0xbc85		; 01621
+	mov	ax,str_fmt_1int - DS_BASE	; 01621
 	push	ax			; 01624
 	push	dx			; 01625
 	call	scanf_format_parser	; 01626

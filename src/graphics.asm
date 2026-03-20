@@ -613,7 +613,7 @@ loc_00FCA:
 	call	clear_screen		; 00FCC
 	mov	ax,0x8000		; 00FCF
 	push	ax			; 00FD2
-	mov	ax,0xbc78		; 00FD3
+	mov	ax,str_castle_bcg - DS_BASE	; 00FD3
 	push	ax			; 00FD6
 	call	open_file_retry		; 00FD7
 	db	0x8B, 0xE5		; 00FDA mov sp,bp
