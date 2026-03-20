@@ -621,8 +621,10 @@ loc_03E5F:
 ;   SI = pointer to null-terminated text string
 ;   DI = destination offset in offscreen buffer
 ;
-; Each glyph is looked up in the font bitmap table at DS:0xB86A
-; (pointer table at DS:[-0x4796], widths at DS:[-0x248C]).
+; Each glyph is looked up via three tables in data.asm:
+;   font_glyph_ptrs    (DS:0xB86A) — word offsets to bitmap data
+;   font_glyph_heights (DS:0xDB56) — rows per glyph
+;   font_glyph_widths  (DS:0xDB74) — columns per glyph
 ; Glyphs are variable-width, rendered column by column with
 ; sub-pixel alignment via shift_glyph_pixels.
 ;
