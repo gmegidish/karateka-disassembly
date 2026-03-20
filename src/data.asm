@@ -264,20 +264,23 @@ db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  ; 06E0E |........|
 
 ; --- animation_commands (0x06E16-0x06E88) ---
-db 'set_tune', 0  ; 06E16 "set_tune"
-db 'set_bg', 0  ; 06E1F "set_bg"
-db 'set_fig', 0  ; 06E26 "set_fig"
-db 'chg_fig', 0  ; 06E2E "chg_fig"
-db 'do_scr', 0  ; 06E36 "do_scr"
-db 'del_fig', 0  ; 06E3D "del_fig"
-db 'set_wipe', 0  ; 06E45 "set_wipe"
-db 'set_nowipe', 0  ; 06E4E "set_nowipe"
-db 'wait', 0  ; 06E59 "wait"
-db 'init_sal', 0  ; 06E5E "init_sal"
-db 'set_pos', 0  ; 06E67 "set_pos"
-db 'inc_x', 0  ; 06E6F "inc_x"
-db 'loop', 0  ; 06E75 "loop"
-db 'end_animation', 0  ; 06E7A "end_animation"
+; Null-terminated command names for the animation script compiler.
+; Referenced via pointer table at DS:0x1E8 (anim_cmd_table, 14 word entries).
+; parse_anim_command compares input text against these to identify opcodes.
+str_set_tune:           db 'set_tune', 0       ; 06E16 opcode 0x00
+str_set_bg:             db 'set_bg', 0         ; 06E1F opcode 0x02
+str_set_fig:            db 'set_fig', 0        ; 06E26 opcode 0x04
+str_chg_fig:            db 'chg_fig', 0        ; 06E2E opcode 0x06
+str_do_scr:             db 'do_scr', 0         ; 06E36 opcode 0x08
+str_del_fig:            db 'del_fig', 0        ; 06E3D opcode 0x0A
+str_set_wipe:           db 'set_wipe', 0       ; 06E45 opcode 0x0C
+str_set_nowipe:         db 'set_nowipe', 0     ; 06E4E opcode 0x0E
+str_wait:               db 'wait', 0           ; 06E59 opcode 0x10
+str_init_sal:           db 'init_sal', 0       ; 06E5E opcode 0x12
+str_set_pos:            db 'set_pos', 0        ; 06E67 opcode 0x14
+str_inc_x:              db 'inc_x', 0          ; 06E6F opcode 0x16
+str_loop:               db 'loop', 0           ; 06E75 opcode 0x18
+str_end_animation:      db 'end_animation', 0  ; 06E7A opcode 0xFF
 
 ; --- animation_tables (0x06E88-0x06FC2) ---
 db 0x76, 0x01, 0x7F, 0x01, 0x86, 0x01, 0x8E, 0x01, 0x96, 0x01, 0x9D, 0x01, 0xA5, 0x01, 0xAE, 0x01  ; 06E88 |v...............|
@@ -307,8 +310,8 @@ db 0x00, 0x00, 0x00, 0x60, 0x00, 0x40, 0x07, 0x40, 0x06, 0x40, 0x01, 0x00, 0x00,
 db 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00  ; 06FBB |. .....|
 
 ; --- index_filenames (0x06FC2-0x06FD7) ---
-db 'qazwsx46 b0.ind', 0  ; 06FC2 "qazwsx46 b0.ind"
-db '.dat', 0  ; 06FD2 ".dat"
+str_index_filename:     db 'qazwsx46 b0.ind', 0  ; 06FC2 (obfuscated name)
+str_dat_ext:            db '.dat', 0              ; 06FD2
 
 ; --- game_data_1 (0x06FD7-0x0AE57) ---
 db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  ; 06FD7 |................|
@@ -1313,13 +1316,13 @@ db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  ; 0AE47 |................|
 
 ; --- game_strings (0x0AE57-0x0AEBB) ---
-db 'Karateka needs a graphics adapter card to operate correctly.', 0  ; 0AE57 "Karateka needs a graphics adapter card to operate correctly."
-db 'allgal', 0  ; 0AE94 "allgal"
-db 'fuji.bcg', 0  ; 0AE9B "fuji.bcg"
-db 'title.bcg', 0  ; 0AEA4 "title.bcg"
-db 'cal00', 0  ; 0AEAE "cal00"
-db 'cal01', 0  ; 0AEB4 "cal01"
-db 0x00  ; 0AEBA |.|
+str_no_graphics:        db 'Karateka needs a graphics adapter card to operate correctly.', 0  ; 0AE57
+str_allgal:             db 'allgal', 0    ; 0AE94
+str_fuji_bcg:           db 'fuji.bcg', 0  ; 0AE9B
+str_title_bcg:          db 'title.bcg', 0 ; 0AEA4
+str_cal00:              db 'cal00', 0     ; 0AEAE
+str_cal01:              db 'cal01', 0     ; 0AEB4
+db 0x00  ; 0AEBA (padding)
 
 ; --- game_data_2 (0x0AEBB-0x12918) ---
 db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  ; 0AEBB |................|
@@ -3288,12 +3291,14 @@ db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  ; 1290B |.............|
 
 ; --- file_strings (0x12918-0x12970) ---
-db 'castle.bcg', 0  ; 12918 "castle.bcg"
-db 0x72, 0x00, 0x25, 0x64, 0x00, 0x25, 0x64, 0x20, 0x25, 0x64, 0x20, 0x25, 0x64, 0x00, 0x25, 0x64  ; 12923 |r.%d.%d %d %d.%d|
-db 0x20, 0x25, 0x64, 0x20, 0x25, 0x64, 0x20, 0x25, 0x64, 0x00, 0x25, 0x64, 0x20, 0x25, 0x64, 0x00  ; 12933 | %d %d %d.%d %d.|
-db 0x00, 0x4B, 0x41, 0x52, 0x41, 0x54, 0x45, 0x4B, 0x41, 0x20, 0x43, 0x4F, 0x50, 0x59, 0x52, 0x49  ; 12943 |.KARATEKA COPYRI|
-db 0x47, 0x48, 0x54, 0x20, 0x31, 0x39, 0x38, 0x36, 0x20, 0x42, 0x52, 0x4F, 0x44, 0x45, 0x52, 0x42  ; 12953 |GHT 1986 BRODERB|
-db 0x55, 0x4E, 0x44, 0x20, 0x53, 0x4F, 0x46, 0x54, 0x57, 0x41, 0x52, 0x45, 0x00  ; 12963 |UND SOFTWARE.|
+str_castle_bcg:         db 'castle.bcg', 0                          ; 12918
+str_fmt_r:              db 'r', 0                                   ; 12923 (fopen mode: read)
+str_fmt_1int:           db '%d', 0                                  ; 12925
+str_fmt_3int:           db '%d %d %d', 0                            ; 12928
+str_fmt_4int:           db '%d %d %d %d', 0                         ; 12931
+str_fmt_2int:           db '%d %d', 0                               ; 1293D
+db 0x00                                                             ; 12943 (padding)
+str_copyright:          db 'KARATEKA COPYRIGHT 1986 BRODERBUND SOFTWARE', 0 ; 12944
 
 ; --- game_data_3 (0x12970-0x14200) ---
 db 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  ; 12970 |................|
@@ -3709,15 +3714,15 @@ db 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x20, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00,
 db 0x00, 0x00, 0x00, 0x00, 0xA0, 0x00, 0xA8, 0x00, 0xAA, 0x00, 0xAA, 0x80, 0xAA, 0x00, 0xA8, 0x00  ; 142F0 |................|
 db 0xA0, 0x00, 0x00, 0x05, 0x00, 0x15, 0x00, 0x55, 0x01, 0x55, 0x00, 0x55, 0x00, 0x15, 0x00, 0x05  ; 14300 |.......U.U.U....|
 db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  ; 14310 |................|
-db 'cal07a', 0  ; 14320 "cal07a"
-db 'fuji.bcg', 0  ; 14327 "fuji.bcg"
-db 'cal04', 0  ; 14330 "cal04"
-db 'cal05', 0  ; 14336 "cal05"
-db 'cal06', 0  ; 1433C "cal06"
-db 'allval', 0  ; 14342 "allval"
-db 'cal03', 0  ; 14349 "cal03"
-db 'prngal', 0  ; 1434F "prngal"
-db 'cal07', 0  ; 14356 "cal07"
+str_cal07a:             db 'cal07a', 0    ; 14320
+str_fuji_bcg2:          db 'fuji.bcg', 0  ; 14327
+str_cal04:              db 'cal04', 0     ; 14330
+str_cal05:              db 'cal05', 0     ; 14336
+str_cal06:              db 'cal06', 0     ; 1433C
+str_allval:             db 'allval', 0    ; 14342
+str_cal03:              db 'cal03', 0     ; 14349
+str_prngal:             db 'prngal', 0    ; 1434F
+str_cal07:              db 'cal07', 0     ; 14356
 db 0x00, 0xE9, 0x3B, 0xFC  ; 1435C |..;.|
 
 ; --- cutscene_script_data (0x14360-0x14855) ---
