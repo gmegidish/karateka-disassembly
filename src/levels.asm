@@ -1099,7 +1099,7 @@ loc_03410:
 	push	ax			; 03443
 	mov	ax,str_fuji_bcg2 - DS_BASE	; 03444  palette filename
 	push	ax			; 03447
-	call	load_palette		; 03448
+	call	load_resource		; 03448
 	db	0x8B, 0xE5		; 0344B mov sp,bp
 	mov	word [0x118],0x20	; 0344D  enemy_frozen = 32 frames
 	mov	word [0x110],0x46	; 03453  enemy_anim_id = death/frozen
@@ -1128,7 +1128,7 @@ loc_03410:
 	push	ax			; 03489
 	mov	ax,str_fuji_bcg2 - DS_BASE	; 0348A
 	push	ax			; 0348D
-	call	load_palette		; 0348E
+	call	load_resource		; 0348E
 	db	0x8B, 0xE5		; 03491 mov sp,bp
 	mov	word [0x10e],0xc8	; 03493  enemy_x = 200
 	mov	word [0xe2],0x1		; 03499  scene_param_e2 = 1 (special encounter)
@@ -1545,7 +1545,7 @@ loc_037EE:
 	push	ax			; 03815
 	mov	ax,str_fuji_bcg2 - DS_BASE	; 03816
 	push	ax			; 03819
-	call	load_palette		; 0381A
+	call	load_resource		; 0381A
 	db	0x8B, 0xE5		; 0381D mov sp,bp
 	push	word [0xea]		; 0381F
 	call	spawn_enemy		; 03823

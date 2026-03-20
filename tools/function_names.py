@@ -109,7 +109,7 @@ FUNCTION_NAMES = {
     0x00EE8: "blit_column_delay",    # Busy-wait delay (1000 cycles) between bit-plane passes in blit
     0x00EEE: "animate_figure",       # Animate a figure (calls draw + delay)
     0x00F27: "animate_step",         # Single animation step
-    0x00F52: "load_palette",         # Load color palette
+    0x00F52: "load_resource",        # Load indexed data block from resource file
     0x00FBB: "load_background",      # Load background image file
     0x01027: "load_animation",       # Load animation data file
     0x0166D: "open_file_retry",      # Open file via open_file_slot, retry on failure

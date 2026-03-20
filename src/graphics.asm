@@ -527,19 +527,21 @@ animate_step:
 	mov	word [0x168],0x0	; 00F4B
 	ret				; 00F51
 
-; ---- function load_palette ----
-; Loads a palette file from disk and sets the CGA palette.
+; ---- function load_resource ----
+; Loads an indexed data block from a resource file.
+; Opens the file, reads a 2-byte size from index table at (0xA6D6 + offset),
+; then reads that many bytes of resource data. Closes the file and returns.
 ;
 ; Parameters (on stack, Lattice C convention):
-;   [bp+0x12] = palette index (passed to open_file_retry)
-;   [bp+0x14] = data offset index into resource table
+;   [bp+0x12] = resource filename pointer (e.g. str_fuji_bcg)
+;   [bp+0x14] = offset index into resource table at DS:0xA6D6
 ;
 ; Local variables:
-;   [bp+0x6] = file handle from open_file_retry
-;   [bp+0x8] = total data size (high byte << 8 + low byte)
+;   [bp+0x6] = file slot from open_file_retry
+;   [bp+0x8] = total data size (high_byte << 8 | low_byte)
 ;
-; Returns: AX = total data size
-load_palette:
+; Returns: AX = total data size loaded
+load_resource:
 	push	bp			; 00F52
 	sub	sp,0xe			; 00F53
 	jc	short loc_00F5E		; 00F56 jc 0xf5e

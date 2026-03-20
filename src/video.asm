@@ -15,7 +15,7 @@ game_shutdown:
 	push	ax			; 005EB
 	mov	ax,str_fuji_bcg - DS_BASE	; 005EC  ; palette data offset
 	push	ax			; 005EF
-	call	load_palette		; 005F0  ; load_palette(data_ptr, length)
+	call	load_resource		; 005F0  ; load_resource(data_ptr, length)
 	db	0x8B, 0xE5		; 005F3 mov sp,bp
 	db	0x33, 0xC0		; 005F5 xor ax,ax
 	push	ax			; 005F7

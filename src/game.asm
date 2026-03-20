@@ -191,7 +191,7 @@ loc_003D6:
 	push	ax			; 003F9
 	mov	ax,str_fuji_bcg - DS_BASE	; 003FA
 	push	ax			; 003FD
-	call	load_palette		; 003FE
+	call	load_resource		; 003FE
 	db	0x8B, 0xE5		; 00401 mov sp,bp
 	mov	word [0xea],0x0		; 00403
 	push	word [0xea]		; 00409
@@ -212,7 +212,7 @@ loc_0042E:
 	push	ax			; 00430
 	mov	ax,str_title_bcg - DS_BASE	; 00431
 	push	ax			; 00434
-	call	load_palette		; 00435
+	call	load_resource		; 00435
 	db	0x8B, 0xE5		; 00438 mov sp,bp
 	call	draw_scene_element	; 0043A
 	test	ax,ax			; 0043D
@@ -269,7 +269,7 @@ loc_004A6:
 	push	ax			; 004BC
 	mov	ax,str_fuji_bcg - DS_BASE	; 004BD
 	push	ax			; 004C0
-	call	load_palette		; 004C1
+	call	load_resource		; 004C1
 	db	0x8B, 0xE5		; 004C4 mov sp,bp
 	db	0x33, 0xC0		; 004C6 xor ax,ax
 	push	ax			; 004C8
@@ -388,7 +388,7 @@ load_scene:
 	push	ax			; 005B6
 	mov	ax,str_fuji_bcg - DS_BASE	; 005B7
 	push	ax			; 005BA
-	call	load_palette		; 005BB
+	call	load_resource		; 005BB
 	db	0x8B, 0xE5		; 005BE mov sp,bp
 	db	0x33, 0xC0		; 005C0 xor ax,ax
 	push	ax			; 005C2
