@@ -1,6 +1,19 @@
 ; Sprite rendering: draws sprites to offscreen buffer at DS:0x337
 ; (CGA 320x200, 80 bytes per scanline)
 ;
+; Sprite data is stored COLUMN-MAJOR: the RLE-compressed data encodes
+; one full column (height bytes) at a time, left to right. The inner
+; draw loop iterates over height (advancing by 0x50 = 80 bytes per
+; scanline), and the outer loop advances to the next column.
+;
+; Each sprite has two parallel data streams (KM mask + KS sprite),
+; decompressed in lockstep by advance_anim_frame. The mask is applied
+; first (AND NOT to clear pixels), then the sprite is ORed in.
+;
+; The sprite header is 3 bytes: [widthBytes, height, type], stored at
+; the start of each figure's data. widthBytes * 4 = pixel width (CGA
+; packs 4 pixels per byte). The header is skipped (+3) before drawing.
+;
 ; Three entry points handle different clipping cases:
 ;   draw_sprite          — normal case + right-edge clipping
 ;   draw_sprite_mirrored — left-edge entry (sprite X < camera)
