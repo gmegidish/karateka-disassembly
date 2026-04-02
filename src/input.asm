@@ -472,9 +472,33 @@ loc_0443F:
 	ret				; 04440
 
 ; ---- function add_figure_to_scene ----
-; Adds a figure entry to the scene animation list buffer at [0xBB2E].
-; Shifts existing entries up by 4 bytes, then writes a new 4-byte entry
-; containing the figure's screen X position and character code.
+; Adds the HEAD figure to the scene figure list during GAMEPLAY.
+; This is NOT used during cutscene animations (ALLPAL scripts).
+;
+; The head is a separate sprite (figure 46 for player, different for enemies)
+; composited on top of the headless body sprites. Body sprites contain only
+; the torso, arms, and legs — the head is always drawn separately.
+;
+; Head position is looked up from two tables embedded in the EXE:
+;   X offset table at DS:0xE15E — word per pose, added to character base X
+;   Y position table at DS:0xE182 — byte per pose, absolute screen Y
+; These tables are indexed by [bp+6] (pose index, doubled for word table).
+;
+; The character codes (0x61-0x64) map to head figure IDs:
+;   0x61/0x62 = player head (figure 46, 8x8 pixels)
+;   0x63/0x64 = enemy head (figure varies by character type)
+;
+; Guards reuse the same body sprites as the player (horizontally mirrored)
+; but have a different head sprite (figure 102, 12x10, with helmet).
+; The villain (Akuma) has his own head (figure 178, 8x9).
+;
+; NOTE: During cutscene playback (ALLPAL/ALLGAL/ALLVAL scripts processed
+; by the bytecode interpreter in timer.asm), this function is NOT called.
+; The mechanism for head placement in cutscenes remains unidentified —
+; the text animation scripts only place the body + figure 47 (a 12x6 foot
+; shadow), and figure 46 (the head) is explicitly placed in only one
+; sequence (pal31). The compiled animation bytecode does not contain
+; additional set_fig commands for the head beyond what the text sources show.
 ;
 ; Input:
 ;   [bp+4] = character type (0=player, 1=enemy)

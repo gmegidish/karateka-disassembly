@@ -17,8 +17,19 @@ clear_screen:
 	ret				; 00B5D
 
 ; ---- function advance_anim_frame ----
-; Reads the next frame data from two animation sequences.
+; Reads the next frame data from two parallel RLE-compressed streams.
+; Sequence 1 (base 0x443c) = KM mask data, Sequence 2 (base 0x893a) = KS sprite data.
 ; No parameters. No stack frame.
+;
+; RLE format: byte 0x7B is the escape marker.
+;   0x7B VALUE COUNT => output VALUE a total of (COUNT+1) times.
+;   The first call returns VALUE directly (from the stream), then COUNT
+;   subsequent calls return VALUE from the cached repeat register.
+;   Any other byte is returned as a literal.
+;
+; Note: both streams (KM mask and KS sprite) are decompressed in lockstep.
+; The mask determines which pixels are opaque (used for compositing with
+; background), while the sprite provides the actual CGA color values.
 ;
 ; Uses globals:
 ;   [0x421e] = read position for sequence 1 (base 0x443c)
@@ -29,8 +40,8 @@ clear_screen:
 ;   [0x422f] = repeat value for seq 2
 ;
 ; Returns:
-;   DL = frame data from sequence 1
-;   AL = frame data from sequence 2
+;   DL = frame data from sequence 1 (mask)
+;   AL = frame data from sequence 2 (sprite)
 advance_anim_frame:
 	cmp	byte [0x422c],0x0	; 00B5E
 	jz	short loc_00B70		; 00B63 jz 0xb70
