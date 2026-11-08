@@ -1,3 +1,6 @@
+<img src="images/karateka-hebrew-crt.gif" alt="Hebrew Karateka intro, DOSBox Staging CRT">
+<img src="images/karateka-demo-crt.gif" alt="Hebrew Karateka autoplay demo, DOSBox Staging CRT">
+
 <img src="images/KS0.png">
 <img src="images/KS1.png">
 <img src="images/KS2.png">
