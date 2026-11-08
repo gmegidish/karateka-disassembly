@@ -670,30 +670,54 @@ check_joystick_check_wxs_button:
 	jnz	short check_joystick_check_qza_button		; 0459A jnz 0x45b6
 	cmp	byte [joy_axis_up],0x1	; 0459C
 	jnz	short check_joystick_wxs_button_check_down		; 045A1 jnz 0x45a7
+%ifdef HEBREW
+	mov	ax,0x71			; cancels the key table swap: the joystick is unchanged
+%else
 	mov	ax,0x77			; 045A3
+%endif
 	ret				; 045A6
 check_joystick_wxs_button_check_down:
 	cmp	byte [joy_axis_down],0x1	; 045A7
 	jnz	short check_joystick_wxs_button_alone		; 045AC jnz 0x45b2
+%ifdef HEBREW
+	mov	ax,0x7a			; cancels the key table swap: the joystick is unchanged
+%else
 	mov	ax,0x78			; 045AE
+%endif
 	ret				; 045B1
 check_joystick_wxs_button_alone:
+%ifdef HEBREW
+	mov	ax,0x61			; cancels the key table swap: the joystick is unchanged
+%else
 	mov	ax,0x73			; 045B2
+%endif
 	ret				; 045B5
 check_joystick_check_qza_button:
 	cmp	byte [joy_btn_bit5],0x1	; 045B6
 	jnz	short check_joystick_check_up_alone		; 045BB jnz 0x45d7
 	cmp	byte [joy_axis_up],0x1	; 045BD
 	jnz	short check_joystick_qza_button_check_down		; 045C2 jnz 0x45c8
+%ifdef HEBREW
+	mov	ax,0x77			; cancels the key table swap: the joystick is unchanged
+%else
 	mov	ax,0x71			; 045C4
+%endif
 	ret				; 045C7
 check_joystick_qza_button_check_down:
 	cmp	byte [joy_axis_down],0x1	; 045C8
 	jnz	short check_joystick_qza_button_alone		; 045CD jnz 0x45d3
+%ifdef HEBREW
+	mov	ax,0x78			; cancels the key table swap: the joystick is unchanged
+%else
 	mov	ax,0x7a			; 045CF
+%endif
 	ret				; 045D2
 check_joystick_qza_button_alone:
+%ifdef HEBREW
+	mov	ax,0x73			; cancels the key table swap: the joystick is unchanged
+%else
 	mov	ax,0x61			; 045D3
+%endif
 	ret				; 045D6
 check_joystick_check_up_alone:
 	cmp	byte [joy_axis_up],0x0	; 045D7

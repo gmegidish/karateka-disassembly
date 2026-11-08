@@ -1210,8 +1210,13 @@ scroll_text_up_copy_row_loop:
 	ret				; 0408F
 ; Wait one tick between scanlines
 scroll_text_up_wait_tick:
+%ifdef HEBREW
+	call	scroll_wait		; a little slower than the original
+	times 3 nop
+%else
 	mov	ax,0x1			; 04090
 	call	delay_ticks		; 04093
+%endif
 	pop	dx			; 04096
 	jmp	short scroll_text_up_scroll_scanline		; 04097 jmp 0x404f
 ; Text line done: count down the remaining lines
@@ -1236,7 +1241,13 @@ scroll_text_up_text_line_done:
 ; Fail: zeroes 11 words starting at [0xc3d2] (player_frame_ptr and the 10 words
 ; after it), damaging the player's animation frame pointers.
 anti_tamper_check:
+%ifdef HEBREW
+; The Hebrew patches change the code region this check sums, so skip the anti-tamper sum.
+	ret
+	times 3 nop
+%else
 	lea	si,[anti_tamper_region_1_start]		; 040A1
+%endif
 ; Region 1 (AL carries in from the caller)
 	mov	bx,0x2c0		; 040A5
 anti_tamper_check_sum_region_1_loop:

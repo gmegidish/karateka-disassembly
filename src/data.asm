@@ -524,7 +524,11 @@ db 0x00, 0x00, 0x00, 0x60, 0x00, 0x40, 0x07, 0x40, 0x06, 0x40, 0x01, 0x00, 0x00,
 db 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00  ; 06FBB |. .....|
 
 ; --- index_filenames (0x06FC2-0x06FD7) ---
+%ifdef HEBREW
+str_index_filename:     db 'wsxqaz46 b0.ind', 0  ; QAZ and WSX swapped to match the mirrored screen
+%else
 str_index_filename:     db 'qazwsx46 b0.ind', 0  ; 06FC2 (obfuscated name)
+%endif
 str_dat_ext:            db '.dat', 0              ; 06FD2
 
 ; --- game_data_1 (0x06FD7-0x0AE57) ---
@@ -4054,7 +4058,13 @@ times 27-($-hebrew_intro_line) db 0
 %else
 db '%high atop a craggy cliff|', 0  ; 14855 "%high atop a craggy cliff|"
 %endif
+%ifdef HEBREW
+hebrew_presents_line:
+db 'hpres.bcg', 0			; at intro_text+26
+times 22-($-hebrew_presents_line) db 0
+%else
 db 'guarded by an army of', 0  ; 14870 "guarded by an army of"
+%endif
 db 'fierce warriors| stands the', 0  ; 14886 "fierce warriors| stands the"
 db 'fortress of the evil', 0  ; 148A2 "fortress of the evil"
 db 'warlord akuma{ deep in the', 0  ; 148B7 "warlord akuma{ deep in the"

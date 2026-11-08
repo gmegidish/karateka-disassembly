@@ -747,6 +747,17 @@ title_step_picture:
 ; Returns: AX from delay_with_input: nonzero if a key ended the wait, else 0.
 title_step_sprite:
 	call	clear_screen		; 00F27
+; The Hebrew publisher credit replaces sprite 0x5B (crowns kept), loaded straight to line 66.
+%ifdef HEBREW
+	mov	ax,(offscreen_buffer + 66*80 - resource_buffer) & 0xFFFF
+	push	ax
+	mov	ax,intro_text+26	; "hpres.bcg", see the intro_text slot in data.asm
+	push	ax
+	call	load_resource
+	pop	cx
+	pop	cx
+	times 5 nop
+%else
 	mov	ax,0x73			; 00F2A
 	push	ax			; 00F2D
 	mov	ax,0x6a			; 00F2E
@@ -755,6 +766,7 @@ title_step_sprite:
 	push	ax			; 00F35
 	call	draw_sprite_unflipped	; 00F36
 	add	sp,0x6			; 00F39
+%endif
 	call	update_display		; 00F3C
 	mov	word [title_ctrl_v_armed],0x1	; 00F3F
 	mov	ax,0x48			; 00F45

@@ -875,6 +875,20 @@ scroll_bitmap_run:
 	pop	cx
 	pop	ax
 	ret
+; Waits between scanlines: 1 tick, 2 on every 4th row (DX = row * 80 on the
+; stack), so the scroll takes about 20% longer. Row * 80 / 16 = row * 5, and
+; row * 5 mod 4 = row mod 4, so bits 4-5 of DX give the row modulo 4.
+scroll_wait:
+	pop	cx
+	pop	dx
+	push	dx
+	push	cx
+	mov	ax,1
+	test	dl,0x30
+	jnz	scroll_wait_go
+	inc	ax
+scroll_wait_go:
+	jmp	near delay_ticks
 	times 57-($-scroll_bitmap_run) nop
 
 %else
