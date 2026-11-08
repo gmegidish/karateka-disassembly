@@ -73,7 +73,7 @@ Requires: `nasm`, `ndisasm` (both installed via homebrew).
 - `main()` at 0x5953 is called from the C runtime startup at 0x01F5
 - `main()` calls `game_init()` which orchestrates everything
 - `game_main_loop()` at 0x03C7 has the most callees (24 functions)
-- `wait_vsync()` at 0x3BAE is the most-called function (21 callers)
+- `play_sound()` at 0x3BAE is the most-called function (21 callers)
 
 ### Lattice C Conventions
 - Function prologue: `push bp` / `mov bp,sp` (the mov uses alternate encoding 0x8B 0xEC)
@@ -96,7 +96,7 @@ See `tools/function_names.py` for the complete mapping. Highlights:
 - **player_anim_select** (0x205E): Player animation state machine — selects next animation based on combat state
 - **level_setup** (0x2BDD): Combat encounter management — hit detection, health regen, enemy spawn/despawn
 - **cutscene_play** (0x31AA): Level transition state machine — gate openings, boss introductions, endgame
-- **wait_vsync** (0x3BAE): Sound/sync dispatcher — 21 callers, handles music playback and frame timing
+- **play_sound** (0x3BAE): Sound dispatcher — 21 callers, plays speaker effects and tunes, blocking until done
 - **draw_sprite** (0x0640): Renders sprite to offscreen buffer with sub-pixel alignment and CGA bit rotation
 - **load_anim_script** (0x1277): Loads animation script file, compiles text commands to bytecode
 - **run_anim_script** (0x1734): Bytecode interpreter for animation scripts (14 opcodes)
@@ -105,13 +105,13 @@ See `tools/function_names.py` for the complete mapping. Highlights:
 
 ### Video
 - Uses CGA mode 4 (320x200, 4 colors)
-- Double-buffered rendering (init_screen_buffers, swap_screen_buffers)
+- Double-buffered rendering (swap_screen_buffers)
 - INT 10h for mode setting and cursor control
 - Screen effects: wipe, fade, scroll left/right, dissolve
 
 ### Sound
 - PC speaker via direct port I/O (toggle_speaker, play_speaker_data)
-- Music playback embedded in wait_vsync — 15 music data pointers, two-channel tone generator with vibrato
+- Music playback embedded in play_sound — 15 music data pointers, two-channel tone generator with vibrato
 - Music sequences triggered via play_music_sequence (saves/restores scene state, plays animation+music, returns)
 
 ### Input

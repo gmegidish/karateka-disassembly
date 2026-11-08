@@ -12,20 +12,21 @@
 ;   [bp+0x64] = IOB pointer from fopen_iob
 ;   [bp+0x52] = bytes read from fread_iob
 ;   [bp+0x02] = 80-byte local buffer for reading text lines
+; The value returned in AX and stored at [bp+0x5E] only counts lines with an unrecognized command, since parse_anim_command increments it solely on a failed match.
 load_anim_script:
 	push	bp			; 01277
 	sub	sp,0x66			; 01278
-	jc	short loc_01283		; 0127B jc 0x1283
-	cmp	sp,[0x17]		; 0127D
-	ja	short loc_01286		; 01281 ja 0x1286
-loc_01283:
-	jmp	0x420			; 01283
-loc_01286:
+	jc	short load_anim_script_stack_overflow		; 0127B jc 0x1283
+	cmp	sp,[stack_limit]		; 0127D
+	ja	short load_anim_script_stack_ok		; 01281 ja 0x1286
+load_anim_script_stack_overflow:
+	jmp	near stack_overflow_handler			; 01283
+load_anim_script_stack_ok:
 	db	0x8B, 0xEC		; 01286 mov bp,sp
 	db	0x33, 0xC0		; 01288 xor ax,ax
 	mov	[bp+0x5e],ax		; 0128A
 	mov	[bp+0x5a],ax		; 0128D
-loc_01290:
+load_anim_script_open_file:
 	mov	ax,str_fmt_r - DS_BASE		; 01290 ; fopen mode "r"
 	push	ax			; 01293
 	push	word [bp+0x6a]		; 01294 ; filename
@@ -33,10 +34,10 @@ loc_01290:
 	db	0x8B, 0xE5		; 0129A mov sp,bp
 	test	ax,ax			; 0129C ; file opened?
 	mov	[bp+0x64],ax		; 0129E ; save IOB pointer
-	jnz	short loc_012A8		; 012A1 jnz 0x12a8
+	jnz	short load_anim_script_read_line_loop		; 012A1 jnz 0x12a8
 	call	check_disk_prompt	; 012A3 ; file not found — prompt for disk and retry
-	jmp	short loc_01290		; 012A6 jmp 0x1290
-loc_012A8:
+	jmp	short load_anim_script_open_file		; 012A6 jmp 0x1290
+load_anim_script_read_line_loop:
 	push	word [bp+0x64]		; 012A8 ; IOB pointer
 	mov	ax,0x50			; 012AB ; read up to 80 bytes
 	push	ax			; 012AE
@@ -46,7 +47,7 @@ loc_012A8:
 	db	0x8B, 0xE5		; 012B6 mov sp,bp
 	test	ax,ax			; 012B8 ; 0 = EOF
 	mov	[bp+0x52],ax		; 012BA
-	jz	short loc_012D5		; 012BD jz 0x12d5 ; done reading — close file
+	jz	short load_anim_script_close_file		; 012BD jz 0x12d5 ; done reading — close file
 	lea	ax,[bp+0x5e]		; 012BF ; &command_count
 	push	ax			; 012C2
 	lea	ax,[bp+0x5a]		; 012C3 ; &bytecode_size
@@ -56,13 +57,13 @@ loc_012A8:
 	push	ax			; 012CD
 	call	parse_anim_command	; 012CE ; parse one command line into bytecode
 	db	0x8B, 0xE5		; 012D1 mov sp,bp
-	jmp	short loc_012A8		; 012D3 jmp 0x12a8
-loc_012D5:
+	jmp	short load_anim_script_read_line_loop		; 012D3 jmp 0x12a8
+load_anim_script_close_file:
 	push	word [bp+0x64]		; 012D5 ; IOB pointer
 	call	fclose_iob		; 012D8 ; close script file
 	db	0x8B, 0xE5		; 012DB mov sp,bp
 	mov	ax,[bp+0x5a]		; 012DD ; total bytecode size
-	mov	[0xbd02],ax		; 012E0 ; store in anim_script_size
+	mov	[anim_script_size],ax		; 012E0 ; store in anim_script_size
 	mov	ax,[bp+0x5e]		; 012E3 ; return command count in AX
 	add	sp,0x66			; 012E6
 	pop	bp			; 012E9
@@ -79,60 +80,60 @@ loc_012D5:
 parse_anim_command:
 	push	bp			; 012EB
 	sub	sp,0x12			; 012EC
-	jc	short loc_012F7		; 012EF jc 0x12f7
-	cmp	sp,[0x17]		; 012F1
-	ja	short loc_012FA		; 012F5 ja 0x12fa
-loc_012F7:
-	jmp	0x420			; 012F7
-loc_012FA:
+	jc	short parse_anim_command_stack_overflow		; 012EF jc 0x12f7
+	cmp	sp,[stack_limit]		; 012F1
+	ja	short parse_anim_command_stack_ok		; 012F5 ja 0x12fa
+parse_anim_command_stack_overflow:
+	jmp	near stack_overflow_handler			; 012F7
+parse_anim_command_stack_ok:
 	db	0x8B, 0xEC		; 012FA mov bp,sp
 	mov	word [bp+0x8],0x0	; 012FC ; comma_pos = 0
 ; --- Scan for ',' (0x2C) delimiter to split "command,args" ---
-loc_01301:
+parse_anim_command_scan_for_comma:
 	mov	si,[bp+0x16]		; 01301
 	add	si,[bp+0x8]		; 01304
 	mov	al,[si]			; 01307
 	xor	ah,ah			; 01309
 	db	0x3D, 0x2C, 0x00	; 0130B cmp ax,0x2c ; is it a comma?
-	jz	short loc_01315		; 0130E jz 0x1315
+	jz	short parse_anim_command_split_at_comma		; 0130E jz 0x1315
 	inc	word [bp+0x8]		; 01310
-	jmp	short loc_01301		; 01313 jmp 0x1301
-loc_01315:
+	jmp	short parse_anim_command_scan_for_comma		; 01313 jmp 0x1301
+parse_anim_command_split_at_comma:
 	mov	si,[bp+0x16]		; 01315
 	add	si,[bp+0x8]		; 01318
 	mov	byte [si],0x0		; 0131B ; null-terminate command name at comma
 ; --- Match command name against 14 known commands ---
 	mov	word [bp+0xa],0x0	; 0131E ; cmd_index = 0
-loc_01323:
+parse_anim_command_match_command_loop:
 	mov	ax,[bp+0xa]		; 01323
 	db	0x3D, 0x0E, 0x00	; 01326 cmp ax,0xe ; 14 commands total
-	jnl	short loc_0134D		; 01329 jnl 0x134d
+	jnl	short parse_anim_command_check_match		; 01329 jnl 0x134d
 	shl	ax,1			; 0132B
 	db	0x8B, 0xF0		; 0132D mov si,ax
 	mov	ax,0x5			; 0132F
 	push	ax			; 01332
-	push	word [si+0x1e8]		; 01333 ; anim_cmd_table[cmd_index]
+	push	word [si+anim_cmd_table]		; 01333 ; anim_cmd_table[cmd_index]
 	push	word [bp+0x16]		; 01337
 	call	strncmp			; 0133A ; compare first 5 chars of command name
 	db	0x8B, 0xE5		; 0133D mov sp,bp
 	mov	[bp+0x10],al		; 0133F ; 0 = match
 	xor	ah,ah			; 01342
 	test	ax,ax			; 01344
-	jz	short loc_0134D		; 01346 jz 0x134d ; found match
+	jz	short parse_anim_command_check_match		; 01346 jz 0x134d ; found match
 	inc	word [bp+0xa]		; 01348 ; try next command
-	jmp	short loc_01323		; 0134B jmp 0x1323
-loc_0134D:
+	jmp	short parse_anim_command_match_command_loop		; 0134B jmp 0x1323
+parse_anim_command_check_match:
 	mov	al,[bp+0x10]		; 0134D ; check if match was found
 	xor	ah,ah			; 01350
 	test	ax,ax			; 01352
-	jz	short loc_0135E		; 01354 jz 0x135e ; matched — dispatch
+	jz	short parse_anim_command_dispatch		; 01354 jz 0x135e ; matched — dispatch
 	mov	si,[bp+0x1c]		; 01356 ; no match — increment error count
 	inc	word [si]		; 01359
-	jmp	0x1868			; 0135B ; return
-loc_0135E:
+	jmp	near parse_anim_command_return			; 0135B ; return
+parse_anim_command_dispatch:
 ; --- Dispatch: jump to handler via jump table at 0x163E ---
 	mov	ax,[bp+0xa]		; 0135E ; matched command index
-	jmp	0x185a			; 01361 ; jump to dispatch code at 0x185A
+	jmp	near parse_anim_command_jump_via_table			; 01361 ; jump to dispatch code at 0x185A
 ; --- Command 0: set_tune — emit 0x00, parse number ---
 	mov	si,[bp+0x1a]		; 01364
 	mov	ax,[si]			; 01367
@@ -156,7 +157,7 @@ loc_0135E:
 	push	dx			; 0138F
 	call	scanf_format_parser	; 01390
 	db	0x8B, 0xE5		; 01393 mov sp,bp
-	jmp	0x1868			; 01395
+	jmp	near parse_anim_command_return			; 01395
 ; --- Command 1: set_bg — emit 0x02, parse number ---
 	mov	si,[bp+0x1a]		; 01398
 	mov	ax,[si]			; 0139B
@@ -180,7 +181,7 @@ loc_0135E:
 	push	dx			; 013C3
 	call	scanf_format_parser	; 013C4
 	db	0x8B, 0xE5		; 013C7 mov sp,bp
-	jmp	0x1868			; 013C9
+	jmp	near parse_anim_command_return			; 013C9
 ; --- Command 2: set_fig — emit 0x04, parse two numbers (lo/hi) + extra byte ---
 	mov	si,[bp+0x1a]		; 013CC
 	mov	ax,[si]			; 013CF
@@ -234,7 +235,7 @@ loc_0135E:
 	db	0x03, 0xD8		; 0143D add bx,ax
 	mov	ax,[bp+0xe]		; 0143F
 	mov	[bx],al			; 01442
-	jmp	0x1868			; 01444
+	jmp	near parse_anim_command_return			; 01444
 ; --- Command 3: chg_fig — emit 0x06, parse complex data (position + size) ---
 	mov	si,[bp+0x1a]		; 01447
 	mov	ax,[si]			; 0144A
@@ -294,7 +295,7 @@ loc_0135E:
 	db	0x03, 0xD8		; 014C4 add bx,ax
 	mov	ax,[bp+0xe]		; 014C6
 	mov	[bx],al			; 014C9
-	jmp	0x1868			; 014CB
+	jmp	near parse_anim_command_return			; 014CB
 ; --- Command 4: do_scr — emit 0x08 only (no args) ---
 	mov	si,[bp+0x1a]		; 014CE
 	mov	ax,[si]			; 014D1
@@ -302,7 +303,7 @@ loc_0135E:
 	mov	si,[bp+0x18]		; 014D5
 	db	0x03, 0xF0		; 014D8 add si,ax
 	mov	byte [si],0x8		; 014DA ; emit opcode 0x08 (do_scr)
-	jmp	0x1868			; 014DD
+	jmp	near parse_anim_command_return			; 014DD
 ; --- Command 5: del_fig — emit 0x0A, parse number ---
 	mov	si,[bp+0x1a]		; 014E0
 	mov	ax,[si]			; 014E3
@@ -326,7 +327,7 @@ loc_0135E:
 	push	dx			; 0150B
 	call	scanf_format_parser	; 0150C
 	db	0x8B, 0xE5		; 0150F mov sp,bp
-	jmp	0x1868			; 01511
+	jmp	near parse_anim_command_return			; 01511
 ; --- Command 6: set_wipe — emit 0x0C only ---
 	mov	si,[bp+0x1a]		; 01514
 	mov	ax,[si]			; 01517
@@ -334,7 +335,7 @@ loc_0135E:
 	mov	si,[bp+0x18]		; 0151B
 	db	0x03, 0xF0		; 0151E add si,ax
 	mov	byte [si],0xc		; 01520 ; emit opcode 0x0C (set_wipe)
-	jmp	0x1868			; 01523
+	jmp	near parse_anim_command_return			; 01523
 ; --- Command 7: set_nowipe — emit 0x0E only ---
 	mov	si,[bp+0x1a]		; 01526
 	mov	ax,[si]			; 01529
@@ -342,7 +343,7 @@ loc_0135E:
 	mov	si,[bp+0x18]		; 0152D
 	db	0x03, 0xF0		; 01530 add si,ax
 	mov	byte [si],0xe		; 01532 ; emit opcode 0x0E (set_nowipe)
-	jmp	0x1868			; 01535
+	jmp	near parse_anim_command_return			; 01535
 ; --- Command 8: wait — emit 0x10, parse number ---
 	mov	si,[bp+0x1a]		; 01538
 	mov	ax,[si]			; 0153B
@@ -366,7 +367,7 @@ loc_0135E:
 	push	dx			; 01563
 	call	scanf_format_parser	; 01564
 	db	0x8B, 0xE5		; 01567 mov sp,bp
-	jmp	0x1868			; 01569
+	jmp	near parse_anim_command_return			; 01569
 ; --- Command 9: init_sal — emit 0x12 only ---
 	mov	si,[bp+0x1a]		; 0156C
 	mov	ax,[si]			; 0156F
@@ -374,7 +375,7 @@ loc_0135E:
 	mov	si,[bp+0x18]		; 01573
 	db	0x03, 0xF0		; 01576 add si,ax
 	mov	byte [si],0x12		; 01578 ; emit opcode 0x12 (init_sal)
-	jmp	0x1868			; 0157B
+	jmp	near parse_anim_command_return			; 0157B
 ; --- Command 10: set_pos — emit 0x14, parse two numbers ---
 	mov	si,[bp+0x1a]		; 0157E
 	mov	ax,[si]			; 01581
@@ -404,7 +405,7 @@ loc_0135E:
 	push	dx			; 015B5
 	call	scanf_format_parser	; 015B6
 	db	0x8B, 0xE5		; 015B9 mov sp,bp
-	jmp	0x1868			; 015BB
+	jmp	near parse_anim_command_return			; 015BB
 ; --- Command 11: inc_x — emit 0x16, parse number ---
 	mov	si,[bp+0x1a]		; 015BE
 	mov	ax,[si]			; 015C1
@@ -431,7 +432,7 @@ loc_0135E:
 	mov	ax,[bp+0xc]		; 015F0
 	and	ax,0xff			; 015F3
 	mov	[si],al			; 015F6
-	jmp	short loc_01668		; 015F8 jmp 0x1668
+	jmp	short parse_anim_command_return		; 015F8 jmp 0x1668
 ; --- Command 12: loop — emit 0x18, parse number ---
 	mov	si,[bp+0x1a]		; 015FA
 	mov	ax,[si]			; 015FD
@@ -455,7 +456,7 @@ loc_0135E:
 	push	dx			; 01625
 	call	scanf_format_parser	; 01626
 	db	0x8B, 0xE5		; 01629 mov sp,bp
-	jmp	short loc_01668		; 0162B jmp 0x1668
+	jmp	short parse_anim_command_return		; 0162B jmp 0x1668
 ; --- Command 13: end_animation — emit 0xFF ---
 	mov	si,[bp+0x1a]		; 0162D
 	mov	ax,[si]			; 01630
@@ -463,7 +464,7 @@ loc_0135E:
 	mov	si,[bp+0x18]		; 01634
 	db	0x03, 0xF0		; 01637 add si,ax
 	mov	byte [si],0xff		; 01639 ; emit opcode 0xFF (end_animation)
-	jmp	short loc_01668		; 0163C jmp 0x1668
+	jmp	short parse_anim_command_return		; 0163C jmp 0x1668
 ; --- Jump table: 14 word offsets for command handlers (raw data, NOT code) ---
 ; Entries: set_tune(0x1364), set_bg(0x1398), set_fig(0x13CC), chg_fig(0x1447),
 ;          do_scr(0x14CE), del_fig(0x14E0), set_wipe(0x1514), set_nowipe(0x1526),
@@ -481,12 +482,14 @@ loc_0135E:
 	mov	si,0xfa15		; 01654
 	adc	ax,0x162d		; 01657
 ; --- Dispatch: look up handler offset in jump table ---
+; bounds-checks the matched command index and jumps through the table at 0x163E
+parse_anim_command_jump_via_table:
 	db	0x8B, 0xF0		; 0165A mov si,ax ; si = command index
 	cmp	si,0xe			; 0165C ; bounds check (14 commands)
-	jnc	short loc_01668		; 0165F jnc 0x1668 ; out of range — return
+	jnc	short parse_anim_command_return		; 0165F jnc 0x1668 ; out of range — return
 	shl	si,1			; 01661 ; word index
 	jmp	word near [cs:si+0x163e]	; 01663 ; jump via table
-loc_01668:
+parse_anim_command_return:
 	add	sp,0x12			; 01668
 	pop	bp			; 0166B
 	ret				; 0166C

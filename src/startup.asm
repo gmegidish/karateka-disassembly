@@ -37,31 +37,31 @@
 	mov	ah,0x30			; 00011
 	int	0x21			; 00013
 	db	0x0A, 0xC0		; 00015 or al,al
-	jnz	short loc_0001C		; 00017 jnz 0x1c
+	jnz	short crt_startup_store_dos_version		; 00017 jnz 0x1c
 	mov	ax,0x1			; 00019
-loc_0001C:
+crt_startup_store_dos_version:
 	mov	[0xf],ax		; 0001C
-	mov	word [0x5b],es		; 0001F
+	mov	word [psp_segment],es		; 0001F
 	cmp	byte [0xf],0x2		; 00023
-	jl	short loc_00051		; 00028 jl 0x51
+	jl	short crt_startup_parse_command_line		; 00028 jl 0x51
 	mov	ax,[es:0x2c]		; 0002A
-	mov	[0x6d],ax		; 0002E
+	mov	[env_segment],ax		; 0002E
 	db	0x0B, 0xC0		; 00031 or ax,ax
-	jz	short loc_00051		; 00033 jz 0x51
+	jz	short crt_startup_parse_command_line		; 00033 jz 0x51
 	push	es			; 00035
 	cld				; 00036
-	les	di,word [0x6b]		; 00037  ; load environment segment:offset
+	les	di,word [env_string_off]		; 00037  ; load environment segment:offset
 	db	0x33, 0xC0		; 0003B xor ax,ax
 	mov	cx,0x7fff		; 0003D
-loc_00040:
+crt_startup_scan_env_strings:
 	repne	scasb			; 00040  ; scan for null byte
-	jnz	short loc_00050		; 00042 jnz 0x50
+	jnz	short crt_startup_env_scan_done		; 00042 jnz 0x50
 	scasb				; 00044  ; check next byte (double null = end of env)
-	jnz	short loc_00040		; 00045 jnz 0x40  ; not double null, keep scanning
+	jnz	short crt_startup_scan_env_strings		; 00045 jnz 0x40  ; not double null, keep scanning
 	inc	di			; 00047  ; skip 2-byte string count
 	db	0x81, 0xE7, 0xFE, 0xFF	; 00048 and di,0xfffe  ; word-align
-	mov	[0x6f],di		; 0004C  ; save program name offset
-loc_00050:
+	mov	[program_name_off],di		; 0004C  ; save program name offset
+crt_startup_env_scan_done:
 	pop	es			; 00050
 
 ; ---- Command line parsing loop (0x0051-0x007F) ----
@@ -73,33 +73,33 @@ loc_00050:
 ;   space/tab  -> skip whitespace
 ;   other char -> end of parsing, jump to memory setup
 
-loc_00051:
+crt_startup_parse_command_line:
 	mov	si,0x80			; 00051  ; SI = offset of command tail length in PSP
 	mov	cl,[es:si]		; 00054  ; CL = command tail length
 	db	0x32, 0xED		; 00057 xor ch,ch
-	jcxz	short loc_0007F		; 00059 jcxz 0x7f  ; empty command line, skip
-loc_0005B:
+	jcxz	short crt_startup_parse_done		; 00059 jcxz 0x7f  ; empty command line, skip
+crt_startup_parse_next_char:
 	inc	si			; 0005B
 	mov	al,[es:si]		; 0005C  ; get next command line character
 	cmp	byte [0xf],0x2		; 0005F
-	jnl	short loc_0006E		; 00064 jnl 0x6e  ; DOS 2+ skips '<' '>' handling
+	jnl	short crt_startup_check_stack_size_arg		; 00064 jnl 0x6e  ; DOS 2+ skips '<' '>' handling
 	cmp	al,0x3c			; 00066  ; '<' - stdin redirect
-	jz	short loc_00082		; 00068 jz 0x82
+	jz	short crt_startup_stdin_redirect		; 00068 jz 0x82
 	cmp	al,0x3e			; 0006A  ; '>' - stdout redirect
-	jz	short loc_00088		; 0006C jz 0x88
-loc_0006E:
+	jz	short crt_startup_stdout_redirect		; 0006C jz 0x88
+crt_startup_check_stack_size_arg:
 	cmp	al,0x3d			; 0006E  ; '=' - stack size parameter
-	jz	short loc_000B3		; 00070 jz 0xb3
+	jz	short crt_startup_parse_stack_size		; 00070 jz 0xb3
 	cmp	al,0x20			; 00072  ; space
-	jz	short loc_0007A		; 00074 jz 0x7a
+	jz	short crt_startup_parse_advance		; 00074 jz 0x7a
 	cmp	al,0x9			; 00076  ; tab
-	jnz	short loc_0007F		; 00078 jnz 0x7f  ; non-whitespace = done parsing
-loc_0007A:
+	jnz	short crt_startup_parse_done		; 00078 jnz 0x7f  ; non-whitespace = done parsing
+crt_startup_parse_advance:
 	dec	cx			; 0007A
-	jg	short loc_0005B		; 0007B jg 0x5b  ; more chars to parse
+	jg	short crt_startup_parse_next_char		; 0007B jg 0x5b  ; more chars to parse
 	db	0x33, 0xC9		; 0007D xor cx,cx
-loc_0007F:
-	jmp	short loc_000F6		; 0007F jmp 0xf6  ; jump to memory calculation
+crt_startup_parse_done:
+	jmp	short crt_startup_compute_memory		; 0007F jmp 0xf6  ; jump to memory calculation
 	nop				; 00081
 
 ; ---- I/O redirection handler (0x0082-0x00AC) ----
@@ -107,39 +107,39 @@ loc_0007F:
 ; Copies filename characters until space, tab, or end of command line.
 ; Max 32 chars (AH counts); if exceeded, jumps to "Invalid I/O redirection" error.
 
-loc_00082:
+crt_startup_stdin_redirect:
 	mov	di,0x19			; 00082  ; DI = stdin redirect filename buffer
-	jmp	short loc_0008B		; 00085 jmp 0x8b
+	jmp	short crt_startup_copy_redirect_name		; 00085 jmp 0x8b
 	nop				; 00087
-loc_00088:
+crt_startup_stdout_redirect:
 	mov	di,0x39			; 00088  ; DI = stdout redirect filename buffer
-loc_0008B:
+crt_startup_copy_redirect_name:
 	db	0x32, 0xE4		; 0008B xor ah,ah  ; AH = character counter
-loc_0008D:
+crt_startup_redirect_name_loop:
 	dec	cx			; 0008D
-	jz	short loc_000A8		; 0008E jz 0xa8  ; end of command line
+	jz	short crt_startup_redirect_name_end		; 0008E jz 0xa8  ; end of command line
 	inc	si			; 00090
 	mov	al,[es:si]		; 00091
 	cmp	al,0x20			; 00094  ; space = end of filename
-	jz	short loc_000A8		; 00096 jz 0xa8
+	jz	short crt_startup_redirect_name_end		; 00096 jz 0xa8
 	cmp	al,0x9			; 00098  ; tab = end of filename
-	jz	short loc_000A8		; 0009A jz 0xa8
+	jz	short crt_startup_redirect_name_end		; 0009A jz 0xa8
 	mov	[di],al			; 0009C  ; store filename character
 	inc	di			; 0009E
 	inc	ah			; 0009F
 	cmp	ah,0x20			; 000A1  ; max 32 characters
-	jz	short loc_000AD		; 000A4 jz 0xad  ; too long -> error
-	jmp	short loc_0008D		; 000A6 jmp 0x8d
-loc_000A8:
+	jz	short crt_startup_redirect_name_too_long		; 000A4 jz 0xad  ; too long -> error
+	jmp	short crt_startup_redirect_name_loop		; 000A6 jmp 0x8d
+crt_startup_redirect_name_end:
 	mov	byte [di],0x0		; 000A8  ; null-terminate filename
-	jmp	short loc_0007A		; 000AB jmp 0x7a  ; continue parsing
+	jmp	short crt_startup_parse_advance		; 000AB jmp 0x7a  ; continue parsing
 
 ; ---- Error: redirect filename too long (0x00AD-0x00B2) ----
 ; DX points to "Invalid I/O redirection\r\n$" string in data segment.
 
-loc_000AD:
+crt_startup_redirect_name_too_long:
 	mov	dx,err_invalid_redirect - DS_BASE ; 000AD
-	jmp	0x407			; 000B0  ; jump to error_exit (0x0207 code offset)
+	jmp	near error_exit			; 000B0  ; jump to error_exit (0x0207 code offset)
 
 ; ---- Parse '=' stack size parameter (0x00B3-0x00EE) ----
 ; Converts decimal ASCII digits to binary in BX using multiply-by-10:
@@ -147,45 +147,45 @@ loc_000AD:
 ; Overflow is checked after each step. Result stored at [requested_stack_size].
 ; If result is 0 or non-digit found -> "Invalid stack size" error.
 
-loc_000B3:
+crt_startup_parse_stack_size:
 	db	0x33, 0xDB		; 000B3 xor bx,bx  ; accumulator = 0
-loc_000B5:
+crt_startup_stack_size_digit_loop:
 	dec	cx			; 000B5
-	jz	short loc_000E6		; 000B6 jz 0xe6  ; end of input -> done
+	jz	short crt_startup_stack_size_end		; 000B6 jz 0xe6  ; end of input -> done
 	inc	si			; 000B8
 	mov	al,[es:si]		; 000B9
 	cmp	al,0x20			; 000BC  ; space = end of number
-	jz	short loc_000E6		; 000BE jz 0xe6
+	jz	short crt_startup_stack_size_end		; 000BE jz 0xe6
 	cmp	al,0x9			; 000C0  ; tab = end of number
-	jz	short loc_000E6		; 000C2 jz 0xe6
+	jz	short crt_startup_stack_size_end		; 000C2 jz 0xe6
 	sub	al,0x30			; 000C4  ; convert ASCII '0'-'9' to 0-9
-	jl	short loc_000F0		; 000C6 jl 0xf0  ; below '0' -> error
+	jl	short crt_startup_invalid_stack_size		; 000C6 jl 0xf0  ; below '0' -> error
 	cmp	al,0x9			; 000C8
-	jg	short loc_000F0		; 000CA jg 0xf0  ; above '9' -> error
+	jg	short crt_startup_invalid_stack_size		; 000CA jg 0xf0  ; above '9' -> error
 	db	0x03, 0xDB		; 000CC add bx,bx  ; bx *= 2
-	jc	short loc_000F0		; 000CE jc 0xf0  ; overflow -> error
+	jc	short crt_startup_invalid_stack_size		; 000CE jc 0xf0  ; overflow -> error
 	db	0x8B, 0xD3		; 000D0 mov dx,bx  ; save bx*2
 	db	0x03, 0xDB		; 000D2 add bx,bx  ; bx *= 4
-	jc	short loc_000F0		; 000D4 jc 0xf0
+	jc	short crt_startup_invalid_stack_size		; 000D4 jc 0xf0
 	db	0x03, 0xDB		; 000D6 add bx,bx  ; bx *= 8
-	jc	short loc_000F0		; 000D8 jc 0xf0
+	jc	short crt_startup_invalid_stack_size		; 000D8 jc 0xf0
 	db	0x03, 0xDA		; 000DA add bx,dx  ; bx = bx*8 + bx*2 = bx*10
-	jc	short loc_000F0		; 000DC jc 0xf0
+	jc	short crt_startup_invalid_stack_size		; 000DC jc 0xf0
 	db	0x32, 0xE4		; 000DE xor ah,ah  ; clear high byte of digit
 	db	0x03, 0xD8		; 000E0 add bx,ax  ; bx = bx*10 + digit
-	jc	short loc_000F0		; 000E2 jc 0xf0
-	jmp	short loc_000B5		; 000E4 jmp 0xb5  ; next digit
-loc_000E6:
+	jc	short crt_startup_invalid_stack_size		; 000E2 jc 0xf0
+	jmp	short crt_startup_stack_size_digit_loop		; 000E4 jmp 0xb5  ; next digit
+crt_startup_stack_size_end:
 	db	0x0B, 0xDB		; 000E6 or bx,bx
-	jz	short loc_000F0		; 000E8 jz 0xf0  ; zero is invalid
-	mov	[0xe0],bx		; 000EA  ; store requested stack size
-	jmp	short loc_0007A		; 000EE jmp 0x7a  ; continue command line parsing
+	jz	short crt_startup_invalid_stack_size		; 000E8 jz 0xf0  ; zero is invalid
+	mov	[requested_stack_size],bx		; 000EA  ; store requested stack size
+	jmp	short crt_startup_parse_advance		; 000EE jmp 0x7a  ; continue command line parsing
 
 ; ---- Error: invalid stack size (0x00F0-0x00F5) ----
 
-loc_000F0:
+crt_startup_invalid_stack_size:
 	mov	dx,err_invalid_stack_size - DS_BASE ; 000F0
-	jmp	0x407			; 000F3  ; jump to error_exit
+	jmp	near error_exit			; 000F3  ; jump to error_exit
 
 ; ---- Memory calculation (0x00F6-0x013E) ----
 ; Ensures stack size >= 512 bytes (0x200). Calculates total memory needed
@@ -193,39 +193,39 @@ loc_000F0:
 ; allocated memory segment). If insufficient -> "Insufficient memory" error.
 ; Available bytes = (top_segment - SS) * 16, capped at 0xFFF0 if > 64KB.
 
-loc_000F6:
-	mov	ax,[0x6f]		; 000F6  ; program name size
-	mov	bx,[0xe0]		; 000F9  ; requested stack size
+crt_startup_compute_memory:
+	mov	ax,[program_name_off]		; 000F6  ; program name size
+	mov	bx,[requested_stack_size]		; 000F9  ; requested stack size
 	shr	bx,1			; 000FD  ; round down to even
 	db	0x03, 0xDB		; 000FF add bx,bx  ; (effectively bx & 0xFFFE)
 	cmp	bx,0x200		; 00101  ; minimum 512 bytes
-	ja	short loc_0010E		; 00105 ja 0x10e
+	ja	short crt_startup_check_available_memory		; 00105 ja 0x10e
 	mov	bx,0x200		; 00107  ; enforce minimum
-	mov	[0xe0],bx		; 0010A
-loc_0010E:
+	mov	[requested_stack_size],bx		; 0010A
+crt_startup_check_available_memory:
 	db	0x03, 0xD8		; 0010E add bx,ax  ; total = stack + program name
-	jc	short loc_00139		; 00110 jc 0x139  ; overflow -> insufficient memory
+	jc	short crt_startup_insufficient_memory		; 00110 jc 0x139  ; overflow -> insufficient memory
 	mov	dx,[es:0x2]		; 00112  ; PSP:0x02 = top of memory segment
 	mov	ax,ss			; 00117
 	db	0x2B, 0xD0		; 00119 sub dx,ax  ; dx = segments available
 	test	dx,0xf000		; 0011B  ; more than 64KB available?
-	jnz	short loc_0012C		; 0011F jnz 0x12c  ; yes -> cap at 0xFFF0
+	jnz	short crt_startup_cap_available_memory		; 0011F jnz 0x12c  ; yes -> cap at 0xFFF0
 	shl	dx,1			; 00121  ; convert segments to bytes (*16)
 	shl	dx,1			; 00123
 	shl	dx,1			; 00125
 	shl	dx,1			; 00127
-	jmp	short loc_0012F		; 00129 jmp 0x12f
+	jmp	short crt_startup_compare_available_memory		; 00129 jmp 0x12f
 	nop				; 0012B
-loc_0012C:
+crt_startup_cap_available_memory:
 	mov	dx,0xfff0		; 0012C  ; cap at 64KB - 16
-loc_0012F:
+crt_startup_compare_available_memory:
 	db	0x3B, 0xD3		; 0012F cmp dx,bx  ; enough memory?
-	jc	short loc_00139		; 00131 jc 0x139  ; no -> error
-	add	bx,[0x17]		; 00133  ; add stack overflow check margin
-	jnc	short loc_0013F		; 00137 jnc 0x13f  ; ok -> proceed to stack setup
-loc_00139:
+	jc	short crt_startup_insufficient_memory		; 00131 jc 0x139  ; no -> error
+	add	bx,[stack_limit]		; 00133  ; add stack overflow check margin
+	jnc	short crt_startup_setup_stack_and_heap		; 00137 jnc 0x13f  ; ok -> proceed to stack setup
+crt_startup_insufficient_memory:
 	mov	dx,err_insufficient_memory - DS_BASE ; 00139
-	jmp	0x407			; 0013C  ; jump to error_exit
+	jmp	near error_exit			; 0013C  ; jump to error_exit
 
 ; ---- Stack and heap setup (0x013F-0x0184) ----
 ; CLI, set final SP and SS (DS=SS for Lattice C small model).
@@ -233,13 +233,13 @@ loc_00139:
 ; Calculate heap size from remaining memory. Call reset_heap().
 ; STI when done.
 
-loc_0013F:
+crt_startup_setup_stack_and_heap:
 	cli				; 0013F
-	mov	[0x15],bx		; 00140  ; save stack top
+	mov	[stack_top],bx		; 00140  ; save stack top
 	db	0x8B, 0xE3		; 00144 mov sp,bx  ; set stack pointer
 	mov	ax,ds			; 00146
 	mov	ss,ax			; 00148  ; SS = DS (Lattice C small model)
-	mov	word [0x11],ss		; 0014A  ; save SS
+	mov	word [saved_ss],ss		; 0014A  ; save SS
 	sti				; 0014E
 	push	cx			; 0014F  ; save remaining command line length
 	add	bx,0xf			; 00150
@@ -247,21 +247,21 @@ loc_0013F:
 	shr	bx,cl			; 00155  ; bx = stack paragraphs (ceil)
 	mov	ax,ss			; 00157
 	db	0x03, 0xC3		; 00159 add ax,bx
-	mov	[0x5f],ax		; 0015B  ; heap start segment
-	mov	[0x63],ax		; 0015E  ; heap current segment
+	mov	[heap_start_seg],ax		; 0015B  ; heap start segment
+	mov	[heap_current_seg],ax		; 0015E  ; heap current segment
 	mov	bx,[es:0x2]		; 00161  ; top of memory
 	db	0x2B, 0xD8		; 00166 sub bx,ax  ; remaining segments
-	jna	short loc_00139		; 00168 jna 0x139  ; no memory left -> error
+	jna	short crt_startup_insufficient_memory		; 00168 jna 0x139  ; no memory left -> error
 	mov	cl,0x4			; 0016A
 	rol	bx,cl			; 0016C  ; convert to paragraphs + remainder
 	db	0x8B, 0xC3		; 0016E mov ax,bx
 	db	0x25, 0x0F, 0x00	; 00170 and ax,0xf  ; remainder (fractional paragraph bytes)
 	db	0x81, 0xE3, 0xF0, 0xFF	; 00173 and bx,0xfff0  ; whole paragraphs
-	mov	[0x65],bx		; 00177  ; heap size in paragraphs
-	mov	[0x67],ax		; 0017B  ; heap remainder
+	mov	[heap_size],bx		; 00177  ; heap size in paragraphs
+	mov	[heap_remainder],ax		; 0017B  ; heap remainder
 	call	reset_heap		; 0017E
 	db	0x0B, 0xC0		; 00181 or ax,ax  ; check return value
-	jnz	short loc_00139		; 00183 jnz 0x139  ; nonzero = error
+	jnz	short crt_startup_insufficient_memory		; 00183 jnz 0x139  ; nonzero = error
 
 ; ---- Build argv[] and detect FPU (0x0185-0x01F4) ----
 ; Push program name onto stack as argv[0] (word-by-word, back to front).
@@ -275,17 +275,18 @@ loc_0013F:
 	db	0x33, 0xC0		; 00187 xor ax,ax
 	push	ax			; 00189  ; push 0 (argv terminator / return address)
 	db	0x8B, 0xEC		; 0018A mov bp,sp  ; save frame pointer for DOS 1.x exit
-	les	di,word [0x6b]		; 0018C  ; load env pointer
-	mov	di,[0x6f]		; 00190  ; program name offset
-loc_00194:
+	les	di,word [env_string_off]		; 0018C  ; load env pointer
+	mov	di,[program_name_off]		; 00190  ; program name offset
+; Copies the whole environment block (word-rounded size at [0x6f]) onto the stack, last word first.
+crt_startup_push_env_block_loop:
 	sub	di,0x2			; 00194  ; push program name word-by-word (back to front)
-	jl	short loc_0019E		; 00197 jl 0x19e  ; done when DI < 0
+	jl	short crt_startup_copy_command_tail		; 00197 jl 0x19e  ; done when DI < 0
 	push	word [es:di]		; 00199
-	jmp	short loc_00194		; 0019C jmp 0x194
-loc_0019E:
-	mov	es,word [0x5b]		; 0019E  ; restore ES = PSP segment
-	mov	[0x6b],sp		; 001A2  ; env_string_off now points to program name on stack
-	mov	word [0x6d],ss		; 001A6  ; env_segment = SS (program name is on stack now)
+	jmp	short crt_startup_push_env_block_loop		; 0019C jmp 0x194
+crt_startup_copy_command_tail:
+	mov	es,word [psp_segment]		; 0019E  ; restore ES = PSP segment
+	mov	[env_string_off],sp		; 001A2  ; env_string_off now points to program name on stack
+	mov	word [env_segment],ss		; 001A6  ; env_segment = SS (program name is on stack now)
 	db	0x8B, 0xDA		; 001AA mov bx,dx  ; BX = command tail length
 	db	0x8B, 0xCA		; 001AC mov cx,dx  ; CX = command tail length
 	add	bx,0x4			; 001AE  ; add space for prefix + null + alignment
@@ -294,26 +295,28 @@ loc_0019E:
 	db	0x8B, 0xFC		; 001B7 mov di,sp  ; DI = start of allocated buffer
 	mov	byte [ss:di],0x63	; 001B9  ; prefix byte 'c' (placeholder for argv[1])
 	inc	di			; 001BD
-	jcxz	short loc_001CF		; 001BE jcxz 0x1cf  ; empty command tail -> skip copy
+	jcxz	short crt_startup_detect_fpu		; 001BE jcxz 0x1cf  ; empty command tail -> skip copy
 	mov	byte [ss:di],0x20	; 001C0  ; space separator
 	inc	di			; 001C4
+; copies PSP command tail bytes after the 'c ' argv prefix
+crt_startup_copy_cmd_tail_loop:
 	mov	al,[es:si]		; 001C5  ; copy command tail byte
 	mov	[ss:di],al		; 001C8
 	inc	si			; 001CB
 	inc	di			; 001CC
 	loop	0x1c5			; 001CD  ; loop until all bytes copied
-loc_001CF:
+crt_startup_detect_fpu:
 	mov	byte [ss:di],0x0	; 001CF  ; null-terminate
 	fninit				; 001D3  ; initialize FPU
-	fnstsw	[0x7c]			; 001D5  ; store FPU status word
+	fnstsw	[fpu_status]			; 001D5  ; store FPU status word
 	mov	ax,0x64			; 001D9  ; 100 decimal
 	db	0x8B, 0xD0		; 001DC mov dx,ax
 	imul	dx			; 001DE  ; 100 * 100 = 10000 (exercise the FPU)
-	test	word [0x7c],0xb8bf	; 001E0  ; check FPU status bits
-	jnz	short loc_001EC		; 001E6 jnz 0x1ec  ; bits set -> no FPU
-	inc	byte [0x7b]		; 001E8  ; fpu_present = 1
-loc_001EC:
-	mov	[0x13],sp		; 001EC  ; save initial SP
+	test	word [fpu_status],0xb8bf	; 001E0  ; check FPU status bits
+	jnz	short crt_startup_save_sp_and_call_main		; 001E6 jnz 0x1ec  ; bits set -> no FPU
+	inc	byte [fpu_present]		; 001E8  ; fpu_present = 1
+crt_startup_save_sp_and_call_main:
+	mov	[initial_sp],sp		; 001EC  ; save initial SP
 	db	0x8B, 0xC4		; 001F0 mov ax,sp
 
 ; ---- Call main() and exit (0x01F5-0x0206) ----
@@ -326,10 +329,10 @@ loc_001EC:
 	pop	es			; 001F4  ; ES = DS
 	call	main			; 001F5
 	cmp	byte [0xf],0x2		; 001F8  ; DOS version >= 2?
-	jl	short loc_00204		; 001FD jl 0x204  ; DOS 1.x -> use RETF
+	jl	short crt_startup_dos1_exit		; 001FD jl 0x204  ; DOS 1.x -> use RETF
 	mov	ax,0x4c00		; 001FF  ; INT 21h/4Ch: exit with code 0
 	int	0x21			; 00202
-loc_00204:
+crt_startup_dos1_exit:
 	db	0x8B, 0xE5		; 00204 mov sp,bp  ; DOS 1.x: restore SP from saved frame
 	retf				; 00206  ; return to PSP:0000 (INT 20h)
 
@@ -341,12 +344,12 @@ loc_00204:
 error_exit:
 	mov	ah,0x9			; 00207  ; INT 21h/09h: print string
 	int	0x21			; 00209
-	mov	es,word [0x5b]		; 0020B  ; restore ES = PSP segment
+	mov	es,word [psp_segment]		; 0020B  ; restore ES = PSP segment
 	cmp	byte [0xf],0x2		; 0020F  ; DOS version >= 2?
-	jl	short loc_0021B		; 00214 jl 0x21b  ; DOS 1.x -> RETF exit
+	jl	short error_exit_dos1_exit		; 00214 jl 0x21b  ; DOS 1.x -> RETF exit
 	mov	ax,0x4c01		; 00216  ; INT 21h/4Ch: exit with code 1
 	int	0x21			; 00219
-loc_0021B:
+error_exit_dos1_exit:
 	push	es			; 0021B  ; DOS 1.x exit:
 	db	0x33, 0xC0		; 0021C xor ax,ax  ; push PSP:0000
 	push	ax			; 0021E
@@ -361,17 +364,17 @@ loc_0021B:
 ; Output: does not return (exits to DOS or PSP)
 
 stack_overflow_handler:
-	mov	ax,[0x15]		; 00220  ; stack_top
+	mov	ax,[stack_top]		; 00220  ; stack_top
 	db	0x2D, 0x04, 0x00	; 00223 sub ax,0x4  ; leave room for far return address
 	db	0x8B, 0xE0		; 00226 mov sp,ax  ; reset stack pointer
 	mov	dx,err_stack_overflow - DS_BASE ; 00228
 	mov	ah,0x9			; 0022B  ; INT 21h/09h: print string
 	int	0x21			; 0022D
 	cmp	byte [0xf],0x2		; 0022F  ; DOS version >= 2?
-	jl	short loc_0023B		; 00234 jl 0x23b
+	jl	short stack_overflow_handler_dos1_exit		; 00234 jl 0x23b
 	mov	ax,0x4c01		; 00236  ; INT 21h/4Ch: exit with code 1
 	int	0x21			; 00239
-loc_0023B:
+stack_overflow_handler_dos1_exit:
 	retf				; 0023B  ; DOS 1.x: far return to PSP:0000
 
 ; ---- crt_exit (0x023C-0x0254) ----
@@ -382,13 +385,13 @@ loc_0023B:
 
 crt_exit:
 	cmp	byte [0xf],0x2		; 0023C  ; DOS version >= 2?
-	jl	short loc_0024C		; 00241 jl 0x24c  ; DOS 1.x -> RETF exit
+	jl	short crt_exit_dos1_exit		; 00241 jl 0x24c  ; DOS 1.x -> RETF exit
 	db	0x8B, 0xEC		; 00243 mov bp,sp
 	mov	ax,[bp+0x2]		; 00245  ; get exit code from stack
 	mov	ah,0x4c			; 00248  ; INT 21h/4Ch: terminate with return code
 	int	0x21			; 0024A
-loc_0024C:
-	mov	ax,[0x15]		; 0024C  ; stack_top
+crt_exit_dos1_exit:
+	mov	ax,[stack_top]		; 0024C  ; stack_top
 	db	0x2D, 0x04, 0x00	; 0024F sub ax,0x4
 	db	0x8B, 0xE0		; 00252 mov sp,ax  ; reset SP for far return
 	retf				; 00254  ; DOS 1.x: return to PSP:0000

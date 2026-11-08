@@ -14,7 +14,7 @@
 ;   2. Reads dimensions: width in columns [bx+0x443C], height [bx+0x443D]
 ;   3. Adjusts X relative to camera [0xE4], computes sub-pixel offset (0-3)
 ;   4. Clips sprite to screen bounds (0-320 pixels)
-;   5. For each column: reads pixel data via advance_anim_frame,
+;   5. For each column: reads pixel data via next_sprite_bytes,
 ;      applies bit rotation for sub-pixel alignment, masks+ORs into buffer
 ;
 ; Parameters:
@@ -37,76 +37,79 @@
 ;   [0x4232] = current buffer write position (word)
 ;
 ; Output: renders sprite into offscreen buffer at DS:0x337
+; Correction: this is the bit-reversing path. It walks sprite columns right to left and reverses each mask and image byte, so it renders the horizontally flipped sprite (render_figures routes the X bit 14 flag here).
 draw_sprite:
 	push	bp			; 00640
 	db	0x8B, 0xEC		; 00641 mov bp,sp
-	mov	byte [0x422c],0x0	; 00643
-	mov	byte [0x422e],0x0	; 00648
+	mov	byte [sprite_image_run_left],0x0	; 00643
+	mov	byte [sprite_mask_run_left],0x0	; 00648
 	mov	si,[bp+0x4]		; 0064D
 	shl	si,1			; 00650
-	mov	bx,[si+0x423c]		; 00652
-	mov	[0x421e],bx		; 00656
-	mov	ax,[si+0x873a]		; 0065A
-	mov	[0x4220],ax		; 0065E
-	mov	al,[bx+0x443c]		; 00661
-	mov	[0x4222],al		; 00665
+	mov	bx,[si+sprite_image_offsets]		; 00652
+	mov	[sprite_image_pos],bx		; 00656
+	mov	ax,[si+sprite_mask_offsets]		; 0065A
+	mov	[sprite_mask_pos],ax		; 0065E
+	mov	al,[bx+sprite_image_bank]		; 00661
+	mov	[sprite_columns_left],al		; 00665
 	cbw				; 00668
 	shl	ax,1			; 00669
 	shl	ax,1			; 0066B
-	mov	[0x4224],ax		; 0066D
-	mov	al,[bx+0x443d]		; 00670
-	mov	[0x4223],al		; 00674
+	mov	[sprite_visible_width],ax		; 0066D
+	mov	al,[bx+sprite_image_bank_byte1]		; 00670
+	mov	[sprite_rows],al		; 00674
 	cbw				; 00677
 	sub	[bp+0x8],ax		; 00678
 	mov	ax,[bp+0x8]		; 0067B
-	mul	byte [0x422b]		; 0067E
-	mov	[0x4230],ax		; 00682
-	add	word [0x421e],0x3	; 00685
-	add	word [0x4220],0x3	; 0068A
+	mul	byte [sprite_line_stride]		; 0067E
+	mov	[sprite_top_line_offset],ax		; 00682
+	add	word [sprite_image_pos],0x3	; 00685
+	add	word [sprite_mask_pos],0x3	; 0068A
 	mov	ax,[bp+0x6]		; 0068F
-	sub	ax,[0xe4]		; 00692
+	sub	ax,[camera_x]		; 00692
 	mov	[bp+0x6],ax		; 00696
 	db	0x8B, 0xD8		; 00699 mov bx,ax
 	and	al,0x3			; 0069B
-	mov	[0x4226],al		; 0069D
+	mov	[sprite_subpixel_x],al		; 0069D
 	shl	al,1			; 006A0
-	mov	[0x4227],al		; 006A2
+	mov	[sprite_bit_shift],al		; 006A2
 	sub	bx,0x140		; 006A5
-	add	bx,[0x4224]		; 006A9
-	jnl	short loc_006B2		; 006AD jnl 0x6b2
-	jmp	short loc_0072D		; 006AF jmp 0x72d
+	add	bx,[sprite_visible_width]		; 006A9
+	jnl	short draw_sprite_crosses_right_edge		; 006AD jnl 0x6b2
+	jmp	short draw_sprite_check_off_left_edge		; 006AF jmp 0x72d
 	nop				; 006B1
-loc_006B2:
+draw_sprite_crosses_right_edge:
 	cmp	word [bp+0x6],0x140	; 006B2
-	jl	short loc_006BC		; 006B7 jl 0x6bc
-	jmp	0xa3a			; 006B9
-loc_006BC:
+	jl	short draw_sprite_skip_offscreen_columns		; 006B7 jl 0x6bc
+	jmp	near draw_sprite_exit			; 006B9
+draw_sprite_skip_offscreen_columns:
 	shr	bx,1			; 006BC
 	shr	bx,1			; 006BE
-	jz	short loc_006D5		; 006C0 jz 0x6d5
-loc_006C2:
-	mov	al,[0x4223]		; 006C2
+	jz	short draw_sprite_check_right_partial_column		; 006C0 jz 0x6d5
+draw_sprite_skip_column_loop:
+	mov	al,[sprite_rows]		; 006C2
 	cbw				; 006C5
 	db	0x8B, 0xF8		; 006C6 mov di,ax
-loc_006C8:
-	call	advance_anim_frame	; 006C8
+draw_sprite_skip_column_bytes_loop:
+	call	next_sprite_bytes	; 006C8
 	dec	di			; 006CB
-	jnz	short loc_006C8		; 006CC jnz 0x6c8
-	dec	byte [0x4222]		; 006CE
+	jnz	short draw_sprite_skip_column_bytes_loop		; 006CC jnz 0x6c8
+	dec	byte [sprite_columns_left]		; 006CE
 	dec	bx			; 006D2
-	jnz	short loc_006C2		; 006D3 jnz 0x6c2
-loc_006D5:
-	cmp	byte [0x4226],0x0	; 006D5
-	jz	short loc_0072D		; 006DA jz 0x72d
-	mov	al,[0x4223]		; 006DC
-	mov	[0x422a],al		; 006DF
-	mov	di,[0x4230]		; 006E2
+	jnz	short draw_sprite_skip_column_loop		; 006D3 jnz 0x6c2
+draw_sprite_check_right_partial_column:
+	cmp	byte [sprite_subpixel_x],0x0	; 006D5
+	jz	short draw_sprite_check_off_left_edge		; 006DA jz 0x72d
+	mov	al,[sprite_rows]		; 006DC
+	mov	[sprite_rows_left],al		; 006DF
+	mov	di,[sprite_top_line_offset]		; 006E2
 	add	di,0x4f			; 006E6
-loc_006E9:
-	call	advance_anim_frame	; 006E9
+draw_sprite_right_partial_row_loop:
+	call	next_sprite_bytes	; 006E9
 	cmp	al,0x0			; 006EC
-	jz	short loc_0071B		; 006EE jz 0x71b
+	jz	short draw_sprite_right_partial_next_row		; 006EE jz 0x71b
 	mov	cx,0x8			; 006F0
+; reverses the 8 bits of AL and DL into AH and DH
+draw_sprite_right_partial_reverse_bits_loop:
 	shr	al,1			; 006F3
 	rcl	ah,1			; 006F5
 	shr	dl,1			; 006F7
@@ -115,66 +118,68 @@ loc_006E9:
 	xchg	al,ah			; 006FD
 	db	0x8A, 0xD6		; 006FF mov dl,dh
 	not	ax			; 00701
-	mov	cl,[0x4227]		; 00703
+	mov	cl,[sprite_bit_shift]		; 00703
 	ror	ax,cl			; 00707
-	and	al,[di+0x337]		; 00709
-	mov	cl,[0x4227]		; 0070D
+	and	al,[di+offscreen_buffer]		; 00709
+	mov	cl,[sprite_bit_shift]		; 0070D
 	mov	dh,0x0			; 00711
 	ror	dx,cl			; 00713
 	db	0x0A, 0xC2		; 00715 or al,dl
-	mov	[di+0x337],al		; 00717
-loc_0071B:
+	mov	[di+offscreen_buffer],al		; 00717
+draw_sprite_right_partial_next_row:
 	add	di,0x50			; 0071B
-	dec	byte [0x422a]		; 0071E
-	jnz	short loc_006E9		; 00722 jnz 0x6e9
-	dec	byte [0x4222]		; 00724
-	jnz	short loc_0072D		; 00728 jnz 0x72d
-	jmp	0xa3a			; 0072A
-loc_0072D:
+	dec	byte [sprite_rows_left]		; 0071E
+	jnz	short draw_sprite_right_partial_row_loop		; 00722 jnz 0x6e9
+	dec	byte [sprite_columns_left]		; 00724
+	jnz	short draw_sprite_check_off_left_edge		; 00728 jnz 0x72d
+	jmp	near draw_sprite_exit			; 0072A
+draw_sprite_check_off_left_edge:
 	mov	ax,[bp+0x6]		; 0072D
-	add	ax,[0x4224]		; 00730
-	jnl	short loc_00739		; 00734 jnl 0x739
-	jmp	0xa3a			; 00736
-loc_00739:
-	mov	word [0x4228],0x0	; 00739
+	add	ax,[sprite_visible_width]		; 00730
+	jnl	short draw_sprite_set_left_clip_flag		; 00734 jnl 0x739
+	jmp	near draw_sprite_exit			; 00736
+draw_sprite_set_left_clip_flag:
+	mov	word [sprite_partial_edge_column],0x0	; 00739
 	cmp	word [bp+0x6],0x0	; 0073F
-	jnl	short loc_0074B		; 00743 jnl 0x74b
-	mov	word [0x4228],0x1	; 00745
-loc_0074B:
+	jnl	short draw_sprite_clamp_left_x		; 00743 jnl 0x74b
+	mov	word [sprite_partial_edge_column],0x1	; 00745
+draw_sprite_clamp_left_x:
 	mov	ax,[bp+0x6]		; 0074B
 	db	0x3D, 0x00, 0x00	; 0074E cmp ax,0x0
-	jnl	short loc_00755		; 00751 jnl 0x755
+	jnl	short draw_sprite_clamp_right_x		; 00751 jnl 0x755
 	db	0x33, 0xC0		; 00753 xor ax,ax
-loc_00755:
+draw_sprite_clamp_right_x:
 	mov	dx,[bp+0x6]		; 00755
-	add	dx,[0x4224]		; 00758
+	add	dx,[sprite_visible_width]		; 00758
 	cmp	dx,0x140		; 0075C
-	jl	short loc_0076D		; 00760 jl 0x76d
+	jl	short draw_sprite_compute_column_span		; 00760 jl 0x76d
 	mov	dx,0x140		; 00762
 	mov	bh,0x0			; 00765
-	mov	bl,[0x4226]		; 00767
+	mov	bl,[sprite_subpixel_x]		; 00767
 	db	0x2B, 0xD3		; 0076B sub dx,bx
-loc_0076D:
+draw_sprite_compute_column_span:
 	shr	ax,1			; 0076D
 	shr	ax,1			; 0076F
 	shr	dx,1			; 00771
 	shr	dx,1			; 00773
-	mov	[0x421c],dx		; 00775
+	mov	[sprite_column_offset_rtl],dx		; 00775
 	db	0x2B, 0xD0		; 00779 sub dx,ax
 	db	0x8A, 0xDA		; 0077B mov bl,dl
-	jng	short loc_007EC		; 0077D jng 0x7ec
-	mov	ax,[0x4230]		; 0077F
-	add	[0x421c],ax		; 00782
-	dec	word [0x421c]		; 00786
-loc_0078A:
-	mov	al,[0x4223]		; 0078A
-	mov	[0x422a],al		; 0078D
-	mov	di,[0x421c]		; 00790
-loc_00794:
-	call	advance_anim_frame	; 00794
+	jng	short draw_sprite_check_left_partial_column		; 0077D jng 0x7ec
+	mov	ax,[sprite_top_line_offset]		; 0077F
+	add	[sprite_column_offset_rtl],ax		; 00782
+	dec	word [sprite_column_offset_rtl]		; 00786
+draw_sprite_column_loop:
+	mov	al,[sprite_rows]		; 0078A
+	mov	[sprite_rows_left],al		; 0078D
+	mov	di,[sprite_column_offset_rtl]		; 00790
+draw_sprite_row_loop:
+	call	next_sprite_bytes	; 00794
 	cmp	al,0x0			; 00797
-	jz	short loc_007DB		; 00799 jz 0x7db
+	jz	short draw_sprite_next_row		; 00799 jz 0x7db
 	mov	cx,0x8			; 0079B
+; reverses the 8 bits of AL and DL into AH and DH
+draw_sprite_reverse_bits_loop:
 	shr	al,1			; 0079E
 	rcl	ah,1			; 007A0
 	shr	dl,1			; 007A2
@@ -182,41 +187,43 @@ loc_00794:
 	loop	0x79e			; 007A6
 	xchg	al,ah			; 007A8
 	db	0x8A, 0xD6		; 007AA mov dl,dh
-	cmp	byte [0x4226],0x0	; 007AC
-	jz	short loc_007CF		; 007B1 jz 0x7cf
+	cmp	byte [sprite_subpixel_x],0x0	; 007AC
+	jz	short draw_sprite_write_aligned_byte		; 007B1 jz 0x7cf
 	not	ax			; 007B3
-	mov	cl,[0x4227]		; 007B5
+	mov	cl,[sprite_bit_shift]		; 007B5
 	ror	ax,cl			; 007B9
-	and	ax,[di+0x337]		; 007BB
-	mov	cl,[0x4227]		; 007BF
+	and	ax,[di+offscreen_buffer]		; 007BB
+	mov	cl,[sprite_bit_shift]		; 007BF
 	mov	dh,0x0			; 007C3
 	ror	dx,cl			; 007C5
 	db	0x0B, 0xC2		; 007C7 or ax,dx
-	mov	[di+0x337],ax		; 007C9
-	jmp	short loc_007DB		; 007CD jmp 0x7db
-loc_007CF:
+	mov	[di+offscreen_buffer],ax		; 007C9
+	jmp	short draw_sprite_next_row		; 007CD jmp 0x7db
+draw_sprite_write_aligned_byte:
 	xor	al,0xff			; 007CF
-	and	al,[di+0x337]		; 007D1
+	and	al,[di+offscreen_buffer]		; 007D1
 	db	0x0A, 0xC2		; 007D5 or al,dl
-	mov	[di+0x337],al		; 007D7
-loc_007DB:
+	mov	[di+offscreen_buffer],al		; 007D7
+draw_sprite_next_row:
 	add	di,0x50			; 007DB
-	dec	byte [0x422a]		; 007DE
-	jnz	short loc_00794		; 007E2 jnz 0x794
-	dec	word [0x421c]		; 007E4
+	dec	byte [sprite_rows_left]		; 007DE
+	jnz	short draw_sprite_row_loop		; 007E2 jnz 0x794
+	dec	word [sprite_column_offset_rtl]		; 007E4
 	dec	bl			; 007E8
-	jnz	short loc_0078A		; 007EA jnz 0x78a
-loc_007EC:
-	cmp	word [0x4228],0x0	; 007EC
-	jz	short loc_0083A		; 007F1 jz 0x83a
-	mov	al,[0x4223]		; 007F3
-	mov	[0x422a],al		; 007F6
-	mov	di,[0x4230]		; 007F9
-loc_007FD:
-	call	advance_anim_frame	; 007FD
+	jnz	short draw_sprite_column_loop		; 007EA jnz 0x78a
+draw_sprite_check_left_partial_column:
+	cmp	word [sprite_partial_edge_column],0x0	; 007EC
+	jz	short draw_sprite_exit		; 007F1 jz 0x83a
+	mov	al,[sprite_rows]		; 007F3
+	mov	[sprite_rows_left],al		; 007F6
+	mov	di,[sprite_top_line_offset]		; 007F9
+draw_sprite_left_partial_row_loop:
+	call	next_sprite_bytes	; 007FD
 	cmp	al,0x0			; 00800
-	jz	short loc_00831		; 00802 jz 0x831
+	jz	short draw_sprite_left_partial_next_row		; 00802 jz 0x831
 	mov	cx,0x8			; 00804
+; reverses the 8 bits of AL and DL into AH and DH
+draw_sprite_left_partial_reverse_bits_loop:
 	shr	al,1			; 00807
 	rcl	ah,1			; 00809
 	shr	dl,1			; 0080B
@@ -226,19 +233,19 @@ loc_007FD:
 	db	0x8A, 0xD6		; 00813 mov dl,dh
 	mov	ah,0x0			; 00815
 	not	ax			; 00817
-	mov	cl,[0x4227]		; 00819
+	mov	cl,[sprite_bit_shift]		; 00819
 	ror	ax,cl			; 0081D
-	and	ah,[di+0x337]		; 0081F
-	mov	cl,[0x4227]		; 00823
+	and	ah,[di+offscreen_buffer]		; 0081F
+	mov	cl,[sprite_bit_shift]		; 00823
 	mov	dh,0x0			; 00827
 	ror	dx,cl			; 00829
 	db	0x0A, 0xE6		; 0082B or ah,dh
-	mov	[di+0x337],ah		; 0082D
-loc_00831:
+	mov	[di+offscreen_buffer],ah		; 0082D
+draw_sprite_left_partial_next_row:
 	add	di,0x50			; 00831
-	dec	byte [0x422a]		; 00834
-	jnz	short loc_007FD		; 00838 jnz 0x7fd
-loc_0083A:
+	dec	byte [sprite_rows_left]		; 00834
+	jnz	short draw_sprite_left_partial_row_loop		; 00838 jnz 0x7fd
+draw_sprite_exit:
 	pop	bp			; 0083A
 	ret				; 0083B
 
@@ -252,43 +259,44 @@ loc_0083A:
 ;   [bp+0x4] = sprite/figure index (word, >= 0xC8 uses fast path)
 ;   [bp+0x6] = X position (negative = entering from left)
 ;   [bp+0x8] = Y position
+; Despite the name this draws unflipped, left to right. It only clips columns hidden left of the screen. With X >= 0 it jumps straight to 00957 inside draw_sprite_rightedge (raw jmp 0xb57 at 00897).
 draw_sprite_mirrored:
 	push	bp			; 0083C
 	db	0x8B, 0xEC		; 0083D mov bp,sp
-	mov	byte [0x422c],0x0	; 0083F
-	mov	byte [0x422e],0x0	; 00844
+	mov	byte [sprite_image_run_left],0x0	; 0083F
+	mov	byte [sprite_mask_run_left],0x0	; 00844
 	mov	si,[bp+0x4]		; 00849
 	shl	si,1			; 0084C
-	mov	bx,[si+0x423c]		; 0084E
-	mov	[0x421e],bx		; 00852
-	mov	ax,[si+0x873a]		; 00856
-	mov	[0x4220],ax		; 0085A
-	mov	al,[bx+0x443c]		; 0085D
-	mov	[0x4222],al		; 00861
+	mov	bx,[si+sprite_image_offsets]		; 0084E
+	mov	[sprite_image_pos],bx		; 00852
+	mov	ax,[si+sprite_mask_offsets]		; 00856
+	mov	[sprite_mask_pos],ax		; 0085A
+	mov	al,[bx+sprite_image_bank]		; 0085D
+	mov	[sprite_columns_left],al		; 00861
 	cbw				; 00864
 	shl	ax,1			; 00865
 	shl	ax,1			; 00867
-	mov	[0x4224],ax		; 00869
-	mov	al,[bx+0x443d]		; 0086C
-	mov	[0x4223],al		; 00870
+	mov	[sprite_visible_width],ax		; 00869
+	mov	al,[bx+sprite_image_bank_byte1]		; 0086C
+	mov	[sprite_rows],al		; 00870
 	cbw				; 00873
 	sub	[bp+0x8],ax		; 00874
 	mov	ax,[bp+0x8]		; 00877
-	mul	byte [0x422b]		; 0087A
-	mov	[0x4230],ax		; 0087E
-	add	word [0x421e],0x3	; 00881
-	add	word [0x4220],0x3	; 00886
+	mul	byte [sprite_line_stride]		; 0087A
+	mov	[sprite_top_line_offset],ax		; 0087E
+	add	word [sprite_image_pos],0x3	; 00881
+	add	word [sprite_mask_pos],0x3	; 00886
 	mov	ax,[bp+0x6]		; 0088B
-	sub	ax,[0xe4]		; 0088E
+	sub	ax,[camera_x]		; 0088E
 	mov	[bp+0x6],ax		; 00892
-	jl	short loc_0089A		; 00895 jl 0x89a
-	jmp	0xb57			; 00897
-loc_0089A:
+	jl	short draw_sprite_mirrored_left_of_screen		; 00895 jl 0x89a
+	jmp	near draw_sprite_rightedge_compute_subpixel			; 00897
+draw_sprite_mirrored_left_of_screen:
 	db	0x8B, 0xD8		; 0089A mov bx,ax
-	add	bx,[0x4224]		; 0089C
-	jg	short loc_008A5		; 008A0 jg 0x8a5
-	jmp	0xc69			; 008A2
-loc_008A5:
+	add	bx,[sprite_visible_width]		; 0089C
+	jg	short draw_sprite_mirrored_clip_left_columns		; 008A0 jg 0x8a5
+	jmp	near draw_sprite_rightedge_exit			; 008A2
+draw_sprite_mirrored_clip_left_columns:
 	db	0x33, 0xDB		; 008A5 xor bx,bx
 	db	0x2B, 0xD8		; 008A7 sub bx,ax
 	db	0x8A, 0xC3		; 008A9 mov al,bl
@@ -296,66 +304,68 @@ loc_008A5:
 	mov	ah,0x4			; 008AD
 	db	0x2A, 0xE0		; 008AF sub ah,al
 	and	ah,0x3			; 008B1
-	mov	[0x4226],ah		; 008B4
+	mov	[sprite_subpixel_x],ah		; 008B4
 	shl	ah,1			; 008B8
-	mov	[0x4227],ah		; 008BA
+	mov	[sprite_bit_shift],ah		; 008BA
 	shr	bx,1			; 008BE
 	shr	bx,1			; 008C0
-	jz	short loc_008F7		; 008C2 jz 0x8f7
+	jz	short draw_sprite_mirrored_check_left_partial_column		; 008C2 jz 0x8f7
 	cmp	byte [bp+0x4],0xc8	; 008C4
-	jc	short loc_008E0		; 008C8 jc 0x8e0
-	mov	al,[0x4223]		; 008CA
+	jc	short draw_sprite_mirrored_skip_column_loop		; 008C8 jc 0x8e0
+	mov	al,[sprite_rows]		; 008CA
 	mul	bl			; 008CD
-	add	[0x421e],ax		; 008CF
-	sub	[0x4222],bl		; 008D3
+	add	[sprite_image_pos],ax		; 008CF
+	sub	[sprite_columns_left],bl		; 008D3
 	shl	bx,1			; 008D7
 	shl	bx,1			; 008D9
 	add	[bp+0x6],bx		; 008DB
-	jmp	short loc_008F7		; 008DE jmp 0x8f7
-loc_008E0:
-	mov	al,[0x4223]		; 008E0
+	jmp	short draw_sprite_mirrored_check_left_partial_column		; 008DE jmp 0x8f7
+draw_sprite_mirrored_skip_column_loop:
+	mov	al,[sprite_rows]		; 008E0
 	cbw				; 008E3
 	db	0x8B, 0xF8		; 008E4 mov di,ax
-loc_008E6:
-	call	advance_anim_frame	; 008E6
+draw_sprite_mirrored_skip_column_bytes_loop:
+	call	next_sprite_bytes	; 008E6
 	dec	di			; 008E9
-	jnz	short loc_008E6		; 008EA jnz 0x8e6
+	jnz	short draw_sprite_mirrored_skip_column_bytes_loop		; 008EA jnz 0x8e6
 	add	word [bp+0x6],0x4	; 008EC
-	dec	byte [0x4222]		; 008F0
+	dec	byte [sprite_columns_left]		; 008F0
 	dec	bx			; 008F4
-	jnz	short loc_008E0		; 008F5 jnz 0x8e0
-loc_008F7:
-	cmp	byte [0x4226],0x0	; 008F7
-	jz	short loc_0094C		; 008FC jz 0x94c
-	mov	al,[0x4223]		; 008FE
-	mov	[0x422a],al		; 00901
-	mov	di,[0x4230]		; 00904
+	jnz	short draw_sprite_mirrored_skip_column_loop		; 008F5 jnz 0x8e0
+draw_sprite_mirrored_check_left_partial_column:
+	cmp	byte [sprite_subpixel_x],0x0	; 008F7
+	jz	short draw_sprite_rightedge_recompute_clip		; 008FC jz 0x94c
+	mov	al,[sprite_rows]		; 008FE
+	mov	[sprite_rows_left],al		; 00901
+	mov	di,[sprite_top_line_offset]		; 00904
 	cmp	byte [bp+0x4],0xc8	; 00908
-	jc	short loc_00911		; 0090C jc 0x911
-	jmp	0xc6b			; 0090E
-loc_00911:
-	call	advance_anim_frame	; 00911
+	jc	short draw_sprite_mirrored_left_partial_row_loop		; 0090C jc 0x911
+	jmp	near draw_sprite_rightedge_opaque_left_partial			; 0090E
+draw_sprite_mirrored_left_partial_row_loop:
+	call	next_sprite_bytes	; 00911
 	cmp	al,0x0			; 00914
-	jz	short loc_00936		; 00916 jz 0x936
+	jz	short draw_sprite_mirrored_left_partial_next_row		; 00916 jz 0x936
 	mov	ah,0x0			; 00918
 	db	0x23, 0xD0		; 0091A and dx,ax
 	not	ax			; 0091C
-	mov	cl,[0x4227]		; 0091E
+	mov	cl,[sprite_bit_shift]		; 0091E
 	ror	ax,cl			; 00922
-	and	ah,[di+0x337]		; 00924
-	mov	cl,[0x4227]		; 00928
+	and	ah,[di+offscreen_buffer]		; 00924
+	mov	cl,[sprite_bit_shift]		; 00928
 	mov	dh,0x0			; 0092C
 	ror	dx,cl			; 0092E
 	db	0x0A, 0xE6		; 00930 or ah,dh
-	mov	[di+0x337],ah		; 00932
-loc_00936:
+	mov	[di+offscreen_buffer],ah		; 00932
+draw_sprite_mirrored_left_partial_next_row:
 	add	di,0x50			; 00936
-	dec	byte [0x422a]		; 00939
-	jnz	short loc_00911		; 0093D jnz 0x911
+	dec	byte [sprite_rows_left]		; 00939
+	jnz	short draw_sprite_mirrored_left_partial_row_loop		; 0093D jnz 0x911
+; advance X by 4 and drop a column; also reached from the opaque left-partial path
+draw_sprite_mirrored_left_partial_column_done:
 	add	word [bp+0x6],0x4	; 0093F
-	dec	byte [0x4222]		; 00943
-	jnz	short loc_0094C		; 00947 jnz 0x94c
-	jmp	0xc69			; 00949
+	dec	byte [sprite_columns_left]		; 00943
+	jnz	short draw_sprite_rightedge_recompute_clip		; 00947 jnz 0x94c
+	jmp	near draw_sprite_rightedge_exit			; 00949
 
 ; ---- function draw_sprite_rightedge ----
 ; Handles sprites extending past the RIGHT edge of screen (X + width > 320).
@@ -363,202 +373,212 @@ loc_00936:
 ; right-edge clipping. Continues using bp from draw_sprite's frame.
 ;
 ; Parameters: same as draw_sprite (continues draw_sprite's stack frame)
+; Correction: entered only from draw_sprite_mirrored, never from draw_sprite. It is the main left-to-right column loop, not only the right-edge case.
+; Sprite indices >= 0xC8 use opaque paths at the end of this function: they copy raw bytes from DS:0x443C with no mask stream and no next_sprite_bytes call.
 draw_sprite_rightedge:
-loc_0094C:
-	mov	al,[0x4222]		; 0094C
+draw_sprite_rightedge_recompute_clip:
+	mov	al,[sprite_columns_left]		; 0094C
 	cbw				; 0094F
 	shl	ax,1			; 00950
 	shl	ax,1			; 00952
-	mov	[0x4224],ax		; 00954
+	mov	[sprite_visible_width],ax		; 00954
+; entered from draw_sprite_mirrored when X >= 0
+draw_sprite_rightedge_compute_subpixel:
 	mov	ax,[bp+0x6]		; 00957
 	and	al,0x3			; 0095A
-	mov	[0x4226],al		; 0095C
+	mov	[sprite_subpixel_x],al		; 0095C
 	shl	al,1			; 0095F
-	mov	[0x4227],al		; 00961
+	mov	[sprite_bit_shift],al		; 00961
 	mov	ax,[bp+0x6]		; 00964
 	sub	ax,0x140		; 00967
-	jng	short loc_0096F		; 0096A jng 0x96f
-	jmp	0xc69			; 0096C
-loc_0096F:
-	mov	word [0x4228],0x0	; 0096F
-	add	ax,[0x4224]		; 00975
-	jng	short loc_00995		; 00979 jng 0x995
-	cmp	byte [0x4226],0x0	; 0097B
-	jz	short loc_00988		; 00980 jz 0x988
-	mov	word [0x4228],0x1	; 00982
-loc_00988:
-	mov	al,[0x4226]		; 00988
+	jng	short draw_sprite_rightedge_check_right_overhang		; 0096A jng 0x96f
+	jmp	near draw_sprite_rightedge_exit			; 0096C
+draw_sprite_rightedge_check_right_overhang:
+	mov	word [sprite_partial_edge_column],0x0	; 0096F
+	add	ax,[sprite_visible_width]		; 00975
+	jng	short draw_sprite_rightedge_compute_columns		; 00979 jng 0x995
+	cmp	byte [sprite_subpixel_x],0x0	; 0097B
+	jz	short draw_sprite_rightedge_clamp_width		; 00980 jz 0x988
+	mov	word [sprite_partial_edge_column],0x1	; 00982
+draw_sprite_rightedge_clamp_width:
+	mov	al,[sprite_subpixel_x]		; 00988
 	cbw				; 0098B
 	add	ax,0x140		; 0098C
 	sub	ax,[bp+0x6]		; 0098F
-	mov	[0x4224],ax		; 00992
-loc_00995:
+	mov	[sprite_visible_width],ax		; 00992
+draw_sprite_rightedge_compute_columns:
 	mov	ax,[bp+0x6]		; 00995
 	db	0x8B, 0xD0		; 00998 mov dx,ax
-	add	ax,[0x4224]		; 0099A
+	add	ax,[sprite_visible_width]		; 0099A
 	shr	ax,1			; 0099E
 	shr	ax,1			; 009A0
 	shr	dx,1			; 009A2
 	shr	dx,1			; 009A4
 	db	0x2B, 0xC2		; 009A6 sub ax,dx
-	sub	ax,[0x4228]		; 009A8
+	sub	ax,[sprite_partial_edge_column]		; 009A8
 	db	0x8A, 0xE8		; 009AC mov ch,al
-	jz	short loc_00A1E		; 009AE jz 0xa1e
-	mov	di,[0x4230]		; 009B0
+	jz	short draw_sprite_rightedge_check_right_partial_column		; 009AE jz 0xa1e
+	mov	di,[sprite_top_line_offset]		; 009B0
 	mov	dx,[bp+0x6]		; 009B4
 	shr	dx,1			; 009B7
 	shr	dx,1			; 009B9
 	db	0x03, 0xFA		; 009BB add di,dx
-	mov	[0x4232],di		; 009BD
+	mov	[sprite_column_offset],di		; 009BD
 	cmp	byte [bp+0x4],0xc8	; 009C1
-	jc	short loc_009CA		; 009C5 jc 0x9ca
-	jmp	0xc9f			; 009C7
-loc_009CA:
-	mov	al,[0x4223]		; 009CA
+	jc	short draw_sprite_rightedge_column_loop		; 009C5 jc 0x9ca
+	jmp	near draw_sprite_rightedge_opaque_columns			; 009C7
+draw_sprite_rightedge_column_loop:
+	mov	al,[sprite_rows]		; 009CA
 	db	0x8A, 0xD8		; 009CD mov bl,al
-	mov	di,[0x4232]		; 009CF
-loc_009D3:
-	call	advance_anim_frame	; 009D3
+	mov	di,[sprite_column_offset]		; 009CF
+draw_sprite_rightedge_row_loop:
+	call	next_sprite_bytes	; 009D3
 	cmp	al,0x0			; 009D6
-	jz	short loc_00A0B		; 009D8 jz 0xa0b
-	cmp	byte [0x4226],0x0	; 009DA
-	jz	short loc_009FF		; 009DF jz 0x9ff
+	jz	short draw_sprite_rightedge_next_row		; 009D8 jz 0xa0b
+	cmp	byte [sprite_subpixel_x],0x0	; 009DA
+	jz	short draw_sprite_rightedge_write_aligned_byte		; 009DF jz 0x9ff
 	mov	ah,0x0			; 009E1
 	not	ax			; 009E3
-	mov	cl,[0x4227]		; 009E5
+	mov	cl,[sprite_bit_shift]		; 009E5
 	ror	ax,cl			; 009E9
-	and	ax,[di+0x337]		; 009EB
-	mov	cl,[0x4227]		; 009EF
+	and	ax,[di+offscreen_buffer]		; 009EB
+	mov	cl,[sprite_bit_shift]		; 009EF
 	mov	dh,0x0			; 009F3
 	ror	dx,cl			; 009F5
 	db	0x0B, 0xC2		; 009F7 or ax,dx
-	mov	[di+0x337],ax		; 009F9
-	jmp	short loc_00A0B		; 009FD jmp 0xa0b
-loc_009FF:
+	mov	[di+offscreen_buffer],ax		; 009F9
+	jmp	short draw_sprite_rightedge_next_row		; 009FD jmp 0xa0b
+draw_sprite_rightedge_write_aligned_byte:
 	not	al			; 009FF
-	and	al,[di+0x337]		; 00A01
+	and	al,[di+offscreen_buffer]		; 00A01
 	db	0x0A, 0xC2		; 00A05 or al,dl
-	mov	[di+0x337],al		; 00A07
-loc_00A0B:
+	mov	[di+offscreen_buffer],al		; 00A07
+draw_sprite_rightedge_next_row:
 	add	di,0x50			; 00A0B
 	dec	bl			; 00A0E
-	jnz	short loc_009D3		; 00A10 jnz 0x9d3
+	jnz	short draw_sprite_rightedge_row_loop		; 00A10 jnz 0x9d3
 	add	word [bp+0x6],0x4	; 00A12
-	inc	word [0x4232]		; 00A16
+	inc	word [sprite_column_offset]		; 00A16
 	dec	ch			; 00A1A
-	jnz	short loc_009CA		; 00A1C jnz 0x9ca
-loc_00A1E:
-	cmp	word [0x4228],0x0	; 00A1E
-	jz	short loc_00A69		; 00A23 jz 0xa69
-	mov	al,[0x4223]		; 00A25
-	mov	[0x422a],al		; 00A28
-	mov	di,[0x4230]		; 00A2B
+	jnz	short draw_sprite_rightedge_column_loop		; 00A1C jnz 0x9ca
+draw_sprite_rightedge_check_right_partial_column:
+	cmp	word [sprite_partial_edge_column],0x0	; 00A1E
+	jz	short draw_sprite_rightedge_exit		; 00A23 jz 0xa69
+	mov	al,[sprite_rows]		; 00A25
+	mov	[sprite_rows_left],al		; 00A28
+	mov	di,[sprite_top_line_offset]		; 00A2B
 	add	di,0x4f			; 00A2F
 	cmp	byte [bp+0x4],0xc8	; 00A32
-	jc	short loc_00A3B		; 00A36 jc 0xa3b
-	jmp	0xd1e			; 00A38
-loc_00A3B:
-	call	advance_anim_frame	; 00A3B
+	jc	short draw_sprite_rightedge_right_partial_row_loop		; 00A36 jc 0xa3b
+	jmp	near draw_sprite_rightedge_opaque_right_partial			; 00A38
+draw_sprite_rightedge_right_partial_row_loop:
+	call	next_sprite_bytes	; 00A3B
 	cmp	al,0x0			; 00A3E
-	jz	short loc_00A60		; 00A40 jz 0xa60
+	jz	short draw_sprite_rightedge_right_partial_next_row		; 00A40 jz 0xa60
 	mov	ah,0x0			; 00A42
 	db	0x23, 0xD0		; 00A44 and dx,ax
 	not	ax			; 00A46
-	mov	cl,[0x4227]		; 00A48
+	mov	cl,[sprite_bit_shift]		; 00A48
 	ror	ax,cl			; 00A4C
-	and	al,[di+0x337]		; 00A4E
-	mov	cl,[0x4227]		; 00A52
+	and	al,[di+offscreen_buffer]		; 00A4E
+	mov	cl,[sprite_bit_shift]		; 00A52
 	mov	dh,0x0			; 00A56
 	ror	dx,cl			; 00A58
 	db	0x0A, 0xC2		; 00A5A or al,dl
-	mov	[di+0x337],al		; 00A5C
-loc_00A60:
+	mov	[di+offscreen_buffer],al		; 00A5C
+draw_sprite_rightedge_right_partial_next_row:
 	add	di,0x50			; 00A60
-	dec	byte [0x422a]		; 00A63
-	jnz	short loc_00A3B		; 00A67 jnz 0xa3b
-loc_00A69:
+	dec	byte [sprite_rows_left]		; 00A63
+	jnz	short draw_sprite_rightedge_right_partial_row_loop		; 00A67 jnz 0xa3b
+draw_sprite_rightedge_exit:
 	pop	bp			; 00A69
 	ret				; 00A6A
 ; Fast-path renderers: reached via jumps when [bp+0x4] >= 0xC8.
 ; These skip the bit rotation loop and write sprite data directly,
 ; which is faster for large/aligned sprites.
-	mov	si,[0x421e]		; 00A6B
-loc_00A6F:
-	mov	dl,[si+0x443c]		; 00A6F
+; fast path taken from draw_sprite_mirrored when [bp+4] >= 0xC8
+draw_sprite_rightedge_opaque_left_partial:
+	mov	si,[sprite_image_pos]		; 00A6B
+draw_sprite_rightedge_opaque_left_partial_row_loop:
+	mov	dl,[si+sprite_image_bank]		; 00A6F
 	mov	ax,0xff00		; 00A73
 	inc	si			; 00A76
-	mov	cl,[0x4227]		; 00A77
+	mov	cl,[sprite_bit_shift]		; 00A77
 	ror	ax,cl			; 00A7B
-	and	ah,[di+0x337]		; 00A7D
-	mov	cl,[0x4227]		; 00A81
+	and	ah,[di+offscreen_buffer]		; 00A7D
+	mov	cl,[sprite_bit_shift]		; 00A81
 	mov	dh,0x0			; 00A85
 	ror	dx,cl			; 00A87
 	db	0x0A, 0xE6		; 00A89 or ah,dh
-	mov	[di+0x337],ah		; 00A8B
+	mov	[di+offscreen_buffer],ah		; 00A8B
 	add	di,0x50			; 00A8F
-	dec	byte [0x422a]		; 00A92
-	jnz	short loc_00A6F		; 00A96 jnz 0xa6f
-	mov	[0x421e],si		; 00A98
-	jmp	0xb3f			; 00A9C
-	mov	bl,[0x4227]		; 00A9F
+	dec	byte [sprite_rows_left]		; 00A92
+	jnz	short draw_sprite_rightedge_opaque_left_partial_row_loop		; 00A96 jnz 0xa6f
+	mov	[sprite_image_pos],si		; 00A98
+	jmp	near draw_sprite_mirrored_left_partial_column_done			; 00A9C
+; fast path taken when [bp+4] >= 0xC8; picks aligned or shifted column loop
+draw_sprite_rightedge_opaque_columns:
+	mov	bl,[sprite_bit_shift]		; 00A9F
 	db	0x32, 0xFF		; 00AA3 xor bh,bh
-	mov	si,[0x421e]		; 00AA5
+	mov	si,[sprite_image_pos]		; 00AA5
 	cmp	bx,0x0			; 00AA9
-	jnz	short loc_00ADD		; 00AAC jnz 0xadd
-loc_00AAE:
-	mov	al,[0x4223]		; 00AAE
-	mov	[0x422a],al		; 00AB1
-	mov	di,[0x4232]		; 00AB4
-loc_00AB8:
-	mov	dl,[si+0x443c]		; 00AB8
+	jnz	short draw_sprite_rightedge_opaque_shifted_column_loop		; 00AAC jnz 0xadd
+draw_sprite_rightedge_opaque_aligned_column_loop:
+	mov	al,[sprite_rows]		; 00AAE
+	mov	[sprite_rows_left],al		; 00AB1
+	mov	di,[sprite_column_offset]		; 00AB4
+draw_sprite_rightedge_opaque_aligned_row_loop:
+	mov	dl,[si+sprite_image_bank]		; 00AB8
 	inc	si			; 00ABC
-	mov	[di+0x337],dl		; 00ABD
+	mov	[di+offscreen_buffer],dl		; 00ABD
 	add	di,0x50			; 00AC1
-	dec	byte [0x422a]		; 00AC4
-	jnz	short loc_00AB8		; 00AC8 jnz 0xab8
+	dec	byte [sprite_rows_left]		; 00AC4
+	jnz	short draw_sprite_rightedge_opaque_aligned_row_loop		; 00AC8 jnz 0xab8
 	add	word [bp+0x6],0x4	; 00ACA
-	inc	word [0x4232]		; 00ACE
+	inc	word [sprite_column_offset]		; 00ACE
 	dec	ch			; 00AD2
-	jnz	short loc_00AAE		; 00AD4 jnz 0xaae
-	mov	[0x421e],si		; 00AD6
-	jmp	0xc1e			; 00ADA
-loc_00ADD:
-	mov	al,[0x4223]		; 00ADD
-	mov	[0x422a],al		; 00AE0
-	mov	di,[0x4232]		; 00AE3
-loc_00AE7:
-	mov	dl,[si+0x443c]		; 00AE7
+	jnz	short draw_sprite_rightedge_opaque_aligned_column_loop		; 00AD4 jnz 0xaae
+	mov	[sprite_image_pos],si		; 00AD6
+	jmp	near draw_sprite_rightedge_check_right_partial_column			; 00ADA
+draw_sprite_rightedge_opaque_shifted_column_loop:
+	mov	al,[sprite_rows]		; 00ADD
+	mov	[sprite_rows_left],al		; 00AE0
+	mov	di,[sprite_column_offset]		; 00AE3
+draw_sprite_rightedge_opaque_shifted_row_loop:
+	mov	dl,[si+sprite_image_bank]		; 00AE7
 	inc	si			; 00AEB
-	mov	ax,[bx+0x4234]		; 00AEC
-	and	ax,[di+0x337]		; 00AF0
-	mov	cl,[0x4227]		; 00AF4
+	mov	ax,[bx+sprite_opaque_keep_masks]		; 00AEC
+	and	ax,[di+offscreen_buffer]		; 00AF0
+	mov	cl,[sprite_bit_shift]		; 00AF4
 	db	0x32, 0xF6		; 00AF8 xor dh,dh
 	ror	dx,cl			; 00AFA
 	db	0x0B, 0xC2		; 00AFC or ax,dx
-	mov	[di+0x337],ax		; 00AFE
+	mov	[di+offscreen_buffer],ax		; 00AFE
 	add	di,0x50			; 00B02
-	dec	byte [0x422a]		; 00B05
-	jnz	short loc_00AE7		; 00B09 jnz 0xae7
+	dec	byte [sprite_rows_left]		; 00B05
+	jnz	short draw_sprite_rightedge_opaque_shifted_row_loop		; 00B09 jnz 0xae7
 	add	word [bp+0x6],0x4	; 00B0B
-	inc	word [0x4232]		; 00B0F
+	inc	word [sprite_column_offset]		; 00B0F
 	dec	ch			; 00B13
-	jnz	short loc_00ADD		; 00B15 jnz 0xadd
-	mov	[0x421e],si		; 00B17
-	jmp	0xc1e			; 00B1B
-	mov	si,[0x421e]		; 00B1E
-loc_00B22:
-	mov	dl,[si+0x443c]		; 00B22
+	jnz	short draw_sprite_rightedge_opaque_shifted_column_loop		; 00B15 jnz 0xadd
+	mov	[sprite_image_pos],si		; 00B17
+	jmp	near draw_sprite_rightedge_check_right_partial_column			; 00B1B
+; fast path taken when [bp+4] >= 0xC8
+draw_sprite_rightedge_opaque_right_partial:
+	mov	si,[sprite_image_pos]		; 00B1E
+draw_sprite_rightedge_opaque_right_partial_row_loop:
+	mov	dl,[si+sprite_image_bank]		; 00B22
 	inc	si			; 00B26
 	mov	ax,0xff00		; 00B27
-	mov	cl,[0x4227]		; 00B2A
+	mov	cl,[sprite_bit_shift]		; 00B2A
 	ror	ax,cl			; 00B2E
-	and	al,[di+0x337]		; 00B30
-	mov	cl,[0x4227]		; 00B34
+	and	al,[di+offscreen_buffer]		; 00B30
+	mov	cl,[sprite_bit_shift]		; 00B34
 	mov	dh,0x0			; 00B38
 	ror	dx,cl			; 00B3A
 	db	0x0A, 0xC2		; 00B3C or al,dl
-	mov	[di+0x337],al		; 00B3E
+	mov	[di+offscreen_buffer],al		; 00B3E
 	add	di,0x50			; 00B42
-	dec	byte [0x422a]		; 00B45
-	jnz	short loc_00B22		; 00B49 jnz 0xb22
-	jmp	0xc69			; 00B4B
+	dec	byte [sprite_rows_left]		; 00B45
+	jnz	short draw_sprite_rightedge_opaque_right_partial_row_loop		; 00B49 jnz 0xb22
+	jmp	near draw_sprite_rightedge_exit			; 00B4B

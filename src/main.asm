@@ -19,6 +19,9 @@
 ;
 ; DS = DGROUP (code+data segment)
 ; ES = PSP segment (set by DOS before program start)
+; The init_iob_entry calls are really fopen(name, mode, iob), reopening redirected streams on DOS 1: stdin from [stdin_redir] mode "r", stdout from [stdout_redir] mode "w", or from the name after '>' mode "a" for '>>', and stderr with an empty name mode "a".
+; On a failed open, init_file_system prints "Can't open stdin file" or "Can't open stdout file" to stderr and show_insert_disk(1) exits.
+; DOS 2+ goes straight to the code at 0x5AA6 that sets up the predefined handles.
 main:
 	push	bp			; 05953
 	sub	sp,0xe			; 05954 - allocate 14 bytes of locals
@@ -29,29 +32,29 @@ main:
 ; Stores up to 32 argument pointers in argv[]. Null-terminates each arg
 ; by replacing the whitespace delimiter with 0x00.
 	mov	word [argc],0x0		; 05959 - argc = 0
-loc_0595F:
+main_parse_next_arg:
 	cmp	word [argc],0x20	; 0595F - if argc >= 32, stop parsing
-	jnl	short loc_059D4		; 05964 jnl 0x59d4
-loc_05966:
+	jnl	short main_args_parsed_check_dos_version		; 05964 jnl 0x59d4
+main_skip_whitespace_loop:
 ; Skip whitespace characters (ctype bit 3 = whitespace)
 	mov	si,[bp+0x12]		; 05966 - si = current position in cmdline
 	mov	al,[si]			; 05969 - al = current char
 	xor	ah,ah			; 0596B
 	inc	ax			; 0596D
 	db	0x8B, 0xF8		; 0596E mov di,ax
-	mov	al,[di+0xe4c4]		; 05970 - lookup ctype[char] (0xe4c4 = ctype table)
+	mov	al,[di+ctype_with_eof]		; 05970 - lookup ctype[char] (0xe4c4 = ctype table)
 	xor	ah,ah			; 05974
 	db	0x25, 0x08, 0x00	; 05976 and ax,0x8 - test whitespace bit
-	jz	short loc_05980		; 05979 - not whitespace, start new arg
+	jz	short main_check_end_of_cmdline		; 05979 - not whitespace, start new arg
 	inc	word [bp+0x12]		; 0597B - skip this whitespace char
-	jmp	short loc_05966		; 0597E - check next char
-loc_05980:
+	jmp	short main_skip_whitespace_loop		; 0597E - check next char
+main_check_end_of_cmdline:
 ; Check for end of string
 	mov	si,[bp+0x12]		; 05980
 	mov	al,[si]			; 05983
 	xor	ah,ah			; 05985
 	test	ax,ax			; 05987
-	jz	short loc_059D4		; 05989 - null terminator, done parsing
+	jz	short main_args_parsed_check_dos_version		; 05989 - null terminator, done parsing
 
 ; Record this argument in argv[]
 	mov	ax,[argc]		; 0598B
@@ -59,24 +62,24 @@ loc_05980:
 	shl	ax,1			; 05992 - word index
 	db	0x8B, 0xF0		; 05994 mov si,ax
 	mov	ax,[bp+0x12]		; 05996
-	mov	[si+0xe440],ax		; 05999 - argv[i] = pointer to this arg (0xe440 = argv)
-loc_0599D:
+	mov	[si+argv],ax		; 05999 - argv[i] = pointer to this arg (0xe440 = argv)
+main_scan_arg_end_loop:
 ; Scan forward to next whitespace or end of string
 	mov	si,[bp+0x12]		; 0599D
 	mov	al,[si]			; 059A0
 	xor	ah,ah			; 059A2
 	test	ax,ax			; 059A4
 	mov	[bp+0x0],ax		; 059A6 - save char value
-	jz	short loc_059BE		; 059A9 - null terminator, end of arg
+	jz	short main_terminate_arg		; 059A9 - null terminator, end of arg
 	inc	ax			; 059AB
 	db	0x8B, 0xF8		; 059AC mov di,ax
-	mov	al,[di+0xe4c4]		; 059AE - lookup ctype[char]
+	mov	al,[di+ctype_with_eof]		; 059AE - lookup ctype[char]
 	xor	ah,ah			; 059B2
 	db	0x25, 0x08, 0x00	; 059B4 and ax,0x8 - test whitespace bit
-	jnz	short loc_059BE		; 059B7 - whitespace found, end of arg
+	jnz	short main_terminate_arg		; 059B7 - whitespace found, end of arg
 	inc	word [bp+0x12]		; 059B9 - advance to next char
-	jmp	short loc_0599D		; 059BC - keep scanning
-loc_059BE:
+	jmp	short main_scan_arg_end_loop		; 059BC - keep scanning
+main_terminate_arg:
 ; Null-terminate this argument
 	mov	si,[bp+0x12]		; 059BE
 	mov	al,[si]			; 059C1
@@ -85,19 +88,19 @@ loc_059BE:
 	mov	[bp+0x4],al		; 059C9 - save original delimiter char
 	xor	ah,ah			; 059CC
 	test	ax,ax			; 059CE
-	jnz	short loc_0595F		; 059D0 - more chars, parse next arg
-	jmp	short loc_059D4		; 059D2 - done
+	jnz	short main_parse_next_arg		; 059D0 - more chars, parse next arg
+	jmp	short main_args_parsed_check_dos_version		; 059D2 - done
 
 ; --- Phase 2: Check DOS version ---
-loc_059D4:
+main_args_parsed_check_dos_version:
 	mov	al,[dos_version]	; 059D4 - DOS major version
 	xor	ah,ah			; 059D7
 	db	0x3D, 0x02, 0x00	; 059D9 cmp ax,0x2
-	jl	short loc_059E1		; 059DC - DOS < 2: skip I/O redirection setup
-	jmp	0x5ca6			; 059DE - DOS >= 2: jump to I/O redirection handler (in crt.asm)
+	jl	short main_open_redirected_streams_dos1		; 059DC - DOS < 2: skip I/O redirection setup
+	jmp	near main_configure_stdio_dos2			; 059DE - DOS >= 2: jump to I/O redirection handler (in crt.asm)
 
 ; --- Phase 3: Set up I/O handles (DOS 1.x path) ---
-loc_059E1:
+main_open_redirected_streams_dos1:
 ; Save interrupt vectors for stdin (INT 19h)
 	mov	ax,iob_stdin		; 059E1 - address of stdin I/O block
 	push	ax			; 059E4
@@ -113,7 +116,7 @@ loc_059E1:
 	xor	bh,bh			; 059F6
 	cmp	bx,0x3e			; 059F8 - is it '>' (0x3E)?
 	mov	[bp+0x8],ax		; 059FB - save stdin result
-	jz	short loc_05A16		; 059FE - yes: append mode, use INT 3Ah
+	jz	short main_open_stdout_append		; 059FE - yes: append mode, use INT 3Ah
 
 ; Save interrupt vectors for stdout (INT 39h, normal mode)
 	mov	ax,iob_stdout		; 05A00 - address of stdout I/O block
@@ -125,9 +128,9 @@ loc_059E1:
 	call	init_iob_entry		; 05A0C - init_iob_entry(0x39, save_buf, iob_stdout)
 	db	0x8B, 0xE5		; 05A0F mov sp,bp
 	mov	[bp+0xa],ax		; 05A11 - save stdout result
-	jmp	short loc_05A2A		; 05A14 jmp 0x5a2a
+	jmp	short main_open_stderr		; 05A14 jmp 0x5a2a
 
-loc_05A16:
+main_open_stdout_append:
 ; Save interrupt vectors for stdout (INT 3Ah, append mode)
 	mov	ax,iob_stdout		; 05A16 - address of stdout I/O block
 	push	ax			; 05A19
@@ -139,7 +142,7 @@ loc_05A16:
 	db	0x8B, 0xE5		; 05A25 mov sp,bp
 	mov	[bp+0xa],ax		; 05A27 - save stdout result
 
-loc_05A2A:
+main_open_stderr:
 ; Save interrupt vectors for stderr
 	mov	ax,iob_stderr		; 05A2A - address of stderr I/O block
 	push	ax			; 05A2D
@@ -151,7 +154,7 @@ loc_05A2A:
 	db	0x8B, 0xE5		; 05A39 mov sp,bp
 	test	ax,ax			; 05A3B
 	mov	[bp+0xc],ax		; 05A3D - save stderr result
-	jnz	short loc_05A4B		; 05A40 - if non-zero, skip CRT I/O init
+	jnz	short main_check_stdin_opened		; 05A40 - if non-zero, skip CRT I/O init
 
 ; stderr setup failed, initialize CRT I/O manually
 	mov	ax,0x1			; 05A42
@@ -160,9 +163,9 @@ loc_05A2A:
 	db	0x8B, 0xE5		; 05A49 mov sp,bp
 
 ; --- Phase 4: Initialize file system ---
-loc_05A4B:
+main_check_stdin_opened:
 	cmp	word [bp+0x8],0x0	; 05A4B - check stdin result
-	jnz	short loc_05A66		; 05A4F - non-zero: skip file system init
+	jnz	short main_set_stdin_buffer		; 05A4F - non-zero: skip file system init
 
 ; stdin handle not available, initialize file system
 	push	word [bp+0xc]		; 05A51 - stderr result
@@ -175,7 +178,7 @@ loc_05A4B:
 	call	show_insert_disk	; 05A61 - prompt for game disk
 	db	0x8B, 0xE5		; 05A64 mov sp,bp
 
-loc_05A66:
+main_set_stdin_buffer:
 ; Format stdin I/O block string
 	push	word [stdio_bufsiz]	; 05A66 - default buffer size (512)
 	call	string_copy		; 05A6A
@@ -194,10 +197,10 @@ loc_05A66:
 
 ; Check stdout result
 	cmp	word [bp+0xa],0x0	; 05A86
-	jz	short loc_05A8F		; 05A8A - zero: need to init file system for stdout
-	jmp	0x5d14			; 05A8C - non-zero: jump to stdout init (in crt.asm)
+	jz	short main_stdout_open_failed		; 05A8A - zero: need to init file system for stdout
+	jmp	near main_call_game_init			; 05A8C - non-zero: jump to stdout init (in crt.asm)
 
-loc_05A8F:
+main_stdout_open_failed:
 ; Initialize file system for stdout path
 	push	word [bp+0xc]		; 05A8F - stderr result
 	mov	ax,0xe49e		; 05A92 - second file system config address
@@ -208,10 +211,12 @@ loc_05A8F:
 	push	ax			; 05A9E
 	call	show_insert_disk	; 05A9F - prompt for game disk
 	db	0x8B, 0xE5		; 05AA2 mov sp,bp
-	jmp	short loc_05B14		; 05AA4 jmp 0x5b14
+	jmp	short main_call_game_init		; 05AA4 jmp 0x5b14
 
 ; --- Phase 5: Configure stdio device flags (reached from DOS 2+ path) ---
 ; Sets up _iob[] flags for stdin/stdout/stderr based on device mode
+; DOS 2+ path: sets stdin/stdout/stderr flags and fds
+main_configure_stdio_dos2:
 	mov	byte [iob_stdin+9],0x0	; 05AA6 - stdin flags2 = 0
 	mov	al,0x1			; 05AAB
 	mov	bl,0x2			; 05AAD
@@ -223,12 +228,12 @@ loc_05A8F:
 	mov	[iob_stdin+8],al	; 05AC3 - stdin flags1 = 1 (text mode/open)
 	mov	[iob_stderr+9],bl	; 05AC6 - stderr flags2 = 2
 	mov	[iob_stdout+8],bl	; 05ACA - stdout flags1 = 2
-	jz	short loc_05AD5		; 05ACE - no mode mismatch: ax = 0
+	jz	short main_device_mode_clear		; 05ACE - no mode mismatch: ax = 0
 	mov	ax,0x10			; 05AD0 - mode mismatch: ax = 0x10
-	jmp	short loc_05AD7		; 05AD3 jmp 0x5ad7
-loc_05AD5:
+	jmp	short main_store_device_mode		; 05AD3 jmp 0x5ad7
+main_device_mode_clear:
 	db	0x33, 0xC0		; 05AD5 xor ax,ax
-loc_05AD7:
+main_store_device_mode:
 	mov	[bp+0x5],ax		; 05AD7 - save device mode flags
 	or	ax,0xc0			; 05ADA - add read+write bits
 	mov	word [file_stdout+2],0x1	; 05ADD - stdout FILE fd = 1
@@ -243,7 +248,7 @@ loc_05AD7:
 	call	dos_ioctl		; 05AFF - check if stdout is a character device
 	db	0x8B, 0xE5		; 05B02 mov sp,bp
 	and	ax,0x80			; 05B04 - bit 7 = character device flag
-	jz	short loc_05B14		; 05B07 - not a char device: skip
+	jz	short main_call_game_init		; 05B07 - not a char device: skip
 
 ; stdout is a character device, set char-device bit in flags
 	mov	al,[iob_stdout+8]	; 05B09 - get stdout flags1
@@ -252,7 +257,7 @@ loc_05AD7:
 	mov	[iob_stdout+8],al	; 05B11 - store updated flags
 
 ; --- Phase 6: Call game_init(argv, argc) ---
-loc_05B14:
+main_call_game_init:
 	mov	ax,argv			; 05B14 - address of argument vector
 	push	ax			; 05B17
 	push	word [argc]		; 05B18 - argument count
@@ -287,13 +292,13 @@ strncmp:
 	push	bp			; 05B2E
 	sub	sp,0x8			; 05B2F
 	db	0x8B, 0xEC		; 05B32 mov bp,sp
-loc_05B34:
+strncmp_compare_loop:
 	cmp	word [bp+0x10],0x0	; 05B34 - count exhausted?
-	jz	short loc_05B6F		; 05B38 jz 0x5b6f
+	jz	short strncmp_loop_ended		; 05B38 jz 0x5b6f
 	mov	si,[bp+0xc]		; 05B3A - si = str1
 	db	0x82			; 05B3D         --+
 	cmp	al,0x0			; 05B3E          | = cmp byte [si],0x0 (*str1 == null?) (*str1 == null?)
-	jz	short loc_05B6F		; 05B40 jz 0x5b6f
+	jz	short strncmp_loop_ended		; 05B40 jz 0x5b6f
 	mov	di,[bp+0xe]		; 05B42 - di = str2
 	db	0x82			; 05B45         --+
 	cmp	ax,0x7400		; 05B46      | = cmp byte [di],0x0; jz ...  (db 82 3D 00 74 xx)
@@ -307,36 +312,36 @@ loc_05B34:
 	xor	ch,ch			; 05B5A
 	db	0x2B, 0xCB		; 05B5C sub cx,bx - diff = *str1 - *str2
 	mov	[bp+0x6],cx		; 05B5E
-	jz	short loc_05B6A		; 05B61 - if equal, continue
+	jz	short strncmp_next_char		; 05B61 - if equal, continue
 	db	0x8B, 0xC1		; 05B63 mov ax,cx - return difference
 	add	sp,0x8			; 05B65
 	pop	bp			; 05B68
 	ret				; 05B69
-loc_05B6A:
+strncmp_next_char:
 	dec	word [bp+0x10]		; 05B6A - count--
-	jmp	short loc_05B34		; 05B6D - next iteration
-loc_05B6F:
+	jmp	short strncmp_compare_loop		; 05B6D - next iteration
+strncmp_loop_ended:
 ; One or both strings ended, check which
 	cmp	word [bp+0x10],0x0	; 05B6F - count exhausted?
-	jz	short loc_05B95		; 05B73 - yes: strings equal up to n chars
+	jz	short strncmp_return_equal		; 05B73 - yes: strings equal up to n chars
 	mov	si,[bp+0xc]		; 05B75 - check if str1 has more
 	db	0x82			; 05B78         --+
 	cmp	al,0x0			; 05B79          | = cmp byte [si],0x0
-	jz	short loc_05B85		; 05B7B - str1 ended
+	jz	short strncmp_check_str2_ended		; 05B7B - str1 ended
 	mov	ax,0x1			; 05B7D - str1 has more: return 1 (str1 > str2)
 	add	sp,0x8			; 05B80
 	pop	bp			; 05B83
 	ret				; 05B84
-loc_05B85:
+strncmp_check_str2_ended:
 	mov	si,[bp+0xe]		; 05B85 - check if str2 has more
 	db	0x82			; 05B88         --+
 	cmp	al,0x0			; 05B89          | = cmp byte [si],0x0
-	jz	short loc_05B95		; 05B8B - str2 also ended: equal
+	jz	short strncmp_return_equal		; 05B8B - str2 also ended: equal
 	mov	ax,0xffff		; 05B8D - str2 has more: return -1 (str1 < str2)
 	add	sp,0x8			; 05B90
 	pop	bp			; 05B93
 	ret				; 05B94
-loc_05B95:
+strncmp_return_equal:
 	db	0x33, 0xC0		; 05B95 xor ax,ax - return 0 (equal)
 	add	sp,0x8			; 05B97
 	pop	bp			; 05B9A
@@ -362,7 +367,7 @@ strcat:
 	mov	bx,[bp+0xc]		; 05BAA
 	db	0x03, 0xD8		; 05BAD add bx,ax - bx = dest + strlen(dest) = end of dest
 	mov	[bp+0x6],bx		; 05BAF - save write position
-loc_05BB2:
+strcat_copy_loop:
 ; Copy loop: copy src chars to end of dest until null
 	mov	si,[bp+0x6]		; 05BB2 - si = write position
 	inc	word [bp+0x6]		; 05BB5
@@ -371,7 +376,7 @@ loc_05BB2:
 	mov	al,[di]			; 05BBE - al = *src
 	mov	[si],al			; 05BC0 - *dest_end = *src
 	test	al,al			; 05BC2
-	jnz	short loc_05BB2		; 05BC4 - loop until null terminator copied
+	jnz	short strcat_copy_loop		; 05BC4 - loop until null terminator copied
 	mov	ax,[bp+0xc]		; 05BC6 - return dest pointer
 	add	sp,0x8			; 05BC9
 	pop	bp			; 05BCC
@@ -398,21 +403,21 @@ strncat:
 	mov	bx,[bp+0xa]		; 05BDC
 	db	0x03, 0xD8		; 05BDF add bx,ax - bx = end of dest
 	mov	[bp+0x4],bx		; 05BE1 - save write position
-loc_05BE4:
+strncat_copy_loop:
 	mov	ax,[bp+0xe]		; 05BE4 - remaining count
 	dec	word [bp+0xe]		; 05BE7 - count--
 	test	ax,ax			; 05BEA
-	jng	short loc_05C04		; 05BEC - count <= 0: done
+	jng	short strncat_terminate		; 05BEC - count <= 0: done
 	mov	si,[bp+0xc]		; 05BEE - si = src
 	inc	word [bp+0xc]		; 05BF1
 	mov	al,[si]			; 05BF4 - al = *src
 	mov	di,[bp+0x4]		; 05BF6 - di = write position
 	mov	[di],al			; 05BF9 - *dest_end = *src
 	test	al,al			; 05BFB
-	jz	short loc_05C04		; 05BFD - null terminator: done
+	jz	short strncat_terminate		; 05BFD - null terminator: done
 	inc	word [bp+0x4]		; 05BFF - advance write position
-	jmp	short loc_05BE4		; 05C02 - next char
-loc_05C04:
+	jmp	short strncat_copy_loop		; 05C02 - next char
+strncat_terminate:
 	mov	si,[bp+0x4]		; 05C04
 	mov	byte [si],0x0		; 05C07 - null-terminate result
 	mov	ax,[bp+0xa]		; 05C0A - return dest pointer

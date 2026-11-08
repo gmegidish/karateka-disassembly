@@ -10,7 +10,7 @@
 ; Key behaviors:
 ;   - scene_index==2 && anim_bg_counter==3: sets scene advance flag [0x12A]=1
 ;   - combat_active: returns 0x1E (approach) or 0x1F (walk)
-;   - Player anim 0x08 (kick): plays sound via wait_vsync, clears flags
+;   - Player anim 0x08 (kick): plays sound via play_sound, clears flags
 ;   - Player anim 0x44: sets combat_active=2 (victory), returns 0
 ;   - Player was hit [0xFC]: knockback 8px, returns 0x1B if mid-attack else 0
 ;   - [0x16C] trigger: returns rand_range(1)+0x11
@@ -21,84 +21,84 @@
 player_anim_select:
 	push	bp			; 0205E
 	sub	sp,0x4			; 0205F
-	jc	short loc_0206A		; 02062 jc 0x206a
-	cmp	sp,[0x17]		; 02064
-	ja	short loc_0206D		; 02068 ja 0x206d
-loc_0206A:
-	jmp	0x420			; 0206A
-loc_0206D:
+	jc	short player_anim_select_stack_overflow		; 02062 jc 0x206a
+	cmp	sp,[stack_limit]		; 02064
+	ja	short player_anim_select_stack_ok		; 02068 ja 0x206d
+player_anim_select_stack_overflow:
+	jmp	near stack_overflow_handler			; 0206A
+player_anim_select_stack_ok:
 	db	0x8B, 0xEC		; 0206D mov bp,sp
-	cmp	word [0x130],0x2	; 0206F
-	jnz	short loc_02083		; 02074 jnz 0x2083
-	cmp	word [0xc3a6],0x3	; 02076
-	jnz	short loc_02083		; 0207B jnz 0x2083
-	mov	word [0x12a],0x1	; 0207D
-loc_02083:
-	cmp	word [0xf8],0x1		; 02083
-	jnz	short loc_020A1		; 02088 jnz 0x20a1
-	cmp	word [0x10c],0x1d	; 0208A
-	jnz	short loc_02099		; 0208F jnz 0x2099
+	cmp	word [scene_index],0x2	; 0206F
+	jnz	short player_anim_select_check_combat_active		; 02074 jnz 0x2083
+	cmp	word [anim_bg_counter],0x3	; 02076
+	jnz	short player_anim_select_check_combat_active		; 0207B jnz 0x2083
+	mov	word [anim_row_reload_state],0x1	; 0207D
+player_anim_select_check_combat_active:
+	cmp	word [combat_active],0x1		; 02083
+	jnz	short player_anim_select_check_kick_finished		; 02088 jnz 0x20a1
+	cmp	word [player_anim_id],0x1d	; 0208A
+	jnz	short player_anim_select_return_approach		; 0208F jnz 0x2099
 	mov	ax,0x1f			; 02091
 	add	sp,0x4			; 02094
 	pop	bp			; 02097
 	ret				; 02098
-loc_02099:
+player_anim_select_return_approach:
 	mov	ax,0x1e			; 02099
 	add	sp,0x4			; 0209C
 	pop	bp			; 0209F
 	ret				; 020A0
-loc_020A1:
-	cmp	word [0x10c],0x8	; 020A1
-	jnz	short loc_020D0		; 020A6 jnz 0x20d0
-	cmp	word [0x170],0x0	; 020A8
-	jnz	short loc_020BA		; 020AD jnz 0x20ba
+player_anim_select_check_kick_finished:
+	cmp	word [player_anim_id],0x8	; 020A1
+	jnz	short player_anim_select_check_combat_end_anim		; 020A6 jnz 0x20d0
+	cmp	word [player_flag_170],0x0	; 020A8
+	jnz	short player_anim_select_kick_alternate_sound		; 020AD jnz 0x20ba
 	mov	ax,0xb			; 020AF
 	push	ax			; 020B2
-	call	wait_vsync		; 020B3
+	call	play_sound		; 020B3
 	db	0x8B, 0xE5		; 020B6 mov sp,bp
-	jmp	short loc_020C3		; 020B8 jmp 0x20c3
-loc_020BA:
+	jmp	short player_anim_select_clear_kick_flags		; 020B8 jmp 0x20c3
+player_anim_select_kick_alternate_sound:
 	mov	ax,0x14			; 020BA
 	push	ax			; 020BD
-	call	wait_vsync		; 020BE
+	call	play_sound		; 020BE
 	db	0x8B, 0xE5		; 020C1 mov sp,bp
-loc_020C3:
+player_anim_select_clear_kick_flags:
 	db	0x33, 0xC0		; 020C3 xor ax,ax
-	mov	[0xdf43],al		; 020C5
-	mov	[0x174],ax		; 020C8
-	mov	[0x16e],ax		; 020CB
-	jmp	short loc_020E4		; 020CE jmp 0x20e4
-loc_020D0:
-	cmp	word [0x10c],0x44	; 020D0
-	jnz	short loc_020E4		; 020D5 jnz 0x20e4
-	mov	word [0xf8],0x2		; 020D7
+	mov	[key_pending],al		; 020C5
+	mov	[player_flag_174],ax		; 020C8
+	mov	[combat_counter_b],ax		; 020CB
+	jmp	short player_anim_select_check_player_hit		; 020CE jmp 0x20e4
+player_anim_select_check_combat_end_anim:
+	cmp	word [player_anim_id],0x44	; 020D0
+	jnz	short player_anim_select_check_player_hit		; 020D5 jnz 0x20e4
+	mov	word [combat_active],0x2		; 020D7
 	db	0x33, 0xC0		; 020DD xor ax,ax
 	add	sp,0x4			; 020DF
 	pop	bp			; 020E2
 	ret				; 020E3
-loc_020E4:
-	cmp	word [0xfc],0x1		; 020E4
-	jnz	short loc_02112		; 020E9 jnz 0x2112
-	mov	word [0xfc],0x0		; 020EB
-	sub	word [0xbcd5],0x8	; 020F1
-	mov	ax,[0x10c]		; 020F6
+player_anim_select_check_player_hit:
+	cmp	word [player_was_hit],0x1		; 020E4
+	jnz	short player_anim_select_check_combat_counter_a		; 020E9 jnz 0x2112
+	mov	word [player_was_hit],0x0		; 020EB
+	sub	word [player_x],0x8	; 020F1
+	mov	ax,[player_anim_id]		; 020F6
 	db	0x3D, 0x04, 0x00	; 020F9 cmp ax,0x4
-	jng	short loc_0210B		; 020FC jng 0x210b
+	jng	short player_anim_select_hit_return_idle		; 020FC jng 0x210b
 	db	0x3D, 0x08, 0x00	; 020FE cmp ax,0x8
-	jnl	short loc_0210B		; 02101 jnl 0x210b
+	jnl	short player_anim_select_hit_return_idle		; 02101 jnl 0x210b
 	mov	ax,0x1b			; 02103
 	add	sp,0x4			; 02106
 	pop	bp			; 02109
 	ret				; 0210A
-loc_0210B:
+player_anim_select_hit_return_idle:
 	db	0x33, 0xC0		; 0210B xor ax,ax
 	add	sp,0x4			; 0210D
 	pop	bp			; 02110
 	ret				; 02111
-loc_02112:
-	cmp	word [0x16c],0x1	; 02112
-	jnz	short loc_02130		; 02117 jnz 0x2130
-	mov	word [0x16c],0x0	; 02119
+player_anim_select_check_combat_counter_a:
+	cmp	word [combat_counter_a],0x1	; 02112
+	jnz	short player_anim_select_check_phase_and_flag_174		; 02117 jnz 0x2130
+	mov	word [combat_counter_a],0x0	; 02119
 	mov	ax,0x1			; 0211F
 	push	ax			; 02122
 	call	rand_range		; 02123
@@ -107,130 +107,149 @@ loc_02112:
 	add	sp,0x4			; 0212B
 	pop	bp			; 0212E
 	ret				; 0212F
-loc_02130:
-	cmp	word [0xfa],0x0		; 02130
-	jng	short loc_02145		; 02135 jng 0x2145
-	cmp	word [0x174],0x1	; 02137
-	jnz	short loc_02145		; 0213C jnz 0x2145
+player_anim_select_check_phase_and_flag_174:
+	cmp	word [combat_phase],0x0		; 02130
+	jng	short player_anim_select_dispatch_by_anim		; 02135 jng 0x2145
+	cmp	word [player_flag_174],0x1	; 02137
+	jnz	short player_anim_select_dispatch_by_anim		; 0213C jnz 0x2145
 	db	0x33, 0xC0		; 0213E xor ax,ax
 	add	sp,0x4			; 02140
 	pop	bp			; 02143
 	ret				; 02144
-loc_02145:
-	mov	ax,[0x10c]		; 02145
+player_anim_select_dispatch_by_anim:
+	mov	ax,[player_anim_id]		; 02145
 	jmp	0x248b			; 02148
+; Jump table case, player_anim_id 0x01 and 0x08: return read_player_input, or 0 when it returns -1.
+player_anim_select_input_default_0:
 	call	read_player_input	; 0214B
 	mov	[bp+0x2],ax		; 0214E
 	inc	ax			; 02151
-	jnz	short loc_02159		; 02152 jnz 0x2159
+	jnz	short player_anim_select_return_input_or_0		; 02152 jnz 0x2159
 	mov	word [bp+0x2],0x0	; 02154
-loc_02159:
+player_anim_select_return_input_or_0:
 	mov	ax,[bp+0x2]		; 02159
 	add	sp,0x4			; 0215C
 	pop	bp			; 0215F
 	ret				; 02160
+; Jump table case, player_anim_id 0x02-0x04: return input + 0x22, or 0x29 when input is -1.
+player_anim_select_input_plus_22:
 	call	read_player_input	; 02161
 	mov	[bp+0x2],ax		; 02164
 	inc	ax			; 02167
-	jnz	short loc_02171		; 02168 jnz 0x2171
+	jnz	short player_anim_select_add_22_to_input		; 02168 jnz 0x2171
 	mov	word [bp+0x2],0x29	; 0216A
-	jmp	short loc_02175		; 0216F jmp 0x2175
-loc_02171:
+	jmp	short player_anim_select_return_plus_22_result		; 0216F jmp 0x2175
+player_anim_select_add_22_to_input:
 	add	word [bp+0x2],0x22	; 02171
-loc_02175:
+player_anim_select_return_plus_22_result:
 	mov	ax,[bp+0x2]		; 02175
 	add	sp,0x4			; 02178
 	pop	bp			; 0217B
 	ret				; 0217C
+; Jump table case, player_anim_id 0x2A-0x2C: return input + 0x25, or 0x29 when input is -1.
+player_anim_select_input_plus_25:
 	call	read_player_input	; 0217D
 	mov	[bp+0x2],ax		; 02180
 	inc	ax			; 02183
-	jnz	short loc_0218D		; 02184 jnz 0x218d
+	jnz	short player_anim_select_add_25_to_input		; 02184 jnz 0x218d
 	mov	word [bp+0x2],0x29	; 02186
-	jmp	short loc_02191		; 0218B jmp 0x2191
-loc_0218D:
+	jmp	short player_anim_select_return_plus_25_result		; 0218B jmp 0x2191
+player_anim_select_add_25_to_input:
 	add	word [bp+0x2],0x25	; 0218D
-loc_02191:
+player_anim_select_return_plus_25_result:
 	mov	ax,[bp+0x2]		; 02191
 	add	sp,0x4			; 02194
 	pop	bp			; 02197
 	ret				; 02198
+; Jump table case, player_anim_id 0x05-0x07: counts inputs 0x18-0x1A in [0x15A]; the third in a row, or input -1, returns 0x1B.
+player_anim_select_input_limit_repeats:
 	call	read_player_input	; 02199
 	db	0x3D, 0x17, 0x00	; 0219C cmp ax,0x17
 	mov	[bp+0x2],ax		; 0219F
-	jng	short loc_021C2		; 021A2 jng 0x21c2
+	jng	short player_anim_select_reset_repeat_count		; 021A2 jng 0x21c2
 	db	0x3D, 0x1B, 0x00	; 021A4 cmp ax,0x1b
-	jnl	short loc_021C2		; 021A7 jnl 0x21c2
-	mov	ax,[0x15a]		; 021A9
+	jnl	short player_anim_select_reset_repeat_count		; 021A7 jnl 0x21c2
+	mov	ax,[player_input_repeat_count]		; 021A9
 	inc	ax			; 021AC
 	db	0x3D, 0x03, 0x00	; 021AD cmp ax,0x3
-	mov	[0x15a],ax		; 021B0
-	jnz	short loc_021C8		; 021B3 jnz 0x21c8
-	mov	word [0x15a],0x0	; 021B5
+	mov	[player_input_repeat_count],ax		; 021B0
+	jnz	short player_anim_select_map_no_input_to_recoil		; 021B3 jnz 0x21c8
+	mov	word [player_input_repeat_count],0x0	; 021B5
 	mov	word [bp+0x2],0xffff	; 021BB
-	jmp	short loc_021C8		; 021C0 jmp 0x21c8
-loc_021C2:
-	mov	word [0x15a],0x0	; 021C2
-loc_021C8:
+	jmp	short player_anim_select_map_no_input_to_recoil		; 021C0 jmp 0x21c8
+player_anim_select_reset_repeat_count:
+	mov	word [player_input_repeat_count],0x0	; 021C2
+player_anim_select_map_no_input_to_recoil:
 	cmp	word [bp+0x2],0xffffffffffffffff	; 021C8
-	jnz	short loc_021D3		; 021CC jnz 0x21d3
+	jnz	short player_anim_select_return_limited_input		; 021CC jnz 0x21d3
 	mov	word [bp+0x2],0x1b	; 021CE
-loc_021D3:
+player_anim_select_return_limited_input:
 	mov	ax,[bp+0x2]		; 021D3
 	add	sp,0x4			; 021D6
 	pop	bp			; 021D9
 	ret				; 021DA
+; Jump table case, player_anim_id 0x0A-0x0B: return input 0x0C only from anim 0x0A, 0x0D only from anim 0x0B, else 0.
+player_anim_select_input_chain:
 	call	read_player_input	; 021DB
 	db	0x3D, 0x0C, 0x00	; 021DE cmp ax,0xc
 	mov	[bp+0x2],ax		; 021E1
-	jnz	short loc_021F5		; 021E4 jnz 0x21f5
-	cmp	word [0x10c],0xa	; 021E6
-	jnz	short loc_021F5		; 021EB jnz 0x21f5
+	jnz	short player_anim_select_check_chain_from_anim_b		; 021E4 jnz 0x21f5
+	cmp	word [player_anim_id],0xa	; 021E6
+	jnz	short player_anim_select_check_chain_from_anim_b		; 021EB jnz 0x21f5
 	mov	ax,0xc			; 021ED
 	add	sp,0x4			; 021F0
 	pop	bp			; 021F3
 	ret				; 021F4
-loc_021F5:
+player_anim_select_check_chain_from_anim_b:
 	cmp	word [bp+0x2],0xd	; 021F5
-	jnz	short loc_0220A		; 021F9 jnz 0x220a
-	cmp	word [0x10c],0xb	; 021FB
-	jnz	short loc_0220A		; 02200 jnz 0x220a
+	jnz	short player_anim_select_chain_return_idle		; 021F9 jnz 0x220a
+	cmp	word [player_anim_id],0xb	; 021FB
+	jnz	short player_anim_select_chain_return_idle		; 02200 jnz 0x220a
 	mov	ax,0xd			; 02202
 	add	sp,0x4			; 02205
 	pop	bp			; 02208
 	ret				; 02209
-loc_0220A:
+player_anim_select_chain_return_idle:
 	db	0x33, 0xC0		; 0220A xor ax,ax
 	add	sp,0x4			; 0220C
 	pop	bp			; 0220F
 	ret				; 02210
+; Jump table case, player_anim_id 0x0F: return 0 without reading input.
+player_anim_select_return_0:
 	db	0x33, 0xC0		; 02211 xor ax,ax
 	add	sp,0x4			; 02213
 	pop	bp			; 02216
 	ret				; 02217
+; Jump table case, player_anim_id 0x41-0x42: return read_player_input, or 0x13 when it returns -1.
+player_anim_select_input_default_13:
 	call	read_player_input	; 02218
 	mov	[bp+0x2],ax		; 0221B
 	inc	ax			; 0221E
-	jnz	short loc_02229		; 0221F jnz 0x2229
+	jnz	short player_anim_select_return_input_or_13		; 0221F jnz 0x2229
 	mov	ax,0x13			; 02221
 	add	sp,0x4			; 02224
 	pop	bp			; 02227
 	ret				; 02228
-loc_02229:
+player_anim_select_return_input_or_13:
 	mov	ax,[bp+0x2]		; 02229
 	add	sp,0x4			; 0222C
 	pop	bp			; 0222F
 	ret				; 02230
+; Jump table case, player_anim_id 0x46: return read_player_input, or 0x0F when it returns -1.
+player_anim_select_input_default_f:
 	call	read_player_input	; 02231
 	mov	[bp+0x2],ax		; 02234
 	inc	ax			; 02237
-	jnz	short loc_0223F		; 02238 jnz 0x223f
+	jnz	short player_anim_select_return_input_or_f		; 02238 jnz 0x223f
 	mov	word [bp+0x2],0xf	; 0223A
-loc_0223F:
+player_anim_select_return_input_or_f:
 	mov	ax,[bp+0x2]		; 0223F
 	add	sp,0x4			; 02242
 	pop	bp			; 02245
 	ret				; 02246
+; Data, not code: 17 {player_anim_id, handler} word pairs, scanned last to first by the dispatch at 0228B.
+; An animation with no entry returns with AX still holding player_anim_id.
+player_anim_select_jump_table:
 	inc	si			; 02247
 	add	[bx+di],dh		; 02248
 	db	0x22, 0x42, 0x00	; 0224A and al,[bp+si+0x0]
@@ -263,13 +282,13 @@ loc_0223F:
 	add	[bx+si],ax		; 02287
 	dec	bx			; 02289
 	db	0x21, 0xBE, 0x40, 0x00	; 0228A and [bp+0x40],di
-loc_0228E:
+player_anim_select_scan_jump_table:
 	cmp	ax,[cs:si+0x2247]	; 0228E
-	jnz	short loc_0229A		; 02293 jnz 0x229a
+	jnz	short player_anim_select_scan_prev_entry		; 02293 jnz 0x229a
 	jmp	word near [cs:si+0x2249]	; 02295
-loc_0229A:
+player_anim_select_scan_prev_entry:
 	sub	si,0x4			; 0229A
-	jns	short loc_0228E		; 0229D jns 0x228e
+	jns	short player_anim_select_scan_jump_table		; 0229D jns 0x228e
 	add	sp,0x4			; 0229F
 	pop	bp			; 022A2
 	ret				; 022A3
@@ -316,13 +335,13 @@ copy_sprite_frame:
 	mov	di,[bp+0x4]		; 022BF
 	mov	si,[bp+0x6]		; 022C2
 	mov	bx,0x3			; 022C5
-loc_022C8:
+copy_sprite_frame_copy_loop:
 	mov	al,[bx+si+0x1]		; 022C8
 	mov	[bx+di],al		; 022CB
 	mov	al,[bx+si+0x6]		; 022CD
 	mov	[bx+di+0x4],al		; 022D0
 	dec	bx			; 022D3
-	jnl	short loc_022C8		; 022D4 jnl 0x22c8
+	jnl	short copy_sprite_frame_copy_loop		; 022D4 jnl 0x22c8
 	mov	ax,[bp+0x8]		; 022D6
 	add	[di+0x1],ax		; 022D9
 	add	[di+0x5],ax		; 022DC

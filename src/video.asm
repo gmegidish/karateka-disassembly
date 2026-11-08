@@ -22,7 +22,7 @@ game_shutdown:
 	call	init_combat_level	; 005F8  ; init_combat_level(0) — final cleanup pass
 	db	0x8B, 0xE5		; 005FB mov sp,bp
 	call	clear_screen		; 005FD
-	mov	word [0xdf44],0x0	; 00600  ; clear input_advance flag
+	mov	word [input_advance],0x0	; 00600  ; clear input_advance flag
 	pop	bp			; 00606
 	ret				; 00607
 
@@ -68,10 +68,10 @@ rand_range:
 	db	0x8B, 0xEC		; 0062A mov bp,sp
 	call	rand_next		; 0062C  ; AX = 16-bit random
 	shl	ax,1			; 0062F  ; clear sign bit → 15-bit positive
-	mov	[0x421a],ax		; 00631  ; store in rand_temp
+	mov	[rand_temp],ax		; 00631  ; store in rand_temp
 	mov	ax,[bp+0x4]		; 00634  ; AX = max_value
 	inc	ax			; 00637  ; AX = max_value + 1
-	mul	word [0x421a]		; 00638  ; DX:AX = (max+1) * random
+	mul	word [rand_temp]		; 00638  ; DX:AX = (max+1) * random
 	db	0x8B, 0xC2		; 0063C mov ax,dx  ; AX = high word = scaled result
 	pop	bp			; 0063E
 	ret				; 0063F

@@ -10,37 +10,43 @@
 ;   timer_wait -> poll_keyboard -> scene_update -> level_setup -> render_figures
 ; Handles approach_flag [0x154] values: 2=vsync(8), 3=vsync(24), 4=vsync(22), else=vsync(1)
 ; Calls cutscene_play and handles scene transitions with fade effects.
+; In this binary reset_to_game_start (002A7) never returns, so the load_game_disk check and check_disk_prompt retry after it are unreachable, and the three pushed arguments are discarded.
+; Actual frame loop order: poll_keyboard(1), timer_wait_3ticks, scene_update, level_setup, render_figures.
+; The approach_flag values select play_sound indices 8, 24 and 22, else 1.
+; [0x16a] is the restart flag: set by Ctrl+R in key_to_move or by a nonzero cutscene_play result.
 game_init:
 	push	bp			; 00255
 	sub	sp,0x4			; 00256
-	jc	short loc_00261		; 00259 jc 0x261
-	cmp	sp,[0x17]		; 0025B
-	ja	short loc_00264		; 0025F ja 0x264
-loc_00261:
+	jc	short game_init_stack_overflow		; 00259 jc 0x261
+	cmp	sp,[stack_limit]		; 0025B
+	ja	short game_init_stack_ok		; 0025F ja 0x264
+game_init_stack_overflow:
 	jmp	0x420			; 00261
-loc_00264:
+game_init_stack_ok:
 	db	0x8B, 0xEC		; 00264 mov bp,sp
 	mov	word [bp+0x2],0x0	; 00266
 	call	noop_stub		; 0026B
 	call	check_graphics_card	; 0026E
 	test	ax,ax			; 00271
-	jnz	short loc_00281		; 00273 jnz 0x281
+	jnz	short game_init_graphics_card_ok		; 00273 jnz 0x281
 	mov	ax,str_no_graphics - DS_BASE	; 00275
 	push	ax			; 00278
 	call	print_error		; 00279
 	db	0x8B, 0xE5		; 0027C mov sp,bp
 	call	show_insert_disk	; 0027E
-loc_00281:
-	call	init_screen_buffers	; 00281
+game_init_graphics_card_ok:
+	call	patch_font_tables	; 00281
 	call	install_handlers	; 00284
 	call	init_controls		; 00287
 	test	ax,ax			; 0028A
-	jnz	short loc_00296		; 0028C jnz 0x296
-	mov	word [0xdf46],0x1	; 0028E
-	jmp	short loc_0029C		; 00294 jmp 0x29c
-loc_00296:
-	mov	word [0xdf46],0x0	; 00296
-loc_0029C:
+	jnz	short game_init_joystick_detected		; 0028C jnz 0x296
+	mov	word [keyboard_only],0x1	; 0028E
+	jmp	short game_init_verify_game_disk		; 00294 jmp 0x29c
+; init_controls found a joystick: [0xdf46]=0 lets poll_keyboard read it.
+game_init_joystick_detected:
+	mov	word [keyboard_only],0x0	; 00296
+; Disk-check retry loop. In this binary it never loops: reset_to_game_start at 002A7 does not return.
+game_init_verify_game_disk:
 	mov	ax,0x737		; 0029C
 	push	ax			; 0029F
 	mov	ax,0x337		; 002A0
@@ -51,44 +57,47 @@ loc_0029C:
 	db	0x8B, 0xE5		; 002AA mov sp,bp
 	call	load_game_disk		; 002AC
 	test	ax,ax			; 002AF
-	jnz	short loc_002B8		; 002B1 jnz 0x2b8
+	jnz	short game_init_start_new_game		; 002B1 jnz 0x2b8
 	call	check_disk_prompt	; 002B3
-	jmp	short loc_0029C		; 002B6 jmp 0x29c
-loc_002B8:
+	jmp	short game_init_verify_game_disk		; 002B6 jmp 0x29c
+; Reached from a successful disk check, from reset_to_game_start, or on restart (Ctrl+R or input_advance > 0).
+game_init_start_new_game:
 	call	load_player_anim_data	; 002B8
 	db	0x33, 0xC0		; 002BB xor ax,ax
-	mov	word [0x114],0xd	; 002BD
-	mov	[0x118],ax		; 002C3
-	mov	[0x11a],ax		; 002C6
-	mov	[0xe2],ax		; 002C9
-	mov	[0xf0],ax		; 002CC
-	mov	[0xec],ax		; 002CF
-	mov	[0x170],ax		; 002D2
-	mov	[0x16c],ax		; 002D5
-	mov	[0x16e],ax		; 002D8
-	mov	[0x172],ax		; 002DB
-	mov	[0x174],ax		; 002DE
-	mov	[0x12a],ax		; 002E1
-	mov	[0xe6],ax		; 002E4
-	mov	[0xe8],ax		; 002E7
-	mov	[0xf2],ax		; 002EA
-	mov	[0xf6],ax		; 002ED
-	mov	[0xf8],ax		; 002F0
-	mov	[0xfa],ax		; 002F3
-	mov	[0x12c],ax		; 002F6
-	mov	[0x130],ax		; 002F9
-	mov	[0x166],ax		; 002FC
-	mov	[0xd5aa],ax		; 002FF
+	mov	word [player_hits_left],0xd	; 002BD
+	mov	[enemy_frozen],ax		; 002C3
+	mov	[scene_locked],ax		; 002C6
+	mov	[scene_param_e2],ax		; 002C9
+	mov	[game_mode],ax		; 002CC
+	mov	[player_facing],ax		; 002CF
+	mov	[player_flag_170],ax		; 002D2
+	mov	[combat_counter_a],ax		; 002D5
+	mov	[combat_counter_b],ax		; 002D8
+	mov	[player_flag_172],ax		; 002DB
+	mov	[player_flag_174],ax		; 002DE
+	mov	[anim_row_reload_state],ax		; 002E1
+	mov	[player_moved_flag],ax		; 002E4
+	mov	[enemy_spawned_flag],ax		; 002E7
+	mov	[player_faces_right],ax		; 002EA
+	mov	[enemy_aggressive],ax		; 002ED
+	mov	[combat_active],ax		; 002F0
+	mov	[combat_phase],ax		; 002F3
+	mov	[scroll_counter],ax		; 002F6
+	mov	[scene_index],ax		; 002F9
+	mov	[approach_timer],ax		; 002FC
+	mov	[enemy_active],ax		; 002FF
 	call	game_main_loop		; 00302
 	db	0x33, 0xC0		; 00305 xor ax,ax
-	mov	[0xfc],ax		; 00307
-	mov	[0x130],ax		; 0030A
+	mov	[player_was_hit],ax		; 00307
+	mov	[scene_index],ax		; 0030A
 	call	timer_mark		; 0030D
-	mov	word [0x16a],0x0	; 00310
-	cmp	word [0x16a],0x1	; 00316
-	jz	short loc_002B8		; 0031B jz 0x2b8
-	cmp	word [0xdf44],0x0	; 0031D
-	jg	short loc_002B8		; 00322 jg 0x2b8
+	mov	word [game_restart_flag],0x0	; 00310
+; per-frame gameplay loop: exits on game_restart_flag==1 or input_advance>0
+game_init_frame_loop:
+	cmp	word [game_restart_flag],0x1	; 00316
+	jz	short game_init_start_new_game		; 0031B jz 0x2b8
+	cmp	word [input_advance],0x0	; 0031D
+	jg	short game_init_start_new_game		; 00322 jg 0x2b8
 	mov	ax,0x1			; 00324
 	push	ax			; 00327
 	call	poll_keyboard		; 00328
@@ -97,83 +106,87 @@ loc_002B8:
 	call	scene_update		; 00330
 	call	level_setup		; 00333
 	call	render_figures		; 00336
-	mov	ax,[0x154]		; 00339
+	mov	ax,[approach_flag]		; 00339
 	test	ax,ax			; 0033C
-	jng	short loc_00383		; 0033E jng 0x383
+	jng	short game_init_after_approach_sound		; 0033E jng 0x383
 	db	0x3D, 0x02, 0x00	; 00340 cmp ax,0x2
-	jnz	short loc_00350		; 00343 jnz 0x350
+	jnz	short game_init_check_approach_flag_3		; 00343 jnz 0x350
 	mov	ax,0x8			; 00345
 	push	ax			; 00348
-	call	wait_vsync		; 00349
+	call	play_sound		; 00349
 	db	0x8B, 0xE5		; 0034C mov sp,bp
-	jmp	short loc_0037D		; 0034E jmp 0x37d
-loc_00350:
-	cmp	word [0x154],0x3	; 00350
-	jnz	short loc_00362		; 00355 jnz 0x362
+	jmp	short game_init_clear_approach_flag		; 0034E jmp 0x37d
+game_init_check_approach_flag_3:
+	cmp	word [approach_flag],0x3	; 00350
+	jnz	short game_init_check_approach_flag_4		; 00355 jnz 0x362
 	mov	ax,0x18			; 00357
 	push	ax			; 0035A
-	call	wait_vsync		; 0035B
+	call	play_sound		; 0035B
 	db	0x8B, 0xE5		; 0035E mov sp,bp
-	jmp	short loc_0037D		; 00360 jmp 0x37d
-loc_00362:
-	cmp	word [0x154],0x4	; 00362
-	jnz	short loc_00374		; 00367 jnz 0x374
+	jmp	short game_init_clear_approach_flag		; 00360 jmp 0x37d
+game_init_check_approach_flag_4:
+	cmp	word [approach_flag],0x4	; 00362
+	jnz	short game_init_approach_default_sound		; 00367 jnz 0x374
 	mov	ax,0x16			; 00369
 	push	ax			; 0036C
-	call	wait_vsync		; 0036D
+	call	play_sound		; 0036D
 	db	0x8B, 0xE5		; 00370 mov sp,bp
-	jmp	short loc_0037D		; 00372 jmp 0x37d
-loc_00374:
+	jmp	short game_init_clear_approach_flag		; 00372 jmp 0x37d
+game_init_approach_default_sound:
 	mov	ax,0x1			; 00374
 	push	ax			; 00377
-	call	wait_vsync		; 00378
+	call	play_sound		; 00378
 	db	0x8B, 0xE5		; 0037B mov sp,bp
-loc_0037D:
-	mov	word [0x154],0x0	; 0037D
-loc_00383:
+game_init_clear_approach_flag:
+	mov	word [approach_flag],0x0	; 0037D
+game_init_after_approach_sound:
 	db	0x33, 0xC0		; 00383 xor ax,ax
-	cmp	word [0x16a],0x0	; 00385
-	mov	[0xee],ax		; 0038A
-	jnz	short loc_00395		; 0038D jnz 0x395
+	cmp	word [game_restart_flag],0x0	; 00385
+	mov	[anim_render_mode],ax		; 0038A
+	jnz	short game_init_check_anim_row_state_2		; 0038D jnz 0x395
 	call	cutscene_play		; 0038F
-	mov	[0x16a],ax		; 00392
-loc_00395:
-	cmp	word [0x12a],0x2	; 00395
-	jnz	short loc_003AB		; 0039A jnz 0x3ab
-	mov	word [0x12a],0x0	; 0039C
+	mov	[game_restart_flag],ax		; 00392
+; [0x12a] sequence: 1 = reload anim row and go to 2, 2 = play sound 1 next frame and clear.
+game_init_check_anim_row_state_2:
+	cmp	word [anim_row_reload_state],0x2	; 00395
+	jnz	short game_init_check_anim_row_state_1		; 0039A jnz 0x3ab
+	mov	word [anim_row_reload_state],0x0	; 0039C
 	mov	ax,0x1			; 003A2
 	push	ax			; 003A5
-	call	wait_vsync		; 003A6
+	call	play_sound		; 003A6
 	db	0x8B, 0xE5		; 003A9 mov sp,bp
-loc_003AB:
-	cmp	word [0x12a],0x1	; 003AB
-	jnz	short loc_003C1		; 003B0 jnz 0x3c1
-	mov	word [0x12a],0x2	; 003B2
-	mov	word [0xc3a6],0x1	; 003B8
-	call	effect_fade		; 003BE
-loc_003C1:
+game_init_check_anim_row_state_1:
+	cmp	word [anim_row_reload_state],0x1	; 003AB
+	jnz	short game_init_scene_transition		; 003B0 jnz 0x3c1
+	mov	word [anim_row_reload_state],0x2	; 003B2
+	mov	word [anim_bg_counter],0x1	; 003B8
+	call	load_anim_row		; 003BE
+game_init_scene_transition:
 	call	scene_transition	; 003C1
-	jmp	0x516			; 003C4
+	jmp	near game_init_frame_loop			; 003C4
 
 ; ---- function game_main_loop ----
 ; Sets up initial game state and runs the intro sequence, then enters the
 ; gameplay loop. Loads enemy animation scripts, palette, combat level 0,
 ; and plays the intro (title screen, animated intro, story text).
 ;
-; GAMEPLAY LOOP at loc_004F4:
+; GAMEPLAY LOOP at game_main_loop_demo_frame_loop:
 ;   timer_wait -> scene_update -> level_setup -> render_figures
 ;   -> handle approach_flag -> scene_transition -> game_scene
 ; Loops until game_scene returns 1 (scene complete).
 ; On completion, calls init_combat_state(0) and jumps to set_video_mode.
+; When the demo ends, the raw jmp 0x612 at 0053F (code offset 0x412) restarts the title sequence, not set_video_mode.
+; A title step or cal00 returning nonzero runs load_scene then exits; cal01 returning nonzero runs game_shutdown then exits.
+; The loop at game_main_loop_demo_frame_loop is an attract demo, not player-controlled play: anim_mode=1 makes scene_update call anim_process for the player.
 game_main_loop:
 	push	bp			; 003C7
 	sub	sp,0x4			; 003C8
-	jc	short loc_003D3		; 003CB jc 0x3d3
-	cmp	sp,[0x17]		; 003CD
-	ja	short loc_003D6		; 003D1 ja 0x3d6
-loc_003D3:
-	jmp	0x420			; 003D3
-loc_003D6:
+	jc	short game_main_loop_stack_overflow		; 003CB jc 0x3d3
+	cmp	sp,[stack_limit]		; 003CD
+	ja	short game_main_loop_stack_ok		; 003D1 ja 0x3d6
+game_main_loop_stack_overflow:
+	jmp	near stack_overflow_handler			; 003D3
+game_main_loop_stack_ok:
 	db	0x8B, 0xEC		; 003D6 mov bp,sp
 	call	flush_keyboard		; 003D8
 	db	0x33, 0xC0		; 003DB xor ax,ax
@@ -181,9 +194,9 @@ loc_003D6:
 	push	bx			; 003E0
 	mov	bx,str_allgal - DS_BASE		; 003E1
 	push	bx			; 003E4
-	mov	[0xf6],ax		; 003E5
-	mov	[0x15c],ax		; 003E8
-	mov	[0x15a],ax		; 003EB
+	mov	[enemy_aggressive],ax		; 003E5
+	mov	[unk_game_main_loop_word],ax		; 003E8
+	mov	[player_input_repeat_count],ax		; 003EB
 	call	load_anim_script	; 003EE
 	db	0x8B, 0xE5		; 003F1 mov sp,bp
 	call	build_enemy_anim_offsets	; 003F3
@@ -193,55 +206,57 @@ loc_003D6:
 	push	ax			; 003FD
 	call	load_resource		; 003FE
 	db	0x8B, 0xE5		; 00401 mov sp,bp
-	mov	word [0xea],0x0		; 00403
-	push	word [0xea]		; 00409
+	mov	word [current_level],0x0		; 00403
+	push	word [current_level]		; 00409
 	call	init_combat_level	; 0040D
 	db	0x8B, 0xE5		; 00410 mov sp,bp
-	mov	word [0xdf44],0x0	; 00412
+; title/credits/demo attract sequence; restarted after the demo finishes
+game_main_loop_title_sequence_start:
+	mov	word [input_advance],0x0	; 00412
 	mov	ax,0xd			; 00418
 	push	ax			; 0041B
-	call	load_animation		; 0041C
+	call	load_sprite_set		; 0041C
 	db	0x8B, 0xE5		; 0041F mov sp,bp
-	call	animate_step		; 00421
+	call	title_step_sprite		; 00421
 	test	ax,ax			; 00424
-	jz	short loc_0042E		; 00426 jz 0x42e
+	jz	short game_main_loop_show_title_screen		; 00426 jz 0x42e
 	call	load_scene		; 00428
-	jmp	0x742			; 0042B
-loc_0042E:
+	jmp	near game_main_loop_reset_and_return			; 0042B
+game_main_loop_show_title_screen:
 	db	0x33, 0xC0		; 0042E xor ax,ax
 	push	ax			; 00430
 	mov	ax,str_title_bcg - DS_BASE	; 00431
 	push	ax			; 00434
 	call	load_resource		; 00435
 	db	0x8B, 0xE5		; 00438 mov sp,bp
-	call	draw_scene_element	; 0043A
+	call	show_credit_mechner	; 0043A
 	test	ax,ax			; 0043D
-	jz	short loc_00447		; 0043F jz 0x447
+	jz	short game_main_loop_show_ibm_credit		; 0043F jz 0x447
 	call	load_scene		; 00441
-	jmp	0x742			; 00444
-loc_00447:
-	call	draw_gate		; 00447
+	jmp	near game_main_loop_reset_and_return			; 00444
+game_main_loop_show_ibm_credit:
+	call	show_credit_ibm		; 00447
 	test	ax,ax			; 0044A
-	jz	short loc_00454		; 0044C jz 0x454
+	jz	short game_main_loop_show_title_picture		; 0044C jz 0x454
 	call	load_scene		; 0044E
-	jmp	0x742			; 00451
-loc_00454:
-	call	animate_figure		; 00454
+	jmp	near game_main_loop_reset_and_return			; 00451
+game_main_loop_show_title_picture:
+	call	title_step_picture		; 00454
 	test	ax,ax			; 00457
-	jz	short loc_00461		; 00459 jz 0x461
+	jz	short game_main_loop_show_scroll_text		; 00459 jz 0x461
 	call	load_scene		; 0045B
-	jmp	0x742			; 0045E
-loc_00461:
+	jmp	near game_main_loop_reset_and_return			; 0045E
+game_main_loop_show_scroll_text:
 	call	show_scroll_text	; 00461
 	test	ax,ax			; 00464
-	jz	short loc_0046E		; 00466 jz 0x46e
+	jz	short game_main_loop_play_cal00_intro		; 00466 jz 0x46e
 	call	load_scene		; 00468
-	jmp	0x742			; 0046B
-loc_0046E:
-	mov	word [0xe4],0x0		; 0046E
+	jmp	near game_main_loop_reset_and_return			; 0046B
+game_main_loop_play_cal00_intro:
+	mov	word [camera_x],0x0		; 0046E
 	call	clear_screen		; 00474
-	mov	word [0xee],0x1		; 00477
-	mov	word [0xea],0x4		; 0047D
+	mov	word [anim_render_mode],0x1		; 00477
+	mov	word [current_level],0x4		; 0047D
 	mov	ax,0xbd04		; 00483
 	push	ax			; 00486
 	mov	ax,str_cal00 - DS_BASE		; 00487
@@ -250,15 +265,15 @@ loc_0046E:
 	db	0x8B, 0xE5		; 0048E mov sp,bp
 	mov	ax,0x6			; 00490
 	push	ax			; 00493
-	call	load_animation		; 00494
+	call	load_sprite_set		; 00494
 	db	0x8B, 0xE5		; 00497 mov sp,bp
 	call	run_anim_script		; 00499
 	test	ax,ax			; 0049C
-	jz	short loc_004A6		; 0049E jz 0x4a6
+	jz	short game_main_loop_play_cal01_intro		; 0049E jz 0x4a6
 	call	load_scene		; 004A0
-	jmp	0x742			; 004A3
-loc_004A6:
-	mov	word [0xea],0x0		; 004A6
+	jmp	near game_main_loop_reset_and_return			; 004A3
+game_main_loop_play_cal01_intro:
+	mov	word [current_level],0x0		; 004A6
 	mov	ax,0xbd04		; 004AC
 	push	ax			; 004AF
 	mov	ax,str_cal01 - DS_BASE		; 004B0
@@ -277,61 +292,62 @@ loc_004A6:
 	db	0x8B, 0xE5		; 004CC mov sp,bp
 	call	run_anim_script		; 004CE
 	test	ax,ax			; 004D1
-	jz	short loc_004DA		; 004D3 jz 0x4da
+	jz	short game_main_loop_start_demo		; 004D3 jz 0x4da
 	call	game_shutdown		; 004D5
-	jmp	short loc_00542		; 004D8 jmp 0x542
-loc_004DA:
-	mov	word [0xea],0x0		; 004DA
-	mov	word [0xf4],0xfa	; 004E0
-	mov	word [0x156],0x1	; 004E6
+	jmp	short game_main_loop_reset_and_return		; 004D8 jmp 0x542
+; Attract demo: anim_mode=1 makes scene_update drive the player with anim_process.
+game_main_loop_start_demo:
+	mov	word [current_level],0x0		; 004DA
+	mov	word [enemy_atk_freq],0xfa	; 004E0
+	mov	word [anim_mode],0x1	; 004E6
 	call	timer_mark		; 004EC
 	mov	word [bp+0x2],0x0	; 004EF
-loc_004F4:
+game_main_loop_demo_frame_loop:
 	cmp	word [bp+0x2],0x1	; 004F4
-	jz	short loc_00537		; 004F8 jz 0x537
+	jz	short game_main_loop_demo_finished		; 004F8 jz 0x537
 	call	timer_wait_3ticks	; 004FA
 	call	scene_update		; 004FD
 	call	level_setup		; 00500
 	call	render_figures		; 00503
-	mov	ax,[0x154]		; 00506
+	mov	ax,[approach_flag]		; 00506
 	test	ax,ax			; 00509
-	jng	short loc_0052C		; 0050B jng 0x52c
+	jng	short game_main_loop_scene_transition		; 0050B jng 0x52c
 	db	0x3D, 0x02, 0x00	; 0050D cmp ax,0x2
-	jnz	short loc_0051D		; 00510 jnz 0x51d
+	jnz	short game_main_loop_approach_default_sound		; 00510 jnz 0x51d
 	mov	ax,0x8			; 00512
 	push	ax			; 00515
-	call	wait_vsync		; 00516
+	call	play_sound		; 00516
 	db	0x8B, 0xE5		; 00519 mov sp,bp
-	jmp	short loc_00526		; 0051B jmp 0x526
-loc_0051D:
+	jmp	short game_main_loop_clear_approach_flag		; 0051B jmp 0x526
+game_main_loop_approach_default_sound:
 	mov	ax,0x1			; 0051D
 	push	ax			; 00520
-	call	wait_vsync		; 00521
+	call	play_sound		; 00521
 	db	0x8B, 0xE5		; 00524 mov sp,bp
-loc_00526:
-	mov	word [0x154],0x0	; 00526
-loc_0052C:
+game_main_loop_clear_approach_flag:
+	mov	word [approach_flag],0x0	; 00526
+game_main_loop_scene_transition:
 	call	scene_transition	; 0052C
 	call	game_scene		; 0052F
 	mov	[bp+0x2],ax		; 00532
-	jmp	short loc_004F4		; 00535 jmp 0x4f4
-loc_00537:
+	jmp	short game_main_loop_demo_frame_loop		; 00535 jmp 0x4f4
+game_main_loop_demo_finished:
 	db	0x33, 0xC0		; 00537 xor ax,ax
 	push	ax			; 00539
 	call	init_combat_state	; 0053A
 	db	0x8B, 0xE5		; 0053D mov sp,bp
-	jmp	0x612			; 0053F
-loc_00542:
-	mov	word [0x10c],0x41	; 00542
+	jmp	near game_main_loop_title_sequence_start			; 0053F
+game_main_loop_reset_and_return:
+	mov	word [player_anim_id],0x41	; 00542
 	call	flush_keyboard		; 00548
 	db	0x33, 0xC0		; 0054B xor ax,ax
-	mov	[0xdf43],al		; 0054D
-	mov	[0xea],ax		; 00550
+	mov	[key_pending],al		; 0054D
+	mov	[current_level],ax		; 00550
 	xor	ah,ah			; 00553
-	mov	word [0x156],0x0	; 00555
-	mov	[0x174],ax		; 0055B
-	mov	[0x16c],ax		; 0055E
-	mov	[0x16e],ax		; 00561
+	mov	word [anim_mode],0x0	; 00555
+	mov	[player_flag_174],ax		; 0055B
+	mov	[combat_counter_a],ax		; 0055E
+	mov	[combat_counter_b],ax		; 00561
 	add	sp,0x4			; 00564
 	pop	bp			; 00567
 	ret				; 00568
@@ -342,36 +358,37 @@ loc_00542:
 ;   OR player reached right boundary [0xBCD5] == [0x104].
 ; Returns AX=0 if: player presses a key (poll returns nonzero).
 ; This is the "should we transition to next scene?" check.
+; Correction: a nonzero poll_keyboard result returns AX=1 like the other two conditions; AX=0 means none of them held.
 game_scene:
 	push	bp			; 00569
 	sub	sp,0x2			; 0056A
-	jc	short loc_00575		; 0056D jc 0x575
-	cmp	sp,[0x17]		; 0056F
-	ja	short loc_00578		; 00573 ja 0x578
-loc_00575:
-	jmp	0x420			; 00575
-loc_00578:
+	jc	short game_scene_stack_overflow		; 0056D jc 0x575
+	cmp	sp,[stack_limit]		; 0056F
+	ja	short game_scene_stack_ok		; 00573 ja 0x578
+game_scene_stack_overflow:
+	jmp	near stack_overflow_handler			; 00575
+game_scene_stack_ok:
 	db	0x8B, 0xEC		; 00578 mov bp,sp
-	cmp	word [0xf8],0x1		; 0057A
-	jnz	short loc_00588		; 0057F jnz 0x588
-	cmp	word [0x10c],0x43	; 00581
-	jz	short loc_0059E		; 00586 jz 0x59e
-loc_00588:
-	mov	ax,[0xbcd5]		; 00588
-	cmp	ax,[0x104]		; 0058B
-	jz	short loc_0059E		; 0058F jz 0x59e
+	cmp	word [combat_active],0x1		; 0057A
+	jnz	short game_scene_check_right_boundary		; 0057F jnz 0x588
+	cmp	word [player_anim_id],0x43	; 00581
+	jz	short game_scene_return_complete		; 00586 jz 0x59e
+game_scene_check_right_boundary:
+	mov	ax,[player_x]		; 00588
+	cmp	ax,[player_x_max]		; 0058B
+	jz	short game_scene_return_complete		; 0058F jz 0x59e
 	mov	ax,0x1			; 00591
 	push	ax			; 00594
 	call	poll_keyboard		; 00595
 	db	0x8B, 0xE5		; 00598 mov sp,bp
 	test	ax,ax			; 0059A
-	jz	short loc_005A6		; 0059C jz 0x5a6
-loc_0059E:
+	jz	short game_scene_return_continue		; 0059C jz 0x5a6
+game_scene_return_complete:
 	mov	ax,0x1			; 0059E
 	add	sp,0x2			; 005A1
 	pop	bp			; 005A4
 	ret				; 005A5
-loc_005A6:
+game_scene_return_continue:
 	db	0x33, 0xC0		; 005A6 xor ax,ax
 	add	sp,0x2			; 005A8
 	pop	bp			; 005AB
@@ -400,8 +417,8 @@ load_scene:
 	push	bx			; 005D0
 	mov	bx,str_cal01 - DS_BASE		; 005D1
 	push	bx			; 005D4
-	mov	[0xdf44],ax		; 005D5
-	mov	[0xea],ax		; 005D8
+	mov	[input_advance],ax		; 005D5
+	mov	[current_level],ax		; 005D8
 	call	load_anim_script	; 005DB
 	db	0x8B, 0xE5		; 005DE mov sp,bp
 	call	run_anim_script		; 005E0

@@ -201,7 +201,7 @@ princess_rescued equ 0xd67e     ; word - 1 if princess rescue triggered (level 3
 ; Character type table (used for whitespace detection in argv parsing)
 ; ctype_table   equ 0xe4c4    ; byte[256] - bit 3 = whitespace
 
-; Sound/music player variables (used by wait_vsync music routines)
+; Sound/music player variables (used by play_sound music routines)
 music_note_ptr  equ 0xd6fd      ; word - pointer to current note in music data
 music_tempo_hi  equ 0xd706      ; byte - note duration (outer loop count)
 music_tempo_lo  equ 0xd707      ; byte - note duration (inner timing)
@@ -223,6 +223,225 @@ busy_wait_delay_cnt equ 0xd70e      ; word - outer loop count for busy_wait_dela
 ; PCM audio sample buffer (256 bytes, loaded at runtime)
 ; play_speaker_data reads 256 bytes of 1-bit audio from here
 speaker_pcm_buf equ 0xda56      ; byte[256] - PCM sample buffer (0xDA56-0xDB55)
+
+; Named by address during the variable naming pass (values are DS-relative unless noted).
+psp_far_ptr                        equ 0x59	; dword - far pointer to the PSP (offset word, always 0; segment half is psp_segment), loaded with LES for INT 21h/4Ah
+program_block_paras                equ 0x69	; word - current size in paragraphs of the DOS memory block starting at the PSP
+player_moved_flag                  equ 0xe6	; word - set to 1 by read_player_input when a move is applied, cleared at new game; never read
+enemy_spawned_flag                 equ 0xe8	; word - set to 1 by spawn_enemy, cleared at new game; never read
+anim_row_reload_state              equ 0x12a	; word - deferred anim row reload: 1 = reload row and go to 2, 2 = play sound 1 and clear to 0
+scene_enemy_pending                equ 0x132	; word[8] - indexed by scene_index; >0 means entering the scene during combat calls spawn_enemy, then clears the entry
+scene_enemy_pending_1              equ 0x134	; word - scene_enemy_pending[1], set to 1 at level 3 start
+scene_enemy_pending_3              equ 0x138	; word - scene_enemy_pending[3], set to 1 at level 3 start
+scene_enemy_pending_4              equ 0x13a	; word - scene_enemy_pending[4], set to 1 at level 3 start
+scene_enemy_pending_5              equ 0x13c	; word - scene_enemy_pending[5], set to 1 at level 3 start
+scene_enemy_pending_6              equ 0x13e	; word - scene_enemy_pending[6], set to 0 at level 3 start
+scene_enemy_pending_7              equ 0x140	; word - scene_enemy_pending[7], set to 3 at level 3 start (only >0 is tested)
+scene_slot_flags_1                 equ 0x144	; word - scene_slot_flags[1], set to 1 at level 3 start
+player_input_repeat_count          equ 0x15a	; word - consecutive inputs 0x18-0x1A during player anims 5-7; the third one forces input 0x1B
+unk_game_main_loop_word            equ 0x15c	; word - cleared at game_main_loop entry alongside player_input_repeat_count; never read
+unk_load_player_anim_data_word_a   equ 0x15e	; word - cleared before the first load_sprite_set; never read
+sprite_image_load_offset           equ 0x160	; word - offset into the image bank (DS:0x443C) where the next sprite set loads; 0 until the first set sets it to that set's size
+unk_load_player_anim_data_word_b   equ 0x162	; word - cleared before the first load_sprite_set; never read
+sprite_mask_load_offset            equ 0x164	; word - offset into the mask bank (DS:0x893A) where the next sprite set loads; 0 until the first set sets it to that set's size
+title_ctrl_v_armed                 equ 0x168	; word - 1 during title_step_sprite's delay; while set, Ctrl+V in poll_keyboard draws sprite 0x5D
+game_restart_flag                  equ 0x16a	; word - 1 restarts the game (Ctrl+R in key_to_move) or holds the nonzero result of cutscene_play, which also suppresses further cutscene_play calls
+level_anim_script_names            equ 0x21c	; word[4] - per-level pointers to animation script filenames (bal00-bal03)
+anti_tamper_region_1_start         equ 0x255	; code offset (CS-relative, not a DS variable) - start of the 0x2C1 bytes checksummed by anti_tamper_check; equals game_init
+sprite_image_stem_ptrs             equ 0x264	; word[14] - pointers to sprite image filename stems (ks0..ksi), indexed by load_sprite_set's set number
+sprite_mask_stem_ptrs              equ 0x2c0	; word[14] - pointers to sprite mask filename stems (km0..kmi), indexed by load_sprite_set's set number
+level_enemy_start_x                equ 0x2dc	; word[5] - per-level enemy spawn X
+level_player_start_x               equ 0x2e6	; word[5] - per-level player starting X
+level_player_x_min                 equ 0x2f0	; word[5] - per-level initial player_x_min
+level_player_x_max                 equ 0x2fa	; word[5] - per-level initial player_x_max and encounter_target
+level_camera_x_min                 equ 0x304	; word[5] - per-level initial camera_x_min
+level_camera_x_max                 equ 0x30e	; word[5] - per-level initial camera_x_max
+level_enemy_x_min                  equ 0x318	; word[5] - per-level initial enemy_x_min
+move_key_table                     equ 0x322	; byte[11] - key codes searched by key_to_move ("qazwsx46 b0"); the index selects the move
+offscreen_buffer                   equ 0x337	; byte[16000] - offscreen framebuffer, 200 lines of 80 bytes; also receives .bcg files and disk sectors
+offscreen_length_prefix_hi         equ 0x338	; byte - offscreen_buffer+1: high byte of the 2-byte length prefix when a .bcg file is loaded into the buffer
+disk_sector_signature              equ 0x7c3	; byte[] - signature checked by load_game_disk: offset 0x8C of the protected sector buffer at DS:0x737, inside offscreen_buffer
+offscreen_outro_text               equ 0x977	; byte[] - offscreen_buffer line 20 col 0: first outro text line
+offscreen_scenery_top              equ 0xd37	; byte[] - offscreen_buffer line 32 col 0: start of the scenery rebuilt when the camera moves
+anti_tamper_region_2_start         equ 0x169c	; code offset (CS-relative, not a DS variable) - start of the 0x81 bytes checksummed by anti_tamper_check; equals reset_to_game_start
+offscreen_title_picture            equ 0x1917	; byte[] - offscreen_buffer line 70 col 0: destination of the title picture
+offscreen_disk_prompt_line1        equ 0x1b01	; byte[] - offscreen_buffer line 76 col 10: disk prompt text line 1
+offscreen_fuji_band                equ 0x1c37	; byte[] - offscreen_buffer line 80 col 0: destination of the fuji.bcg scenery strip
+offscreen_credit_ibm_line1         equ 0x1d8d	; byte[] - offscreen_buffer line 84 col 22: IBM credit text line 1
+offscreen_credit_mechner_line1     equ 0x1d92	; byte[] - offscreen_buffer line 84 col 27: Mechner credit text line 1
+offscreen_fuji_band_gap            equ 0x1f57	; byte[160] - offscreen_buffer line 90 col 0: 2 lines cleared inside the fuji band at level 2
+offscreen_disk_prompt_line2        equ 0x2009	; byte[] - offscreen_buffer line 92 col 18: disk prompt text line 2
+offscreen_the_end_text             equ 0x20b6	; byte[] - offscreen_buffer line 94 col 31: "the end" text
+offscreen_credit_ibm_line2         equ 0x2287	; byte[] - offscreen_buffer line 100 col 16: IBM credit text line 2
+offscreen_credit_mechner_line2     equ 0x228b	; byte[] - offscreen_buffer line 100 col 20: Mechner credit text line 2
+offscreen_solid_line               equ 0x2457	; byte[80] - offscreen_buffer line 106 col 0: line filled with pixel value 3 over the fuji band below level 2
+offscreen_disk_prompt_line3        equ 0x24ff	; byte[] - offscreen_buffer line 108 col 8: disk prompt text line 3
+offscreen_above_ground_band        equ 0x26d7	; byte[] - offscreen_buffer line 114 col 0: band cleared by clear_above_ground
+offscreen_partial_update_band      equ 0x2777	; byte[] - offscreen_buffer line 116 col 0: start of the region update_display_partial copies when the camera is unchanged
+offscreen_ground_stripes           equ 0x3357	; byte[] - offscreen_buffer line 154 col 0: 15 pairs of ground stripe lines
+offscreen_health_bar_area          equ 0x3cb7	; byte[1280] - offscreen_buffer line 184 col 0: 16 lines cleared on a full health bar redraw
+health_bar_left_base               equ 0x3f87	; byte[] - offscreen_buffer line 193 col 0: left bar base; pip N is at base + 3*N - 2
+health_bar_left_pip_1              equ 0x3f88	; byte[] - offscreen_buffer line 193 col 1: first left bar pip, blinked at low health
+health_bar_left_pip_2              equ 0x3f8b	; byte[] - offscreen_buffer line 193 col 4: second left bar pip, blinked at low health
+health_bar_right_pip_2             equ 0x3fd1	; byte[] - offscreen_buffer line 193 col 74: second right bar pip, blinked at low health
+health_bar_right_pip_1             equ 0x3fd4	; byte[] - offscreen_buffer line 193 col 77: first right bar pip, blinked at low health
+health_bar_right_end               equ 0x3fd7	; byte[] - offscreen_buffer line 194 col 0, one past the end of line 193: right bar base; pip N is at base - 3*N
+sprite_column_offset_rtl           equ 0x421c	; word - offscreen offset of the current column top in draw_sprite, which walks columns right to left
+sprite_image_pos                   equ 0x421e	; word - read position in the image stream, relative to sprite_image_bank
+sprite_mask_pos                    equ 0x4220	; word - read position in the mask stream, relative to sprite_mask_bank
+sprite_columns_left                equ 0x4222	; byte - 4-pixel columns of the current sprite not yet consumed
+sprite_rows                        equ 0x4223	; byte - sprite height, in scanlines per column
+sprite_visible_width               equ 0x4224	; word - sprite width in pixels (columns * 4), clamped to the screen edge by the left-to-right path
+sprite_subpixel_x                  equ 0x4226	; byte - X position within a byte, 0-3 pixels
+sprite_bit_shift                   equ 0x4227	; byte - rotate count for sub-pixel alignment (sprite_subpixel_x * 2)
+sprite_partial_edge_column         equ 0x4228	; word - 1 if a column straddling the screen edge must be drawn separately
+sprite_rows_left                   equ 0x422a	; byte - rows left to draw in the current column
+sprite_line_stride                 equ 0x422b	; byte - offscreen bytes per scanline (initialized to 0x50, never written), multiplier for Y
+sprite_image_run_left              equ 0x422c	; byte - RLE repeats still owed for the image stream
+sprite_image_run_value             equ 0x422d	; byte - value being repeated for the image stream
+sprite_mask_run_left               equ 0x422e	; byte - RLE repeats still owed for the mask stream
+sprite_mask_run_value              equ 0x422f	; byte - value being repeated for the mask stream
+sprite_top_line_offset             equ 0x4230	; word - offscreen offset of the first row of the sprite (top Y * 80)
+sprite_column_offset               equ 0x4232	; word - offscreen offset of the current column top, stepped left to right
+sprite_opaque_keep_masks           equ 0x4234	; word[4] - destination keep-mask for an opaque byte, indexed by sprite_bit_shift (0,2,4,6); only entries 2-6 are used
+sprite_image_offsets               equ 0x423c	; word[256] - sprite id to offset in sprite_image_bank, built one byte at a time from the .ind file
+sprite_image_offsets_hi            equ 0x423d	; byte - high byte of the first sprite_image_offsets word, indexed by id*2
+sprite_image_bank                  equ 0x443c	; byte[0x42FE] - image bank: ks*.ind scratch and RLE sprite data; each sprite is +0 width, +1 height, +3 stream
+sprite_image_bank_byte1            equ 0x443d	; byte - sprite_image_bank + 1: sprite height, or RLE count byte after the 0x7B marker
+sprite_image_bank_byte2            equ 0x443e	; byte - sprite_image_bank + 2: low byte of the .ind record offset field
+sprite_image_bank_byte3            equ 0x443f	; byte - sprite_image_bank + 3: high byte of the .ind record offset field
+critical_error_handler_offset      equ 0x4810	; code offset - address of critical_error_handler, passed in DX to INT 21h/25h for INT 24h
+sprite_mask_offsets                equ 0x873a	; word[256] - sprite id to offset in sprite_mask_bank, built one byte at a time from the .ind file
+sprite_mask_offsets_hi             equ 0x873b	; byte - high byte of the first sprite_mask_offsets word, indexed by id*2
+sprite_mask_bank                   equ 0x893a	; byte[0x1D9C] - mask bank: km*.ind scratch and RLE mask data, same layout as sprite_image_bank
+sprite_mask_bank_byte1             equ 0x893b	; byte - sprite_mask_bank + 1: RLE count byte after the 0x7B marker
+sprite_mask_bank_byte2             equ 0x893c	; byte - sprite_mask_bank + 2: low byte of the .ind record offset field
+sprite_mask_bank_byte3             equ 0x893d	; byte - sprite_mask_bank + 3: high byte of the .ind record offset field
+resource_buffer                    equ 0xa6d6	; byte[0x1194] - load_resource destination; title.bcg is loaded at offset 0 and shown from here
+resource_buffer_byte1              equ 0xa6d7	; byte - resource_buffer + 1: high byte of the .bcg length prefix
+fuji_picture                       equ 0xacb2	; byte[0xBB8] - fuji.bcg scanlines, at resource_buffer + 0x5DC; scenery copied into the offscreen buffer
+font_glyph_offset_table            equ 0xb86a	; word[30+] - glyph bitmap offsets from the table base, indexed by glyph*2 (same address as label font_glyph_ptrs)
+font_glyph_bitmap_byte1            equ 0xb86b	; byte - font_glyph_offset_table + 1: base for reading bitmap byte 1 onward with SI = glyph bitmap offset
+font_glyph_ptr_i                   equ 0xb87a	; word - glyph table entry 8 (i), swapped with font_glyph_ptr_z at startup
+font_glyph_ptr_j                   equ 0xb87c	; word - glyph table entry 9 (j), replaced by entry 26 at startup
+font_glyph_ptr_z                   equ 0xb89c	; word - glyph table entry 25 (z), swapped with font_glyph_ptr_i at startup
+font_glyph_ptr_period              equ 0xb89e	; word - glyph table entry 26 (period), shifted by the startup patch
+font_glyph_ptr_comma               equ 0xb8a0	; word - glyph table entry 27 (comma), shifted by the startup patch
+font_glyph_ptr_dash                equ 0xb8a2	; word - glyph table entry 28 (dash), shifted by the startup patch
+font_glyph_ptr_hyphen              equ 0xb8a4	; word - glyph table entry 29 (hyphen), shifted by the startup patch
+font_glyph_ptr_spare               equ 0xb8a6	; word - glyph table entry 30, moved into entry 29 at startup
+figure_list_x                      equ 0xbb34	; word - figure list (4-byte entries from player_anim_buf, 0xBB33) entry +1: X; scripts index with 3-based offsets, which makes this the next entry id
+figure_list_x_hi                   equ 0xbb35	; byte - figure list entry +2: X high byte; chg_fig writes the X high and Y bytes as a word here
+figure_list_y                      equ 0xbb36	; byte - figure list entry +3: Y; del_fig copies a word here with 3-based offsets
+figure_list_id2                    equ 0xbb37	; byte - figure list entry at +4 (second figure written by scene_update): sprite id
+figure_list_x2                     equ 0xbb38	; word - figure list second entry +1: X
+figure_list_y2                     equ 0xbb3a	; byte - figure list second entry +3: Y
+disk_signature_text                equ 0xbca4	; byte[] - NUL-terminated string compared against the disk buffer by load_game_disk (same address as label str_copyright)
+anim_script_bytecode               equ 0xbd04	; byte[0x3FE] - compiled animation script buffer, indexed by script_pc
+anim_script_arg1                   equ 0xbd05	; byte - anim_script_bytecode + 1: byte after the opcode
+anim_script_arg2                   equ 0xbd06	; word - anim_script_bytecode + 2: word at opcode offset 2
+anim_script_arg4                   equ 0xbd08	; byte/word - anim_script_bytecode + 4: byte or word at opcode offset 4
+scenery_figures                    equ 0xc102	; byte[0x29E] - compiled scenery script compacted in place into 4-byte figure entries, grouped by row
+scenery_row_end_ptr                equ 0xc3a4	; word - end of the current row in scenery_figures; figures between the row middle and this are drawn over the actors
+scenery_row_starts                 equ 0xc3a8	; word[7] - per-row pointers to the start of the row in scenery_figures
+scenery_row_middles                equ 0xc3b6	; word[7] - per-row pointers to the 0x12 split in scenery_figures (figures behind the actors end here)
+scenery_row_ends                   equ 0xc3c4	; word[7] - per-row pointers to the end of the row in scenery_figures
+player_seq_recoil                  equ 0xc3e2	; word - player_frame_bak[7]: offset of the 5-frame recoil step (anim 10, dx -4)
+player_seq_long_recoil             equ 0xc3ec	; word - player_frame_bak[12]: offset of the 10-frame backward step (anim 10, dx -4), set at eagle spawn and boss intro
+player_seq_stop_running            equ 0xc3f4	; word - player_frame_bak[16]: offset of the sequence played when space ends the run (anim 0x46) (anim 1, dx +4 then 0)
+player_seq_stand_idle              equ 0xc3fa	; word - player_frame_bak[19]: offset of the 1-frame standing pose (anim 0x41)
+player_seq_death                   equ 0xc40c	; word - player_frame_bak[28]: offset of the death sequence (anim 28), used when player health reaches 0
+player_seq_gate_crush              equ 0xc40e	; word - player_frame_bak[29]: offset of the sequence forced in the level 2 gate crush zone (anim 29)
+player_seq_level0_left_bound       equ 0xc414	; word - player_frame_bak[32]: offset of the 2-frame sequence (anim 0x44) set when the player reaches the left bound on level 0
+player_anim_frames                 equ 0xc428	; byte[] - compiled player script: 17-byte frame records in sequences ended by 0xFF, +0 is the end marker check
+player_frame_anim_id               equ 0xc429	; byte - player_anim_frames + 1: animation id (copied to player_anim_id)
+player_frame_flags                 equ 0xc42a	; byte - player_anim_frames + 2: bit 0 = facing, bits 1-7 = player_dir_flag
+player_frame_dx                    equ 0xc42c	; signed byte - player_anim_frames + 4: X step applied to player_x
+player_frame_sound                 equ 0xc42e	; byte - player_anim_frames + 6: sound id for this frame
+player_frame_figures               equ 0xc42f	; byte[10] - player_anim_frames + 7: source of the two figure entries (see copy_sprite_frame)
+enemy_seq_recoil                   equ 0xcdfa	; word - enemy_frame_bak[8]: offset of the 5-frame recoil step (anim 11, gal08)
+enemy_seq_run_in                   equ 0xce06	; word - enemy_frame_bak[14]: offset of the running sequence (anim 0x46, dx -12), used to bring an enemy in from off screen
+enemy_seq_stand_idle               equ 0xce10	; word - enemy_frame_bak[19]: offset of the 1-frame standing pose (anim 0x41), used when spawning on levels below 2
+enemy_seq_death                    equ 0xce22	; word - enemy_frame_bak[28]: offset of the death sequence (anim 28), used when the enemy is defeated
+enemy_seq_eagle_fly                equ 0xce28	; word - enemy_frame_bak[31]: offset of the eagle flight sequence (anim 0x1F, dx -12), set by activate_enemy
+enemy_seq_eagle_death              equ 0xce2e	; word - enemy_frame_bak[34]: offset of the eagle death sequence (anim 34), set when its last hit lands
+enemy_anim_frames                  equ 0xce3e	; byte[] - compiled enemy script: 17-byte frame records in sequences ended by 0xFF, +0 is the end marker check
+enemy_frame_anim_id                equ 0xce3f	; byte - enemy_anim_frames + 1: animation id (copied to enemy_anim_id)
+enemy_frame_flags                  equ 0xce40	; byte - enemy_anim_frames + 2: bit 0 = facing, bits 1-7 = enemy_dir_flag
+enemy_frame_dx                     equ 0xce42	; signed byte - enemy_anim_frames + 4: X step applied to enemy_x
+enemy_frame_sound                  equ 0xce44	; byte - enemy_anim_frames + 6: sound id for this frame (0 keeps the player one)
+enemy_frame_fig1_id                equ 0xce46	; byte - enemy_anim_frames + 8: sprite id of the first figure
+enemy_frame_fig1_x                 equ 0xce47	; word - enemy_anim_frames + 9: X offset of the first figure
+enemy_frame_fig1_y                 equ 0xce49	; byte - enemy_anim_frames + 0xB: Y of the first figure
+enemy_frame_fig2_id                equ 0xce4b	; byte - enemy_anim_frames + 0xD: sprite id of the second figure
+enemy_frame_fig2_x                 equ 0xce4c	; word - enemy_anim_frames + 0xE: X offset of the second figure
+enemy_frame_fig2_y                 equ 0xce4e	; byte - enemy_anim_frames + 0x10: Y of the second figure
+close_tier1_thresholds             equ 0xd5b4	; word[5][5] - first close-range AI tier: rows by current_level (0-3, row 4 is close_tier1_thresholds_player), columns by (distance-0x1C)/4; enemy_ai_decide returns 0 (idle) when rand_range(0xFF) >= value
+close_tier1_thresholds_player      equ 0xd5dc	; word[5] - row 4 of close_tier1_thresholds, indexed by (distance-0x1C)/4; anim_process calls anim_command when rand_range(0xFF) >= value
+close_tier2_thresholds             equ 0xd5e6	; word[5][5] - second close-range AI tier, same layout as close_tier1_thresholds; enemy_ai_decide returns anim_interpolate() when rand_range(0xFF) >= value
+close_tier2_thresholds_player      equ 0xd60e	; word[5] - row 4 of close_tier2_thresholds; anim_process returns anim_interpolate() when rand_range(0xFF) >= value
+close_tier3_thresholds             equ 0xd618	; word[5][5] - third close-range AI tier, same layout as close_tier1_thresholds; enemy_ai_decide returns anim_frame_update() when rand_range(0xFF) >= value, else combat_pick_far_attack
+close_tier3_thresholds_player      equ 0xd640	; word[5] - row 4 of close_tier3_thresholds; anim_process returns anim_frame_update() when rand_range(0xFF) >= value, else anim_command
+sound_mode                         equ 0xd6bc	; byte - sound filter: 0 = all sounds, 1 = effects only (tunes 9-21 and 25+ silent), other = silent; poll_keyboard Ctrl+S cycles 0-2, key_to_move Ctrl+S XORs with 0xFF
+sound_jump_table                   equ 0xd6bd	; word[24] - code offsets of the play_sound cases, indexed by sound index - 1
+pcm_delay_sound_8                  equ 0xd710	; word - speaker_delay for sound 8 (0x0C in the EXE, low byte scaled for CPU speed by init_controls)
+pcm_delay_sound_22                 equ 0xd712	; word - speaker_delay for sound 22 (0x09 in the EXE, low byte scaled for CPU speed by init_controls)
+pcm_delay_sound_23                 equ 0xd714	; word - speaker_delay for sound 23 (0x07 in the EXE)
+pcm_delay_sound_24                 equ 0xd716	; word - speaker_delay for sound 24 (0x04 in the EXE)
+tune_ptrs                          equ 0xd718	; word[15] - pointers to tune data; init_controls scales the first byte of each tune (its tempo_hi) for CPU speed
+font_glyph_rows                    equ 0xdb56	; byte[30] - rows per column for each glyph (index = char - 'a'); same address as the data.asm label font_glyph_heights
+font_glyph_columns                 equ 0xdb74	; byte[30] - columns (8 pixels wide) for each glyph (index = char - 'a'); same address as the data.asm label font_glyph_widths
+font_glyph_advances                equ 0xdb92	; byte[31] - advance width in pixels for each glyph (index = char - 'a')
+glyph_subpixel_pos                 equ 0xdbb1	; byte - sub-pixel position 0-3 within a byte, carried between glyphs by render_glyphs
+glyph_columns_left                 equ 0xdbb2	; byte - columns left to draw in the current glyph
+scroll_lines_left                  equ 0xdbb3	; byte - story text lines left to scroll in scroll_text_up
+glyph_rows_left                    equ 0xdbb4	; byte - rows left to draw in the current glyph column
+intro_text_line_count              equ 0xdbb5	; byte - number of lines in intro_text (0x25 in the EXE)
+intro_text                         equ 0xdbb6	; char[][] - intro story, one NUL-terminated string per line
+scroll_text_ptr                    equ 0xddbe	; word - pointer to the next text line for scroll_text_up
+outro_text_line_count              equ 0xddc0	; byte - number of lines in outro_text (11 in the EXE); counted down and restored by show_outro_text
+outro_text                         equ 0xddc1	; char[][] - outro story, one NUL-terminated string per line
+text_the_end                       equ 0xdeb6	; char[] - "the end"
+text_a_game_by                     equ 0xdebe	; char[] - "a game by"
+text_jordan_mechner                equ 0xdec8	; char[] - "jordan mechner"
+text_ibm_version_by                equ 0xded7	; char[] - "ibm version by"
+text_connelley_group               equ 0xdee6	; char[] - "the connelley group"
+text_make_sure_disk                equ 0xdefa	; char[] - "make sure your karateka"
+text_disk_in_drive_a               equ 0xdf12	; char[] - "disk is in drive a."
+text_press_any_key                 equ 0xdf26	; char[] - "press any key to continue"
+random_seed                        equ 0xdf40	; word - random number seed, read and written through rand_seed_io (1 in the EXE)
+pending_key                        equ 0xdf42	; byte - buffered keypress, valid when key_pending is set
+key_pending                        equ 0xdf43	; byte - 1 if pending_key holds an unread keypress
+keyboard_only                      equ 0xdf46	; word - 1 = keyboard control (no joystick found, or 'k' pressed), 0 = joystick polled too ('j' pressed)
+video_segment                      equ 0xdf48	; word - video RAM segment (0xB800 in the EXE)
+saved_equipment_byte               equ 0xdf4a	; byte - BIOS equipment flags low byte (INT 11h), restored to 0040:0010 on exit
+saved_video_mode                   equ 0xdf4b	; byte - video mode at startup (INT 10h/0Fh), restored on exit
+exit_disk_drive                    equ 0xdf4c	; byte - drive number selected with INT 21h/0Eh on exit (0 = A: in the EXE, no writer found)
+hercules_crtc_regs                 equ 0xdf4d	; byte[12] - 6845 register values 0-11 for Hercules graphics mode
+scanline_offsets                   equ 0xdf59	; word[200] - video RAM offset of each screen line (CGA interlaced or Hercules 4-bank layout)
+scanline_offsets_next              equ 0xdf5b	; word[199] - scanline_offsets + 2, the entry for the following line
+scanline_offset_bottom             equ 0xe0e7	; word - scanline_offsets entry for line 199
+hercules_active                    equ 0xe0e9	; word - 0 = CGA, 1 = Hercules; written by video setup, never read
+hit_zone_thresholds                equ 0xe0f8	; byte[26] - base strike distance, indexed by the target frame's pose value (frame byte >> 1)
+hit_zone_classes                   equ 0xe112	; byte[26] - pose class 0-9 selecting a column in the hit_result_* tables, indexed like hit_zone_thresholds
+hit_result_far_anim_5_7            equ 0xe12c	; byte[10] - hit result by pose class for attack anims 5 and 7, distance above threshold
+hit_result_far_anim_6              equ 0xe136	; byte[10] - hit result by pose class for attack anim 6, distance above threshold
+hit_result_near_anim_2_3           equ 0xe140	; byte[10] - hit result by pose class for attack anims 2 and 3, near band
+hit_result_near_anim_4             equ 0xe14a	; byte[10] - hit result by pose class for attack anim 4, near band
+hit_result_far_edge                equ 0xe154	; byte[10] - hit result by pose class for attack anims 2-4 at threshold+13 to threshold+17
+figure_x_offsets                   equ 0xe15e	; word[18] - X offset from the actor's position for an add_figure_to_scene entry, by figure index
+figure_screen_y                    equ 0xe182	; byte[18] - Y position of an add_figure_to_scene entry, by figure index
+joy_swap_left_right                equ 0xe1ab	; byte - nonzero swaps joystick left and right (toggled by Ctrl+Y)
+joy_swap_up_down                   equ 0xe1ac	; byte - nonzero swaps joystick up and down (toggled by Ctrl+X)
+joy_swap_axes                      equ 0xe1ad	; byte - nonzero exchanges the joystick X and Y axes (toggled by Ctrl+E)
+joy_swap_buttons                   equ 0xe1ae	; byte - nonzero swaps joystick buttons 1 and 2 (toggled by Ctrl+B)
+iob_stdin_read_count               equ 0xe1b2	; word - iob_stdin + 2: bytes left in the stdin buffer
+iob_stdout_write_count             equ 0xe1c2	; word - iob_stdout + 4: space left in the stdout buffer
+dos_device_table                   equ 0xe2c8	; 24 entries of 10 bytes - device id byte, then device name string (CON:, PRN:, LST:, ...)
+text_io_buffer                     equ 0xe3b8	; byte[130] - INT 21h/0Ah line input buffer for console reads, and text-mode write buffer flushed at 0x80 bytes
+scanf_input_ptr                    equ 0xe43a	; word - current position in the scanf input string
+ctype_with_eof                     equ 0xe4c4	; byte[257] - Lattice character class table including the EOF slot, indexed by char + 1
+ctype_by_char                      equ 0xe4c5	; byte[256] - ctype_with_eof + 1, indexed by char: 1 = upper, 2 = lower, 4 = digit, 8 = whitespace, 0x80 = hex digit
 
 ; --- lattice_c_runtime_tail (0x06C9D-0x06CB0) ---
 db 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x4C, 0x61, 0x74, 0x74, 0x69, 0x63, 0x65, 0x20, 0x43, 0x20, 0x32  ; 06C9D |.....Lattice C 2|

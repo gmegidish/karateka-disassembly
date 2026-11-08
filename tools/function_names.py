@@ -99,19 +99,19 @@ FUNCTION_NAMES = {
 
     # === Graphics Rendering ===
     0x00B4E: "clear_screen",         # Clear offscreen buffer at DS:0x337
-    0x00B5E: "advance_anim_frame",   # Reads animation frame data from two streams, handles RLE repeat markers
+    0x00B5E: "next_sprite_bytes",   # Returns the next decoded byte of the image and mask RLE streams
     0x00BC9: "render_figures",       # Draw all active figures from figure slot list to screen
     0x00C52: "prepare_screen_buffer", # Prepare offscreen buffer + background, dispatch by render_mode/scene_state
     0x00D68: "update_display",       # Copy offscreen buffer (DS:0x337) to CGA VRAM (B800:0) via scanline LUT
-    0x00D89: "draw_background",      # Copy background region directly to CGA VRAM
-    0x00DD0: "scroll_screen",        # Clear scroll region of offscreen buffer
+    0x00D89: "update_display_partial",      # Copies only the changed part of the offscreen buffer to VRAM
+    0x00DD0: "clear_above_ground",        # Clears the offscreen band above the ground stripes
     0x00DEF: "blit_buffer_to_vram",  # Transfer offscreen buffer to CGA VRAM pixel-column by pixel-column (4 bit-plane passes with visible sweep)
     0x00EE8: "blit_column_delay",    # Busy-wait delay (1000 cycles) between bit-plane passes in blit
-    0x00EEE: "animate_figure",       # Animate a figure (calls draw + delay)
-    0x00F27: "animate_step",         # Single animation step
+    0x00EEE: "title_step_picture",       # Title sequence: shows the stored picture, then adds a sprite
+    0x00F27: "title_step_sprite",         # Title sequence: shows one sprite on a blank screen
     0x00F52: "load_resource",        # Load indexed data block from resource file
     0x00FBB: "load_background",      # Load background image file
-    0x01027: "load_animation",       # Load animation data file
+    0x01027: "load_sprite_set",       # Loads the image and mask .ind/.dat pairs for one sprite set
     0x0166D: "open_file_retry",      # Open file via open_file_slot, retry on failure
     0x01277: "load_anim_script",     # Load animation script file from disk and compile to bytecode
     0x012EB: "parse_anim_command",   # Parse one text animation command line into bytecode
@@ -168,25 +168,25 @@ FUNCTION_NAMES = {
     0x02F98: "anim_set_figure",      # Set figure for animation
 
     # === Screen Effects ===
-    0x03A2D: "effect_wipe",          # Screen wipe effect
-    0x03A8A: "effect_fade",          # Fade effect
-    0x03AD0: "effect_scroll_left",   # Scroll left effect
-    0x03B19: "effect_scroll_right",  # Scroll right effect
-    0x03B5C: "effect_dissolve",      # Dissolve effect
-    0x03BAE: "wait_vsync",           # Wait for vertical sync (called 21x!)
+    0x03A2D: "place_player_for_scene",          # Positions the player for a scene and selects its animation row
+    0x03A8A: "load_anim_row",          # Loads the animation row selected by anim_bg_counter
+    0x03AD0: "load_scroll_anim_row",   # Loads the animation row selected by scroll_counter
+    0x03B19: "activate_enemy",  # Activates the enemy at a random vertical offset
+    0x03B5C: "health_decrement_push",      # One step of health loss with a 4-pixel push left
+    0x03BAE: "play_sound",           # Plays a PC speaker effect or tune, blocking until it ends
     0x03DB9: "busy_wait_delay",      # Nested busy-wait delay loop
     0x03DD5: "toggle_speaker",       # Toggle PC speaker gate (port 0x61 bit 1)
     0x03DDE: "play_speaker_data",    # Play 256 bytes of 1-bit audio from speaker_pcm_buf
-    0x03E16: "init_screen_buffers",  # Swap double-buffer pointers, clear figure slot flags
+    0x03E16: "patch_font_tables",  # Patches the font tables once at startup
     0x03E7C: "render_glyphs",        # Render null-terminated glyph string to offscreen buffer
     0x03F29: "shift_glyph_pixels",   # Sub-pixel shift: shift DX:AX right by [0xdbb1]*2 bits
     0x03F3F: "show_scroll_text",     # Show scrolling text (story narration)
-    0x03F56: "draw_ui_element",      # Draw UI element
-    0x03F71: "show_dialog",          # Show multi-line dialog, wait for keypress
-    0x03FB7: "draw_scene_element",   # Draw scene-specific element
-    0x03FDA: "draw_gate",            # Draw gate/door
+    0x03F56: "show_the_end",      # Shows the "the end" screen
+    0x03F71: "show_outro_text",          # Shows the outro story text and plays a tune
+    0x03FB7: "show_credit_mechner",   # Shows the "a game by jordan mechner" credit
+    0x03FDA: "show_credit_ibm",            # Shows the "ibm version by the connelley group" credit
     0x03FFD: "check_disk_prompt",    # Check disk and show prompt if needed
-    0x040A1: "update_score",         # Checksum verification / anti-tamper
+    0x040A1: "anti_tamper_check",         # Checksums code regions and compares against expected values
     0x04028: "scroll_text_up",       # Scroll text up on CGA VRAM one scanline at a time
     0x040D5: "rand_next",            # LCG pseudo-random number generator
     0x04111: "set_rand_seed",        # Set random seed (dead code)
@@ -217,4 +217,19 @@ FUNCTION_NAMES = {
     0x022A4: "memcpy_block",         # Copy block of bytes from source to destination
     0x022BC: "copy_sprite_frame",    # Copy sprite frame data with X offset adjustment
     0x02605: "enemy_ai_decide",      # Enemy AI decision function
+
+    # === Previously headerless functions (not called directly) ===
+    0x02A0A: "empty_stub_02A0A",     # Empty function, no references found
+    0x05692: "delete_resource_file_thunk",  # Forwards to delete_resource_file, no references found
+    0x056A5: "rename_resource_file", # dos_rename_file when [0xF] > 1, no references found
+    0x05706: "strncpy_terminated",   # Copy up to N chars and NUL-terminate, no references found
+    0x05879: "scanf_read_char",      # Next scanf input char, stored at DS:0xE43C
+    0x05D5F: "dos_file_attributes",  # INT 21h/43h - get/set attributes, no references found
+    0x05DBB: "dos_getch_noecho",     # INT 21h/08h - load_file read callback
+    0x05DCF: "dos_getche",           # INT 21h/01h - no references found
+    0x05DF7: "dos_aux_getc",         # INT 21h/03h - load_file callback
+    0x05E0B: "dos_aux_putc",         # INT 21h/04h - load_file/write_file_data callback
+    0x05E1F: "dos_printer_putc",     # INT 21h/05h - write_file_data callback
+    0x06766: "heap_expand_all",      # heap_expand(0), no references found
+    0x067F5: "heap_free_bytes",      # Returns [0xE4BC]*4 as a long, no references found
 }
