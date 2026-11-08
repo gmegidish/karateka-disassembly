@@ -223,12 +223,16 @@ game_main_loop_title_sequence_start:
 	call	load_scene		; 00428
 	jmp	near game_main_loop_reset_and_return			; 0042B
 game_main_loop_show_title_screen:
+%ifdef HEBREW
+	times 12 nop			; the logo is loaded by title_step_picture instead
+%else
 	db	0x33, 0xC0		; 0042E xor ax,ax
 	push	ax			; 00430
 	mov	ax,str_title_bcg - DS_BASE	; 00431
 	push	ax			; 00434
 	call	load_resource		; 00435
 	db	0x8B, 0xE5		; 00438 mov sp,bp
+%endif
 	call	show_credit_mechner	; 0043A
 	test	ax,ax			; 0043D
 	jz	short game_main_loop_show_ibm_credit		; 0043F jz 0x447

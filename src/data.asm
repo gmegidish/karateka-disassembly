@@ -1533,7 +1533,12 @@ db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 str_no_graphics:        db 'Karateka needs a graphics adapter card to operate correctly.', 0  ; 0AE57
 str_allgal:             db 'allgal', 0    ; 0AE94
 str_fuji_bcg:           db 'fuji.bcg', 0  ; 0AE9B
-str_title_bcg:          db 'title.bcg', 0 ; 0AEA4
+str_title_bcg:
+%ifdef HEBREW
+                        db 'hlogo.bcg', 0
+%else
+                        db 'title.bcg', 0 ; 0AEA4
+%endif
 str_cal00:              db 'cal00', 0     ; 0AEAE
 str_cal01:              db 'cal01', 0     ; 0AEB4
 db 0x00  ; 0AEBA (padding)
@@ -4041,7 +4046,14 @@ db 0x0B, 0x0D, 0x0D, 0x0D, 0x0A, 0x0B, 0x0B, 0x0B, 0x11, 0x0B, 0x0B, 0x0B, 0x07,
 db 0x08, 0x00, 0x00, 0x00, 0x00  ; 14850 |.....|
 
 ; --- story_text (0x14855-0x14BE0) ---
+%ifdef HEBREW
+hebrew_intro_line:
+db '%', 'hstory.bin', 0		; '%' stays as the unused line-count byte
+db 'hcopy.bcg', 0			; at intro_text+11
+times 27-($-hebrew_intro_line) db 0
+%else
 db '%high atop a craggy cliff|', 0  ; 14855 "%high atop a craggy cliff|"
+%endif
 db 'guarded by an army of', 0  ; 14870 "guarded by an army of"
 db 'fierce warriors| stands the', 0  ; 14886 "fierce warriors| stands the"
 db 'fortress of the evil', 0  ; 148A2 "fortress of the evil"
@@ -4078,9 +4090,17 @@ db 'karateka there is always a', 0  ; 14B28
 db 'next time{ { { {', 0  ; 14B43
 db ' ', 0  ; 14B54
 db 'the end', 0  ; 14B56
+%ifdef HEBREW
+db 'hmech.bcg', 0			; same 10 bytes as the original string
+%else
 db 'a game by', 0  ; 14B5E "a game by"
+%endif
 db 'jordan mechner', 0  ; 14B68 "jordan mechner"
+%ifdef HEBREW
+db 'hibm.bcg', 0, 0, 0, 0, 0, 0, 0		; same 15 bytes as the original string
+%else
 db 'ibm version by', 0  ; 14B77 "ibm version by"
+%endif
 db 'the connelley group', 0  ; 14B86 "the connelley group"
 db 'make sure your karateka', 0  ; 14B9A "make sure your karateka"
 db 'disk is in drive a{', 0  ; 14BB2 "disk is in drive a{"

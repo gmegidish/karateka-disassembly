@@ -928,12 +928,17 @@ shift_glyph_pixels_done:
 show_scroll_text:
 	call	clear_screen		; 03F3F
 	call	update_display		; 03F42
+%ifdef HEBREW
+	jmp	near scroll_bitmap_run
+	times 14 nop
+%else
 	mov	al,[intro_text_line_count]		; 03F45
 	mov	[scroll_lines_left],al		; 03F48
 	lea	ax,[intro_text]		; 03F4B
 	mov	[scroll_text_ptr],ax		; 03F4F
 	call	scroll_text_up		; 03F52
 	ret				; 03F55
+%endif
 
 ; ---- function show_the_end ----
 ; Shows the "the end" screen.
@@ -1005,12 +1010,24 @@ show_outro_text_done:
 ; Then delay_with_input(0x48): about 4 seconds, ending early on a keypress.
 show_credit_mechner:
 	call	clear_screen		; 03FB7
+%ifdef HEBREW
+; The Hebrew credit is a bitmap loaded straight to line 78 of the framebuffer.
+	mov	ax,(offscreen_buffer + 78*80 - resource_buffer) & 0xFFFF
+	push	ax
+	mov	ax,text_a_game_by	; holds "hmech.bcg" in this build
+	push	ax
+	call	load_resource
+	pop	cx
+	pop	cx
+	times 9 nop
+%else
 	lea	di,[offscreen_credit_mechner_line1]		; 03FBA
 	lea	si,[text_a_game_by]		; 03FBE
 	call	render_glyphs		; 03FC2
 	lea	di,[offscreen_credit_mechner_line2]		; 03FC5
 	lea	si,[text_jordan_mechner]		; 03FC9
 	call	render_glyphs		; 03FCD
+%endif
 	call	update_display		; 03FD0
 	mov	ax,0x48			; 03FD3
 	call	delay_with_input	; 03FD6
@@ -1025,12 +1042,24 @@ show_credit_mechner:
 ; Then delay_with_input(0x48): about 4 seconds, ending early on a keypress.
 show_credit_ibm:
 	call	clear_screen		; 03FDA
+%ifdef HEBREW
+; The Hebrew credit is a bitmap loaded straight to line 78 of the framebuffer.
+	mov	ax,(offscreen_buffer + 78*80 - resource_buffer) & 0xFFFF
+	push	ax
+	mov	ax,text_ibm_version_by	; holds "hibm.bcg" in this build
+	push	ax
+	call	load_resource
+	pop	cx
+	pop	cx
+	times 9 nop
+%else
 	lea	di,[offscreen_credit_ibm_line1]		; 03FDD
 	lea	si,[text_ibm_version_by]		; 03FE1
 	call	render_glyphs		; 03FE5
 	lea	di,[offscreen_credit_ibm_line2]		; 03FE8
 	lea	si,[text_connelley_group]		; 03FEC
 	call	render_glyphs		; 03FF0
+%endif
 	call	update_display		; 03FF3
 	mov	ax,0x48			; 03FF6
 	call	delay_with_input	; 03FF9
@@ -1087,6 +1116,21 @@ scroll_text_up:
 	mov	es,ax			; 0402C
 ; --- New text line: clear the area and render it at DS:0x337 ---
 scroll_text_up_new_text_line:
+%ifdef HEBREW
+; Read the next 14 rows of the story bitmap (file_read expects ES = DS).
+	push	es
+	push	ds
+	pop	es
+	mov	ax,0x460
+	push	ax
+	lea	ax,[offscreen_buffer]
+	push	ax
+	push	word [scroll_text_ptr]	; holds the file handle in this build
+	call	file_read
+	add	sp,0x6
+	pop	es
+	times 31-($-scroll_text_up_new_text_line) nop
+%else
 	mov	si,[scroll_text_ptr]		; 0402E
 	lea	di,[offscreen_buffer]		; 04032
 	db	0x33, 0xC0		; 04036 xor ax,ax
@@ -1100,6 +1144,7 @@ scroll_text_up_new_text_line:
 	call	render_glyphs		; 04045
 	inc	si			; 04048
 	mov	[scroll_text_ptr],si		; 04049
+%endif
 	db	0x33, 0xD2		; 0404D xor dx,dx
 ; --- Scroll one scanline up (BX = 2 * scanline index) ---
 scroll_text_up_scroll_scanline:
@@ -1133,7 +1178,11 @@ scroll_text_up_copy_row_loop:
 	jz	short scroll_text_up_wait_tick		; 0408A jz 0x4090
 	pop	dx			; 0408C
 	pop	es			; 0408D
+%ifdef HEBREW
+	nop				; keep the return address so the file gets closed
+%else
 	pop	bx			; 0408E
+%endif
 	ret				; 0408F
 ; Wait one tick between scanlines
 scroll_text_up_wait_tick:

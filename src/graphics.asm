@@ -686,14 +686,37 @@ title_step_picture:
 	push	ds			; 00EF2
 	pop	es			; 00EF3
 ; copy 52 lines of the DS:0xA6D6 picture to line 70
+%ifdef HEBREW
+; The logo is too tall for resource_buffer, so load it straight into the framebuffer at
+; line 70: load_resource adds this offset to resource_buffer modulo 0x10000.
+	mov	ax,(offscreen_title_picture - resource_buffer) & 0xFFFF
+	push	ax
+	mov	ax,str_title_bcg - DS_BASE
+	push	ax
+	call	load_resource
+	pop	cx
+	pop	cx
+%else
 	mov	cx,0x820		; 00EF4
 	lea	si,[resource_buffer]		; 00EF7
 	lea	di,[offscreen_title_picture]		; 00EFB
 	rep	movsw			; 00EFF
+%endif
 	call	update_display		; 00F01
 	mov	ax,0x12			; 00F04
 	call	delay_with_input	; 00F07
 ; add the sprite on top of the picture
+%ifdef HEBREW
+; The Hebrew copyright line replaces sprite 0x5C: 16 rows loaded straight to line 180.
+	mov	ax,(offscreen_buffer + 180*80 - resource_buffer) & 0xFFFF
+	push	ax
+	mov	ax,intro_text+11	; "hcopy.bcg", see the intro_text slot in data.asm
+	push	ax
+	call	load_resource
+	pop	cx
+	pop	cx
+	times 5 nop
+%else
 	mov	ax,0xb4			; 00F0A
 	push	ax			; 00F0D
 	mov	ax,0x28			; 00F0E
@@ -702,6 +725,7 @@ title_step_picture:
 	push	ax			; 00F15
 	call	draw_sprite_unflipped	; 00F16
 	add	sp,0x6			; 00F19
+%endif
 	call	update_display		; 00F1C
 	mov	ax,0x48			; 00F1F
 	call	delay_with_input	; 00F22

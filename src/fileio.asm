@@ -851,6 +851,33 @@ delete_resource_file_thunk:
 	pop	bp			; 056A3
 	ret				; 056A4
 
+%ifdef HEBREW
+; ---- function scroll_bitmap_run ----
+; Tail of show_scroll_text in the Hebrew build: streams the intro story from a
+; bitmap file, 14 rows per block, then closes it on every exit path.
+; HSTORY.BIN is 39 blocks of 14 rows, 80 bytes per row, CGA mode 4 pixels.
+; It takes the place of the dead rename_resource_file, keeping every address fixed.
+; ponytail: reads the floppy between scroll steps, may stutter on real drives; buffer it if so
+scroll_bitmap_run:
+	mov	ax,0x8000
+	push	ax
+	mov	ax,intro_text		; holds the filename in this build
+	push	ax
+	call	open_file_retry
+	pop	cx
+	pop	cx
+	mov	[scroll_text_ptr],ax
+	mov	byte [scroll_lines_left],39
+	call	scroll_text_up
+	push	ax
+	push	word [scroll_text_ptr]
+	call	close_file_slot
+	pop	cx
+	pop	ax
+	ret
+	times 57-($-scroll_bitmap_run) nop
+
+%else
 ; ---- function rename_resource_file ----
 ; Renames a file through dos_rename_file when [0xF] > 1; otherwise does nothing.
 ; No caller, no stored address found (dead CRT code).
@@ -884,6 +911,7 @@ rename_resource_file_dos1_skip:
 	add	sp,0x4e			; 056D9
 	pop	bp			; 056DC
 	ret				; 056DD
+%endif
 
 ; ---- function strcpy ----
 ; C runtime strcpy. Copies null-terminated string from src to dest.
