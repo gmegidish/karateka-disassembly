@@ -47,7 +47,7 @@ poll_keyboard_handle_keypress:
 	jz	short poll_keyboard_handle_esc		; 04179 jz 0x41f4
 	cmp	al,0x12			; 0417B
 	jnz	short poll_keyboard_check_ctrl_s		; 0417D jnz 0x418c
-	call	consume_key		; 0417F
+	call	play_sound_5_forced		; 0417F
 	mov	word [input_advance],0x1	; 04182
 	db	0x33, 0xC0		; 04188 xor ax,ax
 	pop	bp			; 0418A
@@ -55,7 +55,7 @@ poll_keyboard_handle_keypress:
 poll_keyboard_check_ctrl_s:
 	cmp	al,0x13			; 0418C
 	jnz	short poll_keyboard_check_debug_ctrl_v		; 0418E jnz 0x41a7
-	call	consume_key		; 04190
+	call	play_sound_5_forced		; 04190
 	inc	byte [sound_mode]		; 04193
 	cmp	byte [sound_mode],0x3	; 04197
 	jc	short poll_keyboard_sound_mode_cycled		; 0419C jc 0x41a3
@@ -69,14 +69,14 @@ poll_keyboard_check_debug_ctrl_v:
 	jnz	short poll_keyboard_check_extended_key		; 041AC jnz 0x41ce
 	cmp	al,0x16			; 041AE
 	jnz	short poll_keyboard_check_extended_key		; 041B0 jnz 0x41ce
-	call	consume_key		; 041B2
+	call	play_sound_5_forced		; 041B2
 	mov	ax,0xbe			; 041B5
 	push	ax			; 041B8
 	mov	ax,0x96			; 041B9
 	push	ax			; 041BC
 	mov	ax,0x5d			; 041BD
 	push	ax			; 041C0
-	call	draw_sprite_mirrored	; 041C1
+	call	draw_sprite_unflipped	; 041C1
 	add	sp,0x6			; 041C4
 	call	update_display		; 041C7
 	db	0x33, 0xC0		; 041CA xor ax,ax
@@ -89,7 +89,11 @@ poll_keyboard_check_extended_key:
 	int	0x21			; 041D4
 	cmp	al,0x4b			; 041D6
 	jnz	short poll_keyboard_check_right_arrow		; 041D8 jnz 0x41de
+%ifdef HEBREW
+	mov	al,0x36			; arrows swapped to match the mirrored screen
+%else
 	mov	al,0x34			; 041DA
+%endif
 	jmp	short poll_keyboard_store_pending_key		; 041DC jmp 0x41e8
 poll_keyboard_check_right_arrow:
 	cmp	al,0x4d			; 041DE
@@ -98,7 +102,11 @@ poll_keyboard_check_right_arrow:
 	pop	bp			; 041E4
 	ret				; 041E5
 poll_keyboard_map_right_arrow:
+%ifdef HEBREW
+	mov	al,0x34			; arrows swapped to match the mirrored screen
+%else
 	mov	al,0x36			; 041E6
+%endif
 poll_keyboard_store_pending_key:
 	mov	[pending_key],al		; 041E8
 	mov	byte [key_pending],0x1	; 041EB
@@ -137,13 +145,21 @@ wait_for_key_read_extended_scancode:
 	int	0x21			; 04219
 	cmp	al,0x4b			; 0421B
 	jnz	short wait_for_key_check_right_arrow		; 0421D jnz 0x4225
+%ifdef HEBREW
+	mov	al,0x36			; arrows swapped to match the mirrored screen
+%else
 	mov	al,0x34			; 0421F
+%endif
 	mov	ah,0x0			; 04221
 	jmp	short wait_for_key_flush_and_return		; 04223 jmp 0x422d
 wait_for_key_check_right_arrow:
 	cmp	al,0x4d			; 04225
 	jnz	short wait_for_key_retry		; 04227 jnz 0x41fc
+%ifdef HEBREW
+	mov	al,0x34			; arrows swapped to match the mirrored screen
+%else
 	mov	al,0x36			; 04229
+%endif
 	mov	ah,0x0			; 0422B
 wait_for_key_flush_and_return:
 	push	ax			; 0422D
@@ -164,12 +180,10 @@ flush_keyboard_drain_loop:
 	mov	byte [key_pending],0x0	; 0423B
 	ret				; 04240
 
-; ---- function consume_key ----
-; Reads and discards a keystroke with a visual delay (play_sound(5)).
-; Saves/restores sound mode [0xD6BC] during the wait to prevent
-; sound state corruption.
-; Does not touch the keyboard: it only plays sound 5 with the sound mode forced to 0, then restores the mode.
-consume_key:
+; ---- function play_sound_5_forced ----
+; Plays sound 5 (play_sound_buzz_low) with sound_mode forced to 0, so it is heard even when muted, then restores sound_mode.
+; Reads no key. Callers use it as an acknowledge beep for a key already read: Ctrl+R, Ctrl+S and Ctrl+V in poll_keyboard (0x417F, 0x4190, 0x41B2), 'j' and 'k' in key_to_move (0x1DFD, 0x1E14).
+play_sound_5_forced:
 	push	word [sound_mode]		; 04241
 	mov	byte [sound_mode],0x0	; 04245
 	mov	ax,0x5			; 0424A
@@ -368,16 +382,16 @@ check_graphics_card_adapter_found:
 	add	al,0x41			; 0436A
 	ret				; 0436C
 check_graphics_card_no_adapter:
-	call	video_init		; 0436D
+	call	restore_video_mode		; 0436D
 	db	0x33, 0xC0		; 04370 xor ax,ax
 	ret				; 04372
 
-; ---- function video_init ----
-; Restores original video mode and selects disk drive.
-; Called during error/exit cleanup. Clears video buffer, restores BIOS
-; equipment flags, sets original video mode via INT 10h, and selects
-; the game's disk drive via INT 21h/0Eh.
-video_init:
+; ---- function restore_video_mode ----
+; Restores the original video state and selects a disk drive; initialises nothing.
+; Clears the video buffer, writes saved_equipment_byte back to 0040:0010,
+; sets saved_video_mode via INT 10h/00h, and selects exit_disk_drive via INT 21h/0Eh.
+; Its one caller is check_graphics_card's no-adapter path at 0x436D.
+restore_video_mode:
 	call	clear_video_buffer	; 04373
 	mov	bl,[saved_equipment_byte]		; 04376
 	push	ds			; 0437A
@@ -421,7 +435,7 @@ clear_video_buffer:
 ; Output:
 ;   AX = hit result: 0=miss, 1-4=hit types (4=out of range, 3=light hit)
 ;   Heavy/medium/close/advancing/retreating hits from lookup tables
-; [bp+8] is a byte index (enemy_dir_flag from the caller) into the threshold table at 0xE0F8 and the result-index table at 0xE112.
+; [bp+8] is a byte index (enemy_frame_attr from the caller) into the threshold table at 0xE0F8 and the result-index table at 0xE112.
 ; Distance is rounded down to a multiple of 4 after the adjustment. Result 4 is returned below the threshold, 0 above threshold + 0x11.
 check_hit_zone:
 	push	bp			; 043AA
@@ -522,7 +536,7 @@ add_figure_to_scene_select_character:
 add_figure_to_scene_enemy:
 	mov	ax,[enemy_x]		; 0446D
 	mov	cl,0x63			; 04470
-	cmp	word [enemy_active],0x0	; 04472
+	cmp	word [special_enemy_active],0x0	; 04472
 	jz	short add_figure_to_scene_enemy_pick_code		; 04477 jz 0x447c
 	mov	bx,0xe			; 04479
 add_figure_to_scene_enemy_pick_code:
@@ -530,12 +544,12 @@ add_figure_to_scene_enemy_pick_code:
 	jnl	short add_figure_to_scene_prepare_shift		; 0447F jnl 0x4483
 	inc	cl			; 04481
 add_figure_to_scene_prepare_shift:
-	mov	si,[player_anim_end]		; 04483
+	mov	si,[figure_list_cursor]		; 04483
 	db	0x8B, 0xFE		; 04487 mov di,si
 	add	di,0x4			; 04489
 add_figure_to_scene_shift_entries_loop:
-	mov	dl,[si+player_sprite_cmd]		; 0448C
-	mov	[di+player_sprite_cmd],dl		; 04490
+	mov	dl,[si+frame_sound_id]		; 0448C
+	mov	[di+frame_sound_id],dl		; 04490
 	dec	si			; 04494
 	dec	di			; 04495
 	cmp	si,[anim_data_limit]		; 04496
@@ -546,16 +560,16 @@ add_figure_to_scene_shift_entries_loop:
 	jnz	short add_figure_to_scene_store_code_and_x		; 044A6 jnz 0x44ab
 	db	0x2D, 0x23, 0x00	; 044A8 sub ax,0x23
 add_figure_to_scene_store_code_and_x:
-	mov	[si+player_anim_ctr],ax		; 044AB
-	mov	[si+player_sprite_cmd],cl		; 044AF
+	mov	[si+screen_wipe_flag],ax		; 044AB
+	mov	[si+frame_sound_id],cl		; 044AF
 	shr	bx,1			; 044B3
 	mov	cl,[bx+figure_screen_y]		; 044B5
 	cmp	word [scene_index],0x7	; 044B9
 	jnz	short add_figure_to_scene_store_y_and_advance		; 044BE jnz 0x44c3
 	add	cl,0x8			; 044C0
 add_figure_to_scene_store_y_and_advance:
-	mov	[si+player_anim_buf],cl		; 044C3
-	add	word [player_anim_end],0x4	; 044C7
+	mov	[si+figure_list],cl		; 044C3
+	add	word [figure_list_cursor],0x4	; 044C7
 	add	word [anim_data_limit],0x4	; 044CC
 	pop	bp			; 044D1
 	ret				; 044D2
@@ -613,9 +627,9 @@ check_joystick_maybe_swap_axes:
 check_joystick_maybe_swap_buttons:
 	cmp	byte [joy_swap_buttons],0x0	; 0452C
 	jz	short check_joystick_check_right_up_combo		; 04531 jz 0x453d
-	mov	al,[joy_btn_2]		; 04533
-	xchg	al,[joy_btn_1]		; 04536
-	mov	[joy_btn_2],al		; 0453A
+	mov	al,[joy_btn_bit4]		; 04533
+	xchg	al,[joy_btn_bit5]		; 04536
+	mov	[joy_btn_bit4],al		; 0453A
 check_joystick_check_right_up_combo:
 	cmp	byte [joy_axis_right],0x1	; 0453D
 	jnz	short check_joystick_check_b_key_button		; 04542 jnz 0x456d
@@ -623,7 +637,7 @@ check_joystick_check_right_up_combo:
 	jnz	short check_joystick_check_b_key_button		; 04549 jnz 0x456d
 	cmp	word [combat_phase],0x0		; 0454B
 	jnz	short check_joystick_return_ampersand_key		; 04550 jnz 0x4569
-	cmp	word [enemy_active],0x0	; 04552
+	cmp	word [special_enemy_active],0x0	; 04552
 	jnz	short check_joystick_right_up_return_none		; 04557 jnz 0x4566
 	mov	dx,[enemy_x]		; 04559
 	sub	dx,[player_x]		; 0455D
@@ -637,7 +651,7 @@ check_joystick_return_ampersand_key:
 check_joystick_check_b_key_button:
 	cmp	word [player_anim_id],0x3f	; 0456D
 	jng	short check_joystick_check_left		; 04572 jng 0x457f
-	cmp	byte [joy_btn_1],0x1	; 04574
+	cmp	byte [joy_btn_bit5],0x1	; 04574
 	jnz	short check_joystick_check_left		; 04579 jnz 0x457f
 	mov	ax,0x62			; 0457B
 	ret				; 0457E
@@ -652,7 +666,7 @@ check_joystick_check_right:
 	mov	ax,0x36			; 04591
 	ret				; 04594
 check_joystick_check_wxs_button:
-	cmp	byte [joy_btn_2],0x1	; 04595
+	cmp	byte [joy_btn_bit4],0x1	; 04595
 	jnz	short check_joystick_check_qza_button		; 0459A jnz 0x45b6
 	cmp	byte [joy_axis_up],0x1	; 0459C
 	jnz	short check_joystick_wxs_button_check_down		; 045A1 jnz 0x45a7
@@ -667,7 +681,7 @@ check_joystick_wxs_button_alone:
 	mov	ax,0x73			; 045B2
 	ret				; 045B5
 check_joystick_check_qza_button:
-	cmp	byte [joy_btn_1],0x1	; 045B6
+	cmp	byte [joy_btn_bit5],0x1	; 045B6
 	jnz	short check_joystick_check_up_alone		; 045BB jnz 0x45d7
 	cmp	byte [joy_axis_up],0x1	; 045BD
 	jnz	short check_joystick_qza_button_check_down		; 045C2 jnz 0x45c8
@@ -693,7 +707,7 @@ check_joystick_check_up_alone:
 	mov	ax,0x30			; 045F3
 	ret				; 045F6
 check_joystick_up_check_enemy_range:
-	cmp	word [enemy_active],0x0	; 045F7
+	cmp	word [special_enemy_active],0x0	; 045F7
 	jnz	short check_joystick_return_none		; 045FC jnz 0x4616
 	cmp	word [combat_phase],0x0		; 045FE
 	jnz	short check_joystick_return_space_key		; 04603 jnz 0x4612

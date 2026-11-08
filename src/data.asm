@@ -17,11 +17,11 @@ heap_base_off   equ 0x5d        ; word - heap base offset (initial heap_offset v
 heap_start_seg  equ 0x5f        ; word - heap start segment
 heap_offset     equ 0x61        ; word - current heap allocation offset from base
 heap_current_seg equ 0x63       ; word - heap current allocation segment
-heap_size       equ 0x65        ; word - heap size in paragraphs
-heap_remainder  equ 0x67        ; word - heap remaining bytes (fractional paragraph)
+heap_bytes_lo       equ 0x65        ; word - low word of the 32-bit byte count heap_alloc can still carve (high word is heap_bytes_hi)
+heap_bytes_hi  equ 0x67        ; word - high word of the 32-bit byte count heap_alloc can still carve (low word is heap_bytes_lo)
 env_string_off  equ 0x6b        ; word - environment string pointer (offset)
 env_segment     equ 0x6d        ; word - environment segment
-program_name_off equ 0x6f       ; word - program name pointer offset in environment
+env_block_size equ 0x6f       ; word - size in bytes of the DOS environment block, rounded up to a word; startup reserves it and copies the block onto the stack
 fpu_present     equ 0x7b        ; byte - 1 if FPU (8087) detected, 0 otherwise
 fpu_status      equ 0x7c        ; word - FPU status word from FNSTSW
 dos_error_code  equ 0x80        ; word - DOS error code (used by DOS wrappers)
@@ -62,11 +62,11 @@ joy_axis_left    equ 0xe1a1     ; byte - 1 if joystick left
 joy_axis_right   equ 0xe1a2     ; byte - 1 if joystick right
 joy_axis_up      equ 0xe1a3     ; byte - 1 if joystick up
 joy_axis_down    equ 0xe1a4     ; byte - 1 if joystick down
-joy_btn_2        equ 0xe1a5     ; byte - 1 if button 2 pressed
-joy_btn_1        equ 0xe1a6     ; byte - 1 if button 1 pressed
+joy_btn_bit4        equ 0xe1a5     ; byte - 1 if game port bit 4 is pressed and bit 5 is not; exchanged with joy_btn_bit5 when joy_swap_buttons is set
+joy_btn_bit5        equ 0xe1a6     ; byte - 1 if game port bit 5 is pressed and bit 4 is not; exchanged with joy_btn_bit4 when joy_swap_buttons is set
 cpu_speed_count  equ 0xe1a7     ; word - CPU speed measurement (loop iterations per 7 timer ticks)
 
-; File I/O state (used by open_file_slot, get_file_slot, show_insert_disk)
+; File I/O state (used by open_file_slot, get_file_slot, exit)
 file_slot_count  equ 0xe5cc     ; word - number of file table slots allocated
 file_table_base  equ 0xe5ce     ; start of file table (42 bytes per slot)
 file_error_code  equ 0xe4be     ; word - last file operation error code
@@ -75,7 +75,7 @@ file_error_code  equ 0xe4be     ; word - last file operation error code
 heap_free_head_a equ 0xe4b6     ; word - heap free-list head pointer A
 heap_free_head_b equ 0xe4b8     ; word - heap free-list head pointer B
 heap_free_head_c equ 0xe4ba     ; word - heap free-list head pointer C
-heap_free_head_d equ 0xe4bc     ; word - heap free-list head pointer D
+heap_free_units equ 0xe4bc     ; word - free heap in 4-byte units: pool size at heap_init_free_list, reduced by crt_malloc, increased by crt_free
 
 ; Heap memory pool tracking (used by reset_heap on DOS 2+)
 heap_pool_lo     equ 0xe4c0     ; word - heap pool size low word
@@ -115,25 +115,25 @@ player_anim_id   equ 0x10c      ; word - player current animation ID
 enemy_x          equ 0x10e      ; word - enemy X position
 enemy_anim_id    equ 0x110      ; word - enemy current animation ID
 enemy_facing     equ 0x112      ; word - enemy facing direction
-player_hits_left equ 0x114      ; word - player hit points remaining / right wipe column count
-enemy_health     equ 0x116      ; word - enemy health points (max 9) / left wipe column count
+enemy_hit_points equ 0x114      ; word - enemy hit points remaining; 13 at spawn on levels 0-1, 5 for the special enemy; also the right health bar pip count
+player_hit_points     equ 0x116      ; word - player hit points remaining; starts at 13, 12 or 10 by level, 0 kills the player; also the left health bar pip count
 enemy_frozen     equ 0x118      ; word - countdown frames until enemy unfreezes
 scene_locked     equ 0x11a      ; word - countdown frames until scene unlocks
-hit_regen_rate_p equ 0x11c      ; word - player health regen rate (ticks between regen)
-encounter_counter equ 0x11e     ; word - hit exchange counter during encounter
-hit_regen_rate_e equ 0x120      ; word - enemy health regen rate (ticks between regen)
-hit_regen_init_e equ 0x122      ; word - enemy health regen initial rate (reset value)
-enemy_health_regen equ 0x124    ; word - enemy health recovery amount
-hit_regen_timer_e equ 0x126     ; word - enemy health regen countdown timer
-hit_regen_timer_p equ 0x128     ; word - player health regen countdown timer
+enemy_regen_rate equ 0x11c      ; word - frames between enemy regen steps; reload value of enemy_regen_timer
+enemy_regen_pending equ 0x11e     ; word - hit points queued for the enemy to regain
+player_regen_rate equ 0x120      ; word - frames between player regen steps; reload value of player_regen_timer; forced to 2 for a fast refill
+player_regen_rate_init equ 0x122      ; word - player health regen rate reset value
+player_regen_pending equ 0x124    ; word - hit points queued for the player to regain
+player_regen_timer equ 0x126     ; word - player regen countdown, in frames
+enemy_regen_timer equ 0x128     ; word - enemy regen countdown, in frames
 scroll_counter   equ 0x12c      ; word - screen scroll step counter
-scene_transition_pending equ 0x12e ; word - 1 if scene transition is pending
+draw_health_bars_pending equ 0x12e ; word - 1 if scene transition is pending
 scene_index      equ 0x130      ; word - current scene/encounter index within level
 scene_slot_flags equ 0x142      ; word[8] - per-scene-slot active flags
 level_advance    equ 0x152      ; word - levels to advance (0=none, 3=skip to level 3)
 approach_flag    equ 0x154      ; word - approach state (1=approach, 2=retreat, 3=trigger, 4=done)
 anim_mode        equ 0x156      ; word - animation processing mode
-player_y_off     equ 0x158      ; word - player Y offset
+enemy_sprite_variant     equ 0x158      ; word - added to a normal enemy's second figure sprite id; -1 at init_combat_state, +1 per spawn_enemy, at most 4
 approach_timer   equ 0x166      ; word - approach/wait timer countdown
 player_flag_170  equ 0x170      ; word - player state flag (blocks enemy health drain)
 player_flag_172  equ 0x172      ; word - 1 if approach regen setup done
@@ -142,20 +142,20 @@ combat_counter_a equ 0x16c      ; word - combat counter
 combat_counter_b equ 0x16e      ; word - combat counter
 
 ; Player animation state
-player_sprite_cmd equ 0xbb30    ; byte - player sprite update command
-player_anim_ctr  equ 0xbb31     ; word - player animation counter
-player_anim_buf  equ 0xbb33     ; buffer - player animation data
-player_anim_end  equ 0xbb2e     ; word - player animation end pointer
+frame_sound_id equ 0xbb30    ; byte - sound id played after the frame is presented; also base address for figure list offsets (entry byte +0: sprite id)
+screen_wipe_flag  equ 0xbb31     ; byte - nonzero reveals the frame with the column wipe (set_wipe/set_nowipe); also base address for figure list offsets (entry +1: X word)
+figure_list  equ 0xbb33     ; buffer - figure list: 4-byte entries (sprite id, X word, Y), ended by id 0xFF; also base address for offsets (entry +3: Y)
+figure_list_cursor  equ 0xbb2e     ; word - figure list cursor: offset from frame_sound_id (0xBB30) to the current or next 4-byte entry, starts at 3
 player_x         equ 0xbcd5     ; word - player X position
-player_anim_div_a equ 0xc3a0    ; word - player animation divisor
-player_anim_div_b equ 0xc3a2    ; word - player animation dividend
+scenery_row_start_ptr equ 0xc3a0    ; word - start of the current scenery row's first figure block (from scenery_row_starts)
+scenery_row_mid_ptr equ 0xc3a2    ; word - boundary between the current scenery row's two figure blocks (from scenery_row_middles)
 anim_bg_counter  equ 0xc3a6     ; word - background scene counter (indexes into bg lookup tables)
 player_frame_ptr equ 0xc3d2     ; word - player animation frame pointer
-player_frame_bak equ 0xc3d4     ; word - player animation frame backup
+player_seq_offsets equ 0xc3d4     ; word[42] - player animation sequence offsets into player_anim_frames, indexed by animation number
 
 ; Enemy animation state
 enemy_frame_ptr  equ 0xcde8     ; word - enemy animation frame pointer
-enemy_frame_bak  equ 0xcdea     ; word - enemy animation frame backup
+enemy_seq_offsets  equ 0xcdea     ; word[42] - enemy animation sequence offsets into enemy_anim_frames, indexed by animation number
 
 ; Animation script interpreter state
 script_running   equ 0xbcd0     ; byte - 1 while animation script is executing
@@ -175,10 +175,10 @@ anim_fig_bg      equ 0xbb32     ; byte - current background figure index
 ; Animation working variables
 anim_write_off   equ 0xd5a4     ; word - animation data write offset
 anim_temp_ptr    equ 0xd5a8     ; word - animation data temp pointer
-enemy_active     equ 0xd5aa     ; word - 0=no enemy, 1=enemy present
+special_enemy_active     equ 0xd5aa     ; word - 1 while the special enemy from activate_enemy (anim 0x1F) is in play, 0 for normal encounters
 enemy_y_off      equ 0xd5ac     ; word - enemy Y offset
-player_dir_flag  equ 0xd5ae     ; byte - player direction flag
-enemy_dir_flag   equ 0xd5b0     ; byte - enemy direction flag
+player_frame_attr  equ 0xd5ae     ; byte - current player frame's attribute (flags byte >> 1): index into the hit_zone tables when the enemy strikes
+enemy_frame_attr   equ 0xd5b0     ; byte - current enemy frame's attribute (flags byte >> 1): index into the hit_zone tables when the player strikes
 anim_data_limit  equ 0xd5b2     ; word - animation data limit
 enemy_defeated   equ 0xd64c     ; word - 1 if enemy defeated
 wipe_prev_right  equ 0xd650     ; word - previous right wipe column count (for delta detection)
@@ -187,11 +187,11 @@ trans_buf_left   equ 0xd654     ; 14 bytes - transition column data buffer (left
 trans_buf_right  equ 0xd662     ; 14 bytes - transition column data buffer (right)
 gate_anim_left   equ 0xd670     ; byte - gate animation cooldown (left)
 gate_anim_right  equ 0xd671     ; byte - gate animation cooldown (right)
-anim_state_bb2a  equ 0xbb2a     ; word - animation state variable
+last_drawn_camera_x  equ 0xbb2a     ; word - camera_x of the last displayed frame; 0xFFFF forces a scenery rebuild
 
 ; Cutscene/level transition state (used by cutscene_play)
 cutscene_state   equ 0xd672     ; word - cutscene sub-state counter
-ui_pending       equ 0xd674     ; word - 1 if UI element needs to be displayed
+the_end_pending       equ 0xd674     ; word - 1 when show_the_end should run once the special enemy is gone
 eagle_active     equ 0xd676     ; word - 1 if eagle encounter is active (level 2)
 eagle_scroll_dir equ 0xd678     ; word - eagle scroll direction (+/- for left/right)
 eagle_trigger    equ 0xd67a     ; word - 1 if eagle attack triggered
@@ -263,7 +263,7 @@ offscreen_length_prefix_hi         equ 0x338	; byte - offscreen_buffer+1: high b
 disk_sector_signature              equ 0x7c3	; byte[] - signature checked by load_game_disk: offset 0x8C of the protected sector buffer at DS:0x737, inside offscreen_buffer
 offscreen_outro_text               equ 0x977	; byte[] - offscreen_buffer line 20 col 0: first outro text line
 offscreen_scenery_top              equ 0xd37	; byte[] - offscreen_buffer line 32 col 0: start of the scenery rebuilt when the camera moves
-anti_tamper_region_2_start         equ 0x169c	; code offset (CS-relative, not a DS variable) - start of the 0x81 bytes checksummed by anti_tamper_check; equals reset_to_game_start
+anti_tamper_region_2_start         equ 0x169c	; code offset (CS-relative, not a DS variable) - start of the 0x81 bytes checksummed by anti_tamper_check; equals skip_disk_check
 offscreen_title_picture            equ 0x1917	; byte[] - offscreen_buffer line 70 col 0: destination of the title picture
 offscreen_disk_prompt_line1        equ 0x1b01	; byte[] - offscreen_buffer line 76 col 10: disk prompt text line 1
 offscreen_fuji_band                equ 0x1c37	; byte[] - offscreen_buffer line 80 col 0: destination of the fuji.bcg scenery strip
@@ -286,7 +286,7 @@ health_bar_left_pip_2              equ 0x3f8b	; byte[] - offscreen_buffer line 1
 health_bar_right_pip_2             equ 0x3fd1	; byte[] - offscreen_buffer line 193 col 74: second right bar pip, blinked at low health
 health_bar_right_pip_1             equ 0x3fd4	; byte[] - offscreen_buffer line 193 col 77: first right bar pip, blinked at low health
 health_bar_right_end               equ 0x3fd7	; byte[] - offscreen_buffer line 194 col 0, one past the end of line 193: right bar base; pip N is at base - 3*N
-sprite_column_offset_rtl           equ 0x421c	; word - offscreen offset of the current column top in draw_sprite, which walks columns right to left
+sprite_column_offset_rtl           equ 0x421c	; word - offscreen offset of the current column top in draw_sprite_flipped, which walks columns right to left
 sprite_image_pos                   equ 0x421e	; word - read position in the image stream, relative to sprite_image_bank
 sprite_mask_pos                    equ 0x4220	; word - read position in the mask stream, relative to sprite_mask_bank
 sprite_columns_left                equ 0x4222	; byte - 4-pixel columns of the current sprite not yet consumed
@@ -330,7 +330,7 @@ font_glyph_ptr_comma               equ 0xb8a0	; word - glyph table entry 27 (com
 font_glyph_ptr_dash                equ 0xb8a2	; word - glyph table entry 28 (dash), shifted by the startup patch
 font_glyph_ptr_hyphen              equ 0xb8a4	; word - glyph table entry 29 (hyphen), shifted by the startup patch
 font_glyph_ptr_spare               equ 0xb8a6	; word - glyph table entry 30, moved into entry 29 at startup
-figure_list_x                      equ 0xbb34	; word - figure list (4-byte entries from player_anim_buf, 0xBB33) entry +1: X; scripts index with 3-based offsets, which makes this the next entry id
+figure_list_x                      equ 0xbb34	; word - figure list (4-byte entries from figure_list, 0xBB33) entry +1: X; scripts index with 3-based offsets, which makes this the next entry id
 figure_list_x_hi                   equ 0xbb35	; byte - figure list entry +2: X high byte; chg_fig writes the X high and Y bytes as a word here
 figure_list_y                      equ 0xbb36	; byte - figure list entry +3: Y; del_fig copies a word here with 3-based offsets
 figure_list_id2                    equ 0xbb37	; byte - figure list entry at +4 (second figure written by scene_update): sprite id
@@ -346,28 +346,28 @@ scenery_row_end_ptr                equ 0xc3a4	; word - end of the current row in
 scenery_row_starts                 equ 0xc3a8	; word[7] - per-row pointers to the start of the row in scenery_figures
 scenery_row_middles                equ 0xc3b6	; word[7] - per-row pointers to the 0x12 split in scenery_figures (figures behind the actors end here)
 scenery_row_ends                   equ 0xc3c4	; word[7] - per-row pointers to the end of the row in scenery_figures
-player_seq_recoil                  equ 0xc3e2	; word - player_frame_bak[7]: offset of the 5-frame recoil step (anim 10, dx -4)
-player_seq_long_recoil             equ 0xc3ec	; word - player_frame_bak[12]: offset of the 10-frame backward step (anim 10, dx -4), set at eagle spawn and boss intro
-player_seq_stop_running            equ 0xc3f4	; word - player_frame_bak[16]: offset of the sequence played when space ends the run (anim 0x46) (anim 1, dx +4 then 0)
-player_seq_stand_idle              equ 0xc3fa	; word - player_frame_bak[19]: offset of the 1-frame standing pose (anim 0x41)
-player_seq_death                   equ 0xc40c	; word - player_frame_bak[28]: offset of the death sequence (anim 28), used when player health reaches 0
-player_seq_gate_crush              equ 0xc40e	; word - player_frame_bak[29]: offset of the sequence forced in the level 2 gate crush zone (anim 29)
-player_seq_level0_left_bound       equ 0xc414	; word - player_frame_bak[32]: offset of the 2-frame sequence (anim 0x44) set when the player reaches the left bound on level 0
+player_seq_recoil                  equ 0xc3e2	; word - player_seq_offsets[7]: offset of the 5-frame recoil step (anim 10, dx -4)
+player_seq_long_recoil             equ 0xc3ec	; word - player_seq_offsets[12]: offset of the 10-frame backward step (anim 10, dx -4), set at eagle spawn and boss intro
+player_seq_stop_running            equ 0xc3f4	; word - player_seq_offsets[16]: offset of the sequence played when space ends the run (anim 0x46) (anim 1, dx +4 then 0)
+player_seq_stand_idle              equ 0xc3fa	; word - player_seq_offsets[19]: offset of the 1-frame standing pose (anim 0x41)
+player_seq_death                   equ 0xc40c	; word - player_seq_offsets[28]: offset of the death sequence (anim 28), used when player health reaches 0
+player_seq_gate_crush              equ 0xc40e	; word - player_seq_offsets[29]: offset of the sequence forced in the level 2 gate crush zone (anim 29)
+player_seq_level0_left_bound       equ 0xc414	; word - player_seq_offsets[32]: offset of the 2-frame sequence (anim 0x44) set when the player reaches the left bound on level 0
 player_anim_frames                 equ 0xc428	; byte[] - compiled player script: 17-byte frame records in sequences ended by 0xFF, +0 is the end marker check
 player_frame_anim_id               equ 0xc429	; byte - player_anim_frames + 1: animation id (copied to player_anim_id)
-player_frame_flags                 equ 0xc42a	; byte - player_anim_frames + 2: bit 0 = facing, bits 1-7 = player_dir_flag
+player_frame_flags                 equ 0xc42a	; byte - player_anim_frames + 2: bit 0 = facing, bits 1-7 = player_frame_attr
 player_frame_dx                    equ 0xc42c	; signed byte - player_anim_frames + 4: X step applied to player_x
 player_frame_sound                 equ 0xc42e	; byte - player_anim_frames + 6: sound id for this frame
 player_frame_figures               equ 0xc42f	; byte[10] - player_anim_frames + 7: source of the two figure entries (see copy_sprite_frame)
-enemy_seq_recoil                   equ 0xcdfa	; word - enemy_frame_bak[8]: offset of the 5-frame recoil step (anim 11, gal08)
-enemy_seq_run_in                   equ 0xce06	; word - enemy_frame_bak[14]: offset of the running sequence (anim 0x46, dx -12), used to bring an enemy in from off screen
-enemy_seq_stand_idle               equ 0xce10	; word - enemy_frame_bak[19]: offset of the 1-frame standing pose (anim 0x41), used when spawning on levels below 2
-enemy_seq_death                    equ 0xce22	; word - enemy_frame_bak[28]: offset of the death sequence (anim 28), used when the enemy is defeated
-enemy_seq_eagle_fly                equ 0xce28	; word - enemy_frame_bak[31]: offset of the eagle flight sequence (anim 0x1F, dx -12), set by activate_enemy
-enemy_seq_eagle_death              equ 0xce2e	; word - enemy_frame_bak[34]: offset of the eagle death sequence (anim 34), set when its last hit lands
+enemy_seq_recoil                   equ 0xcdfa	; word - enemy_seq_offsets[8]: offset of the 5-frame recoil step (anim 11, gal08)
+enemy_seq_run_in                   equ 0xce06	; word - enemy_seq_offsets[14]: offset of the running sequence (anim 0x46, dx -12), used to bring an enemy in from off screen
+enemy_seq_stand_idle               equ 0xce10	; word - enemy_seq_offsets[19]: offset of the 1-frame standing pose (anim 0x41), used when spawning on levels below 2
+enemy_seq_death                    equ 0xce22	; word - enemy_seq_offsets[28]: offset of the death sequence (anim 28), used when the enemy is defeated
+enemy_seq_eagle_fly                equ 0xce28	; word - enemy_seq_offsets[31]: offset of the eagle flight sequence (anim 0x1F, dx -12), set by activate_enemy
+enemy_seq_eagle_death              equ 0xce2e	; word - enemy_seq_offsets[34]: offset of the eagle death sequence (anim 34), set when its last hit lands
 enemy_anim_frames                  equ 0xce3e	; byte[] - compiled enemy script: 17-byte frame records in sequences ended by 0xFF, +0 is the end marker check
 enemy_frame_anim_id                equ 0xce3f	; byte - enemy_anim_frames + 1: animation id (copied to enemy_anim_id)
-enemy_frame_flags                  equ 0xce40	; byte - enemy_anim_frames + 2: bit 0 = facing, bits 1-7 = enemy_dir_flag
+enemy_frame_flags                  equ 0xce40	; byte - enemy_anim_frames + 2: bit 0 = facing, bits 1-7 = enemy_frame_attr
 enemy_frame_dx                     equ 0xce42	; signed byte - enemy_anim_frames + 4: X step applied to enemy_x
 enemy_frame_sound                  equ 0xce44	; byte - enemy_anim_frames + 6: sound id for this frame (0 keeps the player one)
 enemy_frame_fig1_id                equ 0xce46	; byte - enemy_anim_frames + 8: sprite id of the first figure
@@ -377,11 +377,11 @@ enemy_frame_fig2_id                equ 0xce4b	; byte - enemy_anim_frames + 0xD: 
 enemy_frame_fig2_x                 equ 0xce4c	; word - enemy_anim_frames + 0xE: X offset of the second figure
 enemy_frame_fig2_y                 equ 0xce4e	; byte - enemy_anim_frames + 0x10: Y of the second figure
 close_tier1_thresholds             equ 0xd5b4	; word[5][5] - first close-range AI tier: rows by current_level (0-3, row 4 is close_tier1_thresholds_player), columns by (distance-0x1C)/4; enemy_ai_decide returns 0 (idle) when rand_range(0xFF) >= value
-close_tier1_thresholds_player      equ 0xd5dc	; word[5] - row 4 of close_tier1_thresholds, indexed by (distance-0x1C)/4; anim_process calls anim_command when rand_range(0xFF) >= value
-close_tier2_thresholds             equ 0xd5e6	; word[5][5] - second close-range AI tier, same layout as close_tier1_thresholds; enemy_ai_decide returns anim_interpolate() when rand_range(0xFF) >= value
-close_tier2_thresholds_player      equ 0xd60e	; word[5] - row 4 of close_tier2_thresholds; anim_process returns anim_interpolate() when rand_range(0xFF) >= value
-close_tier3_thresholds             equ 0xd618	; word[5][5] - third close-range AI tier, same layout as close_tier1_thresholds; enemy_ai_decide returns anim_frame_update() when rand_range(0xFF) >= value, else combat_pick_far_attack
-close_tier3_thresholds_player      equ 0xd640	; word[5] - row 4 of close_tier3_thresholds; anim_process returns anim_frame_update() when rand_range(0xFF) >= value, else anim_command
+close_tier1_thresholds_player      equ 0xd5dc	; word[5] - row 4 of close_tier1_thresholds, indexed by (distance-0x1C)/4; demo_player_ai calls anim_command when rand_range(0xFF) >= value
+close_tier2_thresholds             equ 0xd5e6	; word[5][5] - second close-range AI tier, same layout as close_tier1_thresholds; enemy_ai_decide returns pick_anim_4_to_6() when rand_range(0xFF) >= value
+close_tier2_thresholds_player      equ 0xd60e	; word[5] - row 4 of close_tier2_thresholds; demo_player_ai returns pick_anim_4_to_6() when rand_range(0xFF) >= value
+close_tier3_thresholds             equ 0xd618	; word[5][5] - third close-range AI tier, same layout as close_tier1_thresholds; enemy_ai_decide returns pick_anim_2_to_4() when rand_range(0xFF) >= value, else combat_pick_far_attack
+close_tier3_thresholds_player      equ 0xd640	; word[5] - row 4 of close_tier3_thresholds; demo_player_ai returns pick_anim_2_to_4() when rand_range(0xFF) >= value, else anim_command
 sound_mode                         equ 0xd6bc	; byte - sound filter: 0 = all sounds, 1 = effects only (tunes 9-21 and 25+ silent), other = silent; poll_keyboard Ctrl+S cycles 0-2, key_to_move Ctrl+S XORs with 0xFF
 sound_jump_table                   equ 0xd6bd	; word[24] - code offsets of the play_sound cases, indexed by sound index - 1
 pcm_delay_sound_8                  equ 0xd710	; word - speaker_delay for sound 8 (0x0C in the EXE, low byte scaled for CPU speed by init_controls)

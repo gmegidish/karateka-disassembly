@@ -85,20 +85,20 @@ init_combat_state_stack_overflow:
 	jmp	near stack_overflow_handler			; 01B33
 init_combat_state_stack_ok:
 	db	0x8B, 0xEC		; 01B36 mov bp,sp
-	mov	word [player_y_off],0xffff	; 01B38
+	mov	word [enemy_sprite_variant],0xffff	; 01B38
 	db	0x33, 0xC0		; 01B3E xor ax,ax
 	mov	bx,[bp+0xa]		; 01B40
 	cmp	bx,0x2			; 01B43
-	mov	[scene_transition_pending],ax		; 01B46
+	mov	[draw_health_bars_pending],ax		; 01B46
 	mov	[camera_x],ax		; 01B49
 	jz	short init_combat_state_set_transition_pending		; 01B4C jz 0x1b53
 	cmp	bx,0x4			; 01B4E
 	jnz	short init_combat_state_load_level_positions		; 01B51 jnz 0x1b59
 init_combat_state_set_transition_pending:
-	mov	word [scene_transition_pending],0x1	; 01B53
+	mov	word [draw_health_bars_pending],0x1	; 01B53
 init_combat_state_load_level_positions:
 	mov	word [anim_render_mode],0x1		; 01B59
-	mov	word [anim_state_bb2a],0xffff	; 01B5F
+	mov	word [last_drawn_camera_x],0xffff	; 01B5F
 	mov	ax,[bp+0xa]		; 01B65
 	shl	ax,1			; 01B68
 	db	0x8B, 0xF0		; 01B6A mov si,ax
@@ -154,24 +154,24 @@ init_combat_state_set_enemy_health:
 	mov	word [combat_active],0x0		; 01C0C
 	cmp	word [bp+0xa],0x2	; 01C12
 	jnl	short init_combat_state_enemy_health_level2		; 01C16 jnl 0x1c20
-	mov	word [enemy_health],0xd	; 01C18
+	mov	word [player_hit_points],0xd	; 01C18
 	jmp	short init_combat_state_reset_regen		; 01C1E jmp 0x1c3a
 init_combat_state_enemy_health_level2:
 	cmp	word [bp+0xa],0x2	; 01C20
 	jnz	short init_combat_state_enemy_health_level3		; 01C24 jnz 0x1c2e
-	mov	word [enemy_health],0xc	; 01C26
+	mov	word [player_hit_points],0xc	; 01C26
 	jmp	short init_combat_state_reset_regen		; 01C2C jmp 0x1c3a
 init_combat_state_enemy_health_level3:
 	cmp	word [bp+0xa],0x3	; 01C2E
 	jnz	short init_combat_state_reset_regen		; 01C32 jnz 0x1c3a
-	mov	word [enemy_health],0xa	; 01C34
+	mov	word [player_hit_points],0xa	; 01C34
 init_combat_state_reset_regen:
 	db	0x33, 0xC0		; 01C3A xor ax,ax
-	mov	bx,[hit_regen_rate_e]		; 01C3C
+	mov	bx,[player_regen_rate]		; 01C3C
 	cmp	word [bp+0xa],0x0	; 01C40
-	mov	[enemy_health_regen],ax		; 01C44
+	mov	[player_regen_pending],ax		; 01C44
 	mov	[wipe_prev_left],ax		; 01C47
-	mov	[hit_regen_timer_e],bx		; 01C4A
+	mov	[player_regen_timer],bx		; 01C4A
 	jnz	short init_combat_state_exit		; 01C4E jnz 0x1c53
 	mov	[enemy_aggressive],ax		; 01C50
 init_combat_state_exit:
@@ -191,8 +191,8 @@ init_combat_state_exit:
 ;   - Sets enemy_atk_freq (0x78 for level < 2, 0xA0 for level >= 2)
 ;   - Sets initial combat_hits_left from health calculation
 ;   - Resets hit exchange counter, regen timers
-;   - Increments player_y_off [0x158] (up to max 4)
-; player_hits_left is 13 for levels 0-1, else 0x1A - enemy_health - enemy_health_regen.
+;   - Increments enemy_sprite_variant [0x158] (up to max 4)
+; enemy_hit_points is 13 for levels 0-1, else 0x1A - player_hit_points - player_regen_pending.
 ; Level 3 with scene_index > 1 places the enemy 0x140 further left.
 spawn_enemy:
 	push	bp			; 01C58
@@ -224,7 +224,7 @@ spawn_enemy_set_animation:
 	jmp	short spawn_enemy_set_attack_freq		; 01CA1 jmp 0x1caf
 spawn_enemy_walk_animation:
 	mov	word [enemy_anim_id],0x1	; 01CA3
-	mov	ax,[enemy_frame_bak]		; 01CA9
+	mov	ax,[enemy_seq_offsets]		; 01CA9
 	mov	[enemy_frame_ptr],ax		; 01CAC
 spawn_enemy_set_attack_freq:
 	db	0x33, 0xC0		; 01CAF xor ax,ax
@@ -237,23 +237,23 @@ spawn_enemy_set_attack_freq:
 spawn_enemy_high_attack_freq:
 	mov	word [enemy_atk_freq],0xa0	; 01CC5
 spawn_enemy_set_player_hits:
-	mov	word [player_hits_left],0xd	; 01CCB
+	mov	word [enemy_hit_points],0xd	; 01CCB
 	cmp	word [bp+0x6],0x1	; 01CD1
 	jng	short spawn_enemy_reset_encounter_state		; 01CD5 jng 0x1ce5
 	mov	ax,0x1a			; 01CD7
-	sub	ax,[enemy_health]		; 01CDA
-	sub	ax,[enemy_health_regen]		; 01CDE
-	mov	[player_hits_left],ax		; 01CE2
+	sub	ax,[player_hit_points]		; 01CDA
+	sub	ax,[player_regen_pending]		; 01CDE
+	mov	[enemy_hit_points],ax		; 01CE2
 spawn_enemy_reset_encounter_state:
 	db	0x33, 0xC0		; 01CE5 xor ax,ax
-	mov	bx,[hit_regen_rate_p]		; 01CE7
-	mov	cx,[player_y_off]		; 01CEB
+	mov	bx,[enemy_regen_rate]		; 01CE7
+	mov	cx,[enemy_sprite_variant]		; 01CEB
 	cmp	cx,0x4			; 01CEF
-	mov	[encounter_counter],ax		; 01CF2
+	mov	[enemy_regen_pending],ax		; 01CF2
 	mov	[wipe_prev_right],ax		; 01CF5
-	mov	[hit_regen_timer_p],bx		; 01CF8
+	mov	[enemy_regen_timer],bx		; 01CF8
 	jnl	short spawn_enemy_exit		; 01CFC jnl 0x1d02
-	inc	word [player_y_off]		; 01CFE
+	inc	word [enemy_sprite_variant]		; 01CFE
 spawn_enemy_exit:
 	add	sp,0x2			; 01D02
 	pop	bp			; 01D05
@@ -320,7 +320,7 @@ read_player_input_apply_move:
 	jz	short read_player_input_return_none		; 01D67 jz 0x1d82
 	shl	ax,1			; 01D69
 	db	0x8B, 0xF0		; 01D6B mov si,ax
-	mov	ax,[si+player_frame_bak]		; 01D6D
+	mov	ax,[si+player_seq_offsets]		; 01D6D
 	mov	word [player_moved_flag],0x1		; 01D71
 	mov	[player_frame_ptr],ax		; 01D77
 	mov	ax,[bp+0x2]		; 01D7A
@@ -419,7 +419,7 @@ key_to_move_stack_ok:
 key_to_move_check_j_key:
 	cmp	word [bp+0xa],0x6a	; 01DF7
 	jnz	short key_to_move_check_k_key		; 01DFB jnz 0x1e0e
-	call	consume_key		; 01DFD
+	call	play_sound_5_forced		; 01DFD
 	mov	word [keyboard_only],0x0	; 01E00
 	mov	ax,0xffff		; 01E06
 	add	sp,0x6			; 01E09
@@ -428,7 +428,7 @@ key_to_move_check_j_key:
 key_to_move_check_k_key:
 	cmp	word [bp+0xa],0x6b	; 01E0E
 	jnz	short key_to_move_check_control_key		; 01E12 jnz 0x1e25
-	call	consume_key		; 01E14
+	call	play_sound_5_forced		; 01E14
 	mov	word [keyboard_only],0x1	; 01E17
 	mov	ax,0xffff		; 01E1D
 	add	sp,0x6			; 01E20

@@ -38,16 +38,15 @@ open_file_retry_return_slot:
 	pop	bp			; 0169A
 	ret				; 0169B
 
-; ---- function reset_to_game_start ----
-; Non-local goto (longjmp) back to game_init's stack frame.
-; Restores SP from BP (which still points to game_init's frame),
-; then pushes the address of game_init_start_new_game (the load_player_anim_data call in
-; game_init) and returns to it. This effectively restarts the game
-; from the animation data loading point, unwinding the entire call stack.
+; ---- function skip_disk_check ----
+; Bypasses the disk check. Its one caller is at 0x2A7 in game_init, which pushes three
+; arguments of the shape read_disk_sector expects (drive 0, buffers 0x337 and 0x737).
+; BP is still game_init's frame, so mov sp,bp drops those arguments and the return address.
+; It then pushes 0x2B8 (game_init_start_new_game) and returns to it, skipping the
+; load_game_disk check at 0x2AC. It does not restart the game or unwind any deeper call.
 ;
-; No parameters. Does not return to caller.
-; Its one caller is at 0x2A7 in game_init, which pushes three arguments of the shape read_disk_sector expects; BP is still game_init's frame. Returning to 0x2B8 skips the load_game_disk check at 0x2AC, so it does not restart the game; it bypasses the disk check.
-reset_to_game_start:
+; Reads no parameters. Does not return to caller.
+skip_disk_check:
 	mov	sp,bp			; 0169C
 	mov	ax,0x2b8		; 0169E
 	push	ax			; 016A1
@@ -151,7 +150,7 @@ read_disk_sector_restore_and_return:
 ;
 ; No parameters.
 ; Returns: AX = 1 if signature matches (game disk present), 0 if mismatch
-; Its only call site, at 0x2AC, is never executed because reset_to_game_start at 0x2A7 does not return there.
+; Its only call site, at 0x2AC, is never executed because skip_disk_check at 0x2A7 does not return there.
 load_game_disk:
 	db	0x33, 0xDB		; 01718 xor bx,bx
 	db	0x33, 0xC0		; 0171A xor ax,ax

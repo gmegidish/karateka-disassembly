@@ -11,7 +11,7 @@
 ;   3. Copy animation data to write buffer via memcpy_block
 ;   4. If combat_active > 1, skip to end (combat transition)
 ;   5. PLAYER LOOP: Walk the player animation frame table:
-;      - If end marker (0xFF), call anim_process or player_anim_select to get next anim ID
+;      - If end marker (0xFF), call demo_player_ai or player_anim_select to get next anim ID
 ;      - Look up new frame pointer from animation table
 ;      - Extract anim ID, direction, facing from frame data
 ;      - Apply X velocity (signed byte), clamp to [player_x_min, player_x_max]
@@ -31,8 +31,8 @@
 ; Clobbers: AX, BX, CX, DX, SI, DI
 ; Correction to step 4: combat_active > 1 skips only the player frame processing, by jumping to 02461, where the enemy section still runs unless combat_phase > 1. combat_phase > 1 jumps to 025CD, which skips the enemy and goes straight to the finalize step. enemy_frozen jumps to 02538, skipping velocity, clamping and the frame sound but still writing the figures.
 scene_update:
-	mov	byte [player_sprite_cmd],0x0	; 022E1  ; reset player sprite command
-	mov	word [player_anim_ctr],0x0	; 022E6  ; reset player animation counter
+	mov	byte [frame_sound_id],0x0	; 022E1  ; reset player sprite command
+	mov	word [screen_wipe_flag],0x0	; 022E6  ; reset player animation counter
 	mov	ax,[player_x]		; 022EC
 	db	0x05, 0x03, 0x00	; 022EF add ax,0x3
 	db	0x25, 0xFC, 0xFF	; 022F2 and ax,0xfffc  ; align to 4-pixel boundary
@@ -41,9 +41,9 @@ scene_update:
 	db	0x05, 0x03, 0x00	; 022FB add ax,0x3
 	db	0x25, 0xFC, 0xFF	; 022FE and ax,0xfffc  ; align to 4-pixel boundary
 	mov	[enemy_x],ax		; 02301
-	push	word [player_anim_div_b]		; 02304
-	push	word [player_anim_div_a]		; 02308
-	lea	ax,[player_anim_buf]		; 0230C
+	push	word [scenery_row_mid_ptr]		; 02304
+	push	word [scenery_row_start_ptr]		; 02308
+	lea	ax,[figure_list]		; 0230C
 	push	ax			; 02310
 	call	memcpy_block		; 02311
 	add	sp,0x6			; 02314
@@ -58,9 +58,9 @@ scene_update_check_player_frame_end:
 	jnz	short scene_update_apply_player_frame		; 0232D jnz 0x235c
 	cmp	word [anim_mode],0x0	; 0232F
 	jz	short scene_update_player_anim_from_input		; 02334 jz 0x233b
-	call	anim_process		; 02336
+	call	demo_player_ai		; 02336
 	jmp	short scene_update_validate_player_anim_index		; 02339 jmp 0x233e
-; anim_mode == 0: the player is driven by input; otherwise by anim_process.
+; anim_mode == 0: the player is driven by input; otherwise by demo_player_ai.
 scene_update_player_anim_from_input:
 	call	player_anim_select	; 0233B
 ; Indices >= 0x2A are out of table range and fall back to 0.
@@ -71,7 +71,7 @@ scene_update_validate_player_anim_index:
 scene_update_lookup_player_anim_table:
 	shl	ax,1			; 02345
 	db	0x8B, 0xD8		; 02347 mov bx,ax
-	mov	ax,[bx+player_frame_bak]		; 02349
+	mov	ax,[bx+player_seq_offsets]		; 02349
 	mov	[player_frame_ptr],ax		; 0234D
 	db	0x8B, 0xD8		; 02350 mov bx,ax
 	cmp	word [combat_active],0x1		; 02352
@@ -86,7 +86,7 @@ scene_update_apply_player_frame:
 	db	0x8A, 0xC8		; 0236D mov cl,al
 	and	al,0x1			; 0236F
 	shr	cl,1			; 02371
-	mov	[player_dir_flag],cl		; 02373
+	mov	[player_frame_attr],cl		; 02373
 	mov	[player_facing],ax		; 02377
 	mov	cx,[player_x]		; 0237A
 	cmp	word [scene_locked],0x0	; 0237E
@@ -108,7 +108,7 @@ scene_update_check_player_enemy_overlap:
 	cmp	word [combat_phase],0x0		; 023AE
 	jg	short scene_update_update_camera		; 023B3 jg 0x23f2
 	add	cx,0x8			; 023B5
-	cmp	word [enemy_active],0x0	; 023B8
+	cmp	word [special_enemy_active],0x0	; 023B8
 	jz	short scene_update_check_player_charge_range		; 023BD jz 0x23c2
 	sub	cx,0x4			; 023BF
 ; Player anim 0x0B ends and resets to frame table entry 0 once player_x+8 is within 16 pixels of enemy_x.
@@ -121,7 +121,7 @@ scene_update_check_player_charge_range:
 	pop	cx			; 023D1
 	jl	short scene_update_update_camera		; 023D2 jl 0x23f2
 	mov	word [player_anim_id],0x0	; 023D4
-	mov	dx,[player_frame_bak]		; 023DA
+	mov	dx,[player_seq_offsets]		; 023DA
 	mov	[player_frame_ptr],dx		; 023DE
 scene_update_push_player_back_from_enemy:
 	cmp	cx,[enemy_x]		; 023E2
@@ -154,13 +154,13 @@ scene_update_check_player_frame_sound:
 	cmp	word [scene_locked],0x0	; 0242F
 	jnz	short scene_update_copy_player_figures		; 02434 jnz 0x243d
 	mov	al,[si+player_frame_sound]		; 02436
-	mov	[player_sprite_cmd],al		; 0243A
+	mov	[frame_sound_id],al		; 0243A
 scene_update_copy_player_figures:
 	push	word [player_x]		; 0243D
 	lea	ax,[player_frame_figures]		; 02441
 	db	0x03, 0xC6		; 02445 add ax,si
 	push	ax			; 02447
-	lea	ax,[player_anim_buf]		; 02448
+	lea	ax,[figure_list]		; 02448
 	add	ax,[anim_write_off]		; 0244C
 	push	ax			; 02450
 	call	copy_sprite_frame		; 02451
@@ -183,7 +183,7 @@ scene_update_check_enemy_frame_end:
 scene_update_lookup_enemy_anim_table:
 	db	0x8B, 0xD8		; 02483 mov bx,ax
 	shl	bx,1			; 02485
-	mov	si,[bx+enemy_frame_bak]		; 02487
+	mov	si,[bx+enemy_seq_offsets]		; 02487
 	mov	[enemy_frame_ptr],si		; 0248B
 	jmp	short scene_update_check_enemy_frame_end		; 0248F jmp 0x246b
 scene_update_apply_enemy_frame:
@@ -193,7 +193,7 @@ scene_update_apply_enemy_frame:
 	mov	al,[si+enemy_frame_flags]		; 0249A
 	db	0x8A, 0xC8		; 0249E mov cl,al
 	shr	cl,1			; 024A0
-	mov	[enemy_dir_flag],cl		; 024A2
+	mov	[enemy_frame_attr],cl		; 024A2
 	and	al,0x1			; 024A6
 	mov	[enemy_facing],ax		; 024A8
 	cmp	word [enemy_frozen],0x0	; 024AB
@@ -203,11 +203,11 @@ scene_update_apply_enemy_velocity:
 	mov	al,[si+enemy_frame_dx]		; 024B5
 	cbw				; 024B9
 	add	[enemy_x],ax		; 024BA
-	cmp	word [scene_transition_pending],0x0	; 024BE
+	cmp	word [draw_health_bars_pending],0x0	; 024BE
 	jnz	short scene_update_check_enemy_player_overlap		; 024C3 jnz 0x24df
 	cmp	word [game_mode],0x0		; 024C5
 	jnz	short scene_update_check_enemy_player_overlap		; 024CA jnz 0x24df
-	cmp	word [enemy_active],0x0	; 024CC
+	cmp	word [special_enemy_active],0x0	; 024CC
 	jnz	short scene_update_check_enemy_player_overlap		; 024D1 jnz 0x24df
 	mov	ax,[player_x_max]		; 024D3
 	cmp	ax,[enemy_x]		; 024D6
@@ -218,7 +218,7 @@ scene_update_check_enemy_player_overlap:
 	jg	short scene_update_clamp_enemy_x_min		; 024E4 jg 0x2521
 	mov	ax,[player_x]		; 024E6
 	db	0x05, 0x08, 0x00	; 024E9 add ax,0x8
-	cmp	word [enemy_active],0x0	; 024EC
+	cmp	word [special_enemy_active],0x0	; 024EC
 	jz	short scene_update_check_enemy_charge_range		; 024F1 jz 0x24f8
 	db	0x2D, 0x04, 0x00	; 024F3 sub ax,0x4
 	jmp	short scene_update_block_enemy_at_player		; 024F6 jmp 0x2518
@@ -231,7 +231,7 @@ scene_update_check_enemy_charge_range:
 	cmp	dx,0x10			; 02505
 	jg	short scene_update_clamp_enemy_x_min		; 02508 jg 0x2521
 	mov	word [enemy_anim_id],0x0	; 0250A
-	mov	dx,[enemy_frame_bak]		; 02510
+	mov	dx,[enemy_seq_offsets]		; 02510
 	mov	[enemy_frame_ptr],dx		; 02514
 scene_update_block_enemy_at_player:
 	cmp	[enemy_x],ax		; 02518
@@ -246,39 +246,39 @@ scene_update_check_enemy_frame_sound:
 	mov	al,[si+enemy_frame_sound]		; 0252D
 	cmp	al,0x0			; 02531
 	jz	short scene_update_write_enemy_figures		; 02533 jz 0x2538
-	mov	[player_sprite_cmd],al		; 02535
+	mov	[frame_sound_id],al		; 02535
 ; Also the target of the enemy_frozen jump: a frozen enemy skips velocity, clamping and the frame sound.
 scene_update_write_enemy_figures:
 	mov	di,[anim_write_off]		; 02538
 	mov	al,[si+enemy_frame_fig1_id]		; 0253C
-	mov	[di+player_anim_buf],al		; 02540
+	mov	[di+figure_list],al		; 02540
 	mov	ax,[si+enemy_frame_fig1_x]		; 02544
 	cmp	word [player_faces_right],0x0		; 02548
 	jz	short scene_update_enemy_fig1_check_active_offset		; 0254D jz 0x2552
 	db	0x05, 0x04, 0x00	; 0254F add ax,0x4
 scene_update_enemy_fig1_check_active_offset:
-	cmp	word [enemy_active],0x0	; 02552
+	cmp	word [special_enemy_active],0x0	; 02552
 	jz	short scene_update_enemy_fig1_add_world_x		; 02557 jz 0x255c
 	db	0x05, 0x0C, 0x00	; 02559 add ax,0xc
 scene_update_enemy_fig1_add_world_x:
 	add	ax,[enemy_x]		; 0255C
 	cmp	word [player_faces_right],0x0		; 02560
 	jnz	short scene_update_store_enemy_fig1_x		; 02565 jnz 0x2571
-	cmp	word [enemy_active],0x0	; 02567
+	cmp	word [special_enemy_active],0x0	; 02567
 	jnz	short scene_update_store_enemy_fig1_x		; 0256C jnz 0x2571
 	or	ax,0x4000		; 0256E  ; set flip bit (mirror sprite horizontally)
 scene_update_store_enemy_fig1_x:
 	mov	[di+figure_list_x],ax		; 02571
 	mov	al,[si+enemy_frame_fig1_y]		; 02575
-	cmp	word [enemy_active],0x0	; 02579
+	cmp	word [special_enemy_active],0x0	; 02579
 	jz	short scene_update_store_enemy_fig1_y		; 0257E jz 0x2584
 	add	al,[enemy_y_off]		; 02580
 scene_update_store_enemy_fig1_y:
 	mov	[di+figure_list_y],al		; 02584
 	mov	al,[si+enemy_frame_fig2_id]		; 02588
-	cmp	word [enemy_active],0x0	; 0258C
+	cmp	word [special_enemy_active],0x0	; 0258C
 	jnz	short scene_update_store_enemy_fig2_sprite		; 02591 jnz 0x2597
-	add	al,[player_y_off]		; 02593
+	add	al,[enemy_sprite_variant]		; 02593
 scene_update_store_enemy_fig2_sprite:
 	mov	[di+figure_list_id2],al		; 02597
 	mov	ax,[si+enemy_frame_fig2_x]		; 0259B
@@ -286,7 +286,7 @@ scene_update_store_enemy_fig2_sprite:
 	jz	short scene_update_enemy_fig2_check_active_offset		; 025A4 jz 0x25a9
 	db	0x05, 0x04, 0x00	; 025A6 add ax,0x4
 scene_update_enemy_fig2_check_active_offset:
-	cmp	word [enemy_active],0x0	; 025A9
+	cmp	word [special_enemy_active],0x0	; 025A9
 	jz	short scene_update_enemy_fig2_add_world_x		; 025AE jz 0x25b3
 	db	0x05, 0x0C, 0x00	; 025B0 add ax,0xc
 scene_update_enemy_fig2_add_world_x:
@@ -299,11 +299,11 @@ scene_update_enemy_fig2_add_world_x:
 ; after enemy frame; also the skip target when combat_phase > 1
 scene_update_enemy_frame_done:
 	push	word [scenery_row_end_ptr]		; 025CD
-	push	word [player_anim_div_b]		; 025D1
+	push	word [scenery_row_mid_ptr]		; 025D1
 	mov	ax,[anim_write_off]		; 025D5
 	db	0x05, 0x03, 0x00	; 025D8 add ax,0x3
 	mov	[anim_data_limit],ax		; 025DB
-	lea	ax,[player_anim_buf]		; 025DE
+	lea	ax,[figure_list]		; 025DE
 	add	ax,[anim_write_off]		; 025E2
 	push	ax			; 025E6
 	mov	[anim_temp_ptr],ax		; 025E7
@@ -311,9 +311,9 @@ scene_update_enemy_frame_done:
 	add	sp,0x6			; 025ED
 	add	[anim_write_off],ax		; 025F0
 	mov	si,[anim_write_off]		; 025F4
-	mov	byte [si+player_anim_buf],0xff	; 025F8  ; write end marker to animation buffer
+	mov	byte [si+figure_list],0xff	; 025F8  ; write end marker to animation buffer
 	add	si,0x3			; 025FD
-	mov	[player_anim_end],si		; 02600
+	mov	[figure_list_cursor],si		; 02600
 	ret				; 02604
 
 ; ---- function enemy_ai_decide ----
@@ -337,7 +337,7 @@ scene_update_enemy_frame_done:
 ;   3. If anim 0x1C: set combat counters
 ;   4. If game_mode == 1: special logic (return 0 if anim 2, advance/retreat based on distance)
 ;   5. If combat_phase == 1 (approach): return 0x1E
-;   6. If enemy_active (enemy present):
+;   6. If special_enemy_active (enemy present):
 ;      a. If enemy anim 0x22: enemy defeated — set retreat, calculate health regen
 ;      b. If enemy_was_hit: clear flag, return 0x20 (stand)
 ;      c. Walking logic (anim 0x1F/0x21)
@@ -351,7 +351,7 @@ scene_update_enemy_frame_done:
 ; Input: none (reads global state)
 ; Output: AX = animation table index
 ; Local: [bp+6] = distance between enemy and player
-; Corrections: steps 6f, 6g and 6h do not belong under enemy_active; they run when enemy_active != 1, and the enemy_active == 1 branch always returns before them. Step 6d compares the absolute enemy_x with 300, not the distance, and does not teleport: with combat_active > 0 it sets combat_phase = 2 and clears enemy_active, otherwise it re-rolls enemy_y_off and returns 0x1F; enemy_x <= 300 returns 0x20.
+; Corrections: steps 6f, 6g and 6h do not belong under special_enemy_active; they run when special_enemy_active != 1, and the special_enemy_active == 1 branch always returns before them. Step 6d compares the absolute enemy_x with 300, not the distance, and does not teleport: with combat_active > 0 it sets combat_phase = 2 and clears special_enemy_active, otherwise it re-rolls enemy_y_off and returns 0x1F; enemy_x <= 300 returns 0x20.
 enemy_ai_decide:
 	push	bp			; 02605
 	sub	sp,0xc			; 02606
@@ -426,7 +426,7 @@ enemy_ai_decide_check_approach_phase:
 	pop	bp			; 026A8
 	ret				; 026A9
 enemy_ai_decide_check_enemy_active:
-	cmp	word [enemy_active],0x1	; 026AA
+	cmp	word [special_enemy_active],0x1	; 026AA
 	jz	short enemy_ai_decide_active_check_defeated		; 026AF jz 0x26b4
 	jmp	near enemy_ai_decide_enemy_inactive			; 026B1
 enemy_ai_decide_active_check_defeated:
@@ -436,21 +436,21 @@ enemy_ai_decide_active_check_defeated:
 	mov	word [combat_phase],0x2		; 026BD  ; set combat_phase = retreat
 	mov	bx,0xffff		; 026C3
 	mov	word [enemy_defeated],0x1	; 026C6  ; set enemy_defeated flag
-	cmp	word [enemy_health],0x9	; 026CC
-	mov	[enemy_active],ax		; 026D1
+	cmp	word [player_hit_points],0x9	; 026CC
+	mov	[special_enemy_active],ax		; 026D1
 	mov	[wipe_prev_left],bx		; 026D4
-	mov	[anim_state_bb2a],bx		; 026D8
+	mov	[last_drawn_camera_x],bx		; 026D8
 	jng	short enemy_ai_decide_defeated_compute_regen		; 026DC jng 0x26e9
-	mov	word [enemy_health],0x9	; 026DE
-	mov	[enemy_health_regen],ax		; 026E4
+	mov	word [player_hit_points],0x9	; 026DE
+	mov	[player_regen_pending],ax		; 026E4
 	jmp	short enemy_ai_decide_defeated_return_idle		; 026E7 jmp 0x26fa
 enemy_ai_decide_defeated_compute_regen:
-	mov	ax,[enemy_health]		; 026E9
+	mov	ax,[player_hit_points]		; 026E9
 	db	0x3D, 0x09, 0x00	; 026EC cmp ax,0x9
 	jnl	short enemy_ai_decide_defeated_return_idle		; 026EF jnl 0x26fa
 	mov	bx,0x9			; 026F1
 	db	0x2B, 0xD8		; 026F4 sub bx,ax
-	mov	[enemy_health_regen],bx		; 026F6
+	mov	[player_regen_pending],bx		; 026F6
 enemy_ai_decide_defeated_return_idle:
 	db	0x33, 0xC0		; 026FA xor ax,ax
 	add	sp,0xc			; 026FC
@@ -495,7 +495,7 @@ enemy_ai_decide_active_check_level_3:
 	jng	short enemy_ai_decide_level3_reroll_y_offset		; 02756 jng 0x2768
 	db	0x33, 0xC0		; 02758 xor ax,ax
 	mov	word [combat_phase],0x2		; 0275A
-	mov	[enemy_active],ax		; 02760
+	mov	[special_enemy_active],ax		; 02760
 	add	sp,0xc			; 02763
 	pop	bp			; 02766
 	ret				; 02767
@@ -530,11 +530,11 @@ enemy_ai_decide_active_teleport_offscreen:
 	mov	word [enemy_x],0x780	; 0279D  ; teleport enemy to X=1920 (offscreen right)
 	db	0x33, 0xC0		; 027A3 xor ax,ax
 	mov	word [combat_phase],0x1		; 027A5
-	mov	[enemy_active],ax		; 027AB
+	mov	[special_enemy_active],ax		; 027AB
 	add	sp,0xc			; 027AE
 	pop	bp			; 027B1
 	ret				; 027B2
-; Reached from 026B1 when enemy_active != 1: combat_active handling, enemy_was_hit knockback, then enemy_aggressive check.
+; Reached from 026B1 when special_enemy_active != 1: combat_active handling, enemy_was_hit knockback, then enemy_aggressive check.
 enemy_ai_decide_enemy_inactive:
 	cmp	word [combat_active],0x0		; 027B3
 	jng	short enemy_ai_decide_check_was_hit		; 027B8 jng 0x27e0
@@ -660,13 +660,13 @@ enemy_ai_decide_aggressive_check_interpolate_tier:
 	jnl	short enemy_ai_decide_aggressive_return_interpolate		; 028C5 jnl 0x28d7
 	db	0x3D, 0x04, 0x00	; 028C7 cmp ax,0x4
 	jng	short enemy_ai_decide_aggressive_return_interpolate		; 028CA jng 0x28d7
-	call	anim_interpolate	; 028CC
+	call	pick_anim_4_to_6	; 028CC
 	db	0x05, 0x14, 0x00	; 028CF add ax,0x14
 	add	sp,0xc			; 028D2
 	pop	bp			; 028D5
 	ret				; 028D6
 enemy_ai_decide_aggressive_return_interpolate:
-	call	anim_interpolate	; 028D7
+	call	pick_anim_4_to_6	; 028D7
 	add	sp,0xc			; 028DA
 	pop	bp			; 028DD
 	ret				; 028DE
@@ -685,7 +685,7 @@ enemy_ai_decide_aggressive_check_frame_update_tier:
 	mov	ax,[bp+0xa]		; 028F9
 	cmp	ax,[si+close_tier3_thresholds]		; 028FC
 	jl	short enemy_ai_decide_aggressive_fallback_far_attack		; 02900 jl 0x290a
-	call	anim_frame_update	; 02902
+	call	pick_anim_2_to_4	; 02902
 	add	sp,0xc			; 02905
 	pop	bp			; 02908
 	ret				; 02909
@@ -817,20 +817,19 @@ combat_pick_far_attack_return_standard:
 	pop	bp			; 029E7
 	ret				; 029E8
 
-; ---- function anim_frame_update ----
-; Returns a small random frame offset for animation variation.
+; ---- function pick_anim_2_to_4 ----
+; Returns a random animation table index: rand_range(2) + 2, so 2, 3 or 4.
 ; Input: none
-; Output: AX = rand_range(2) + 2, i.e. random value in {2, 3, 4}
-; The result is used directly as an animation table index by enemy_ai_decide and anim_process; it is not a frame offset.
-anim_frame_update:
+; Output: AX = index, returned as-is by enemy_ai_decide and demo_player_ai. Updates no frame state.
+pick_anim_2_to_4:
 	push	bp			; 029E9
 	sub	sp,0x2			; 029EA
-	jc	short anim_frame_update_stack_overflow		; 029ED jc 0x29f5
+	jc	short pick_anim_2_to_4_stack_overflow		; 029ED jc 0x29f5
 	cmp	sp,[stack_limit]		; 029EF
-	ja	short anim_frame_update_stack_ok		; 029F3 ja 0x29f8
-anim_frame_update_stack_overflow:
+	ja	short pick_anim_2_to_4_stack_ok		; 029F3 ja 0x29f8
+pick_anim_2_to_4_stack_overflow:
 	jmp	near stack_overflow_handler			; 029F5
-anim_frame_update_stack_ok:
+pick_anim_2_to_4_stack_ok:
 	db	0x8B, 0xEC		; 029F8 mov bp,sp
 	mov	ax,0x2			; 029FA
 	push	ax			; 029FD
@@ -853,25 +852,22 @@ empty_stub_02A0A:
 	pop	bp			; 02A0D
 	ret				; 02A0E
 
-; ---- function anim_interpolate ----
-; Returns a random interpolation offset for smooth animation transitions.
+; ---- function pick_anim_4_to_6 ----
+; Returns a random animation table index: 4 or 5 when player_faces_right == 1, otherwise 4, 5 or 6.
 ; Input: none
-; Output: AX = rand_range(1 or 2) + 4
-;   If player_faces_right: range [4, 5] (smoother)
-;   Else: range [4, 5, 6]
-; The result is used directly as an animation table index by enemy_ai_decide (+0x14 when the enemy is in anim 5-7) and anim_process; no interpolation happens.
-anim_interpolate:
+; Output: AX = index. demo_player_ai returns it as-is; enemy_ai_decide adds 0x14 when the enemy is in anim 5-7. Nothing is interpolated.
+pick_anim_4_to_6:
 	push	bp			; 02A0F
 	sub	sp,0x2			; 02A10
-	jc	short anim_interpolate_stack_overflow		; 02A13 jc 0x2a1b
+	jc	short pick_anim_4_to_6_stack_overflow		; 02A13 jc 0x2a1b
 	cmp	sp,[stack_limit]		; 02A15
-	ja	short anim_interpolate_stack_ok		; 02A19 ja 0x2a1e
-anim_interpolate_stack_overflow:
+	ja	short pick_anim_4_to_6_stack_ok		; 02A19 ja 0x2a1e
+pick_anim_4_to_6_stack_overflow:
 	jmp	near stack_overflow_handler			; 02A1B
-anim_interpolate_stack_ok:
+pick_anim_4_to_6_stack_ok:
 	db	0x8B, 0xEC		; 02A1E mov bp,sp
 	cmp	word [player_faces_right],0x1		; 02A20
-	jnz	short anim_interpolate_not_facing_right		; 02A25 jnz 0x2a38
+	jnz	short pick_anim_4_to_6_not_facing_right		; 02A25 jnz 0x2a38
 	mov	ax,0x1			; 02A27
 	push	ax			; 02A2A
 	call	rand_range		; 02A2B
@@ -880,7 +876,7 @@ anim_interpolate_stack_ok:
 	add	sp,0x2			; 02A33
 	pop	bp			; 02A36
 	ret				; 02A37
-anim_interpolate_not_facing_right:
+pick_anim_4_to_6_not_facing_right:
 	mov	ax,0x2			; 02A38
 	push	ax			; 02A3B
 	call	rand_range		; 02A3C
@@ -890,50 +886,48 @@ anim_interpolate_not_facing_right:
 	pop	bp			; 02A47
 	ret				; 02A48
 
-; ---- function anim_process ----
-; Player-side animation state machine — decides what player anim to use.
-; Mirror of enemy_ai_decide but for the player character.
+; ---- function demo_player_ai ----
+; Chooses the player's next animation with no input, in place of player_anim_select.
+; Called only from scene_update (02336), when anim_mode [0x156] is nonzero. anim_mode is set only at 004E6, for the frame loop at 004F4 in game_main_loop, and that loop never calls poll_keyboard.
 ;
 ; Input: none (reads global state)
-; Output: AX = animation table index for player
-; Local: [bp+4] = distance (enemy_x - player_x)
-;        [bp+8] = random value
+; Output: AX = animation table index for the player
+; Local: [bp+4] = distance (enemy_x - player_x), [bp+8] = random value
 ;
-; Logic:
-;   - combat_active: return 0x1E (approach walk)
-;   - If player anim 0x08 (kick): play sound, return 0x0F (block)
-;   - If combat_phase == 1 and anim < 0x3F and enemy anim 0x43: random counter
-;   - combat_phase == 1: return 0x0F
-;   - player_was_hit: knockback 4px, recoil if mid-attack
-;   - Distance > 44: call anim_command
-;   - Distance <= 44: probability table lookup (3 tiers per level)
-;     - Tier 1: idle
-;     - Tier 2: interpolate (mid-attack -> +0x14 offset)
-;     - Tier 3: anim_frame_update
-;     - Tier 4: combat_pick_far_attack (fallback)
-; Called from scene_update only when anim_mode [0x156] is nonzero, in place of player_anim_select. Corrections to the tier list: the tables have no per-level component, rand >= table 1 calls anim_command rather than idling, tier 2 applies no +0x14 offset, and the fallback is anim_command rather than combat_pick_far_attack.
-anim_process:
+; In order:
+;   - combat_active == 1: return 0x1E
+;   - player anim 8: play_sound(0x0B), return 0x0F
+;   - combat_phase == 1 and player anim < 0x3F: enemy anim 0x43 returns 0x11 or 0x12 at random, any other returns 0
+;   - combat_phase == 1 otherwise: return 0x0F
+;   - player_was_hit: clear it, player_x -= 4, return 0x1B for player anim 5-7, otherwise 0
+;   - distance > 0x2C: return anim_command(distance)
+;   - otherwise r = rand_range(0xFF), distance clamped to at least 0x1C, thresholds indexed by (distance-0x1C)/4 with no per-level component:
+;     r >= close_tier1_thresholds_player: anim_command(distance)
+;     r >= close_tier2_thresholds_player: pick_anim_4_to_6()
+;     r >= close_tier3_thresholds_player: pick_anim_2_to_4()
+;     otherwise: anim_command(distance)
+demo_player_ai:
 	push	bp			; 02A49
 	sub	sp,0xa			; 02A4A
-	jc	short anim_process_stack_overflow		; 02A4D jc 0x2a55
+	jc	short demo_player_ai_stack_overflow		; 02A4D jc 0x2a55
 	cmp	sp,[stack_limit]		; 02A4F
-	ja	short anim_process_stack_ok		; 02A53 ja 0x2a58
-anim_process_stack_overflow:
+	ja	short demo_player_ai_stack_ok		; 02A53 ja 0x2a58
+demo_player_ai_stack_overflow:
 	jmp	near stack_overflow_handler			; 02A55
-anim_process_stack_ok:
+demo_player_ai_stack_ok:
 	db	0x8B, 0xEC		; 02A58 mov bp,sp
 	cmp	word [combat_active],0x1		; 02A5A
-	jnz	short anim_process_compute_distance		; 02A5F jnz 0x2a69
+	jnz	short demo_player_ai_compute_distance		; 02A5F jnz 0x2a69
 	mov	ax,0x1e			; 02A61
 	add	sp,0xa			; 02A64
 	pop	bp			; 02A67
 	ret				; 02A68
-anim_process_compute_distance:
+demo_player_ai_compute_distance:
 	mov	ax,[enemy_x]		; 02A69
 	sub	ax,[player_x]		; 02A6C
 	cmp	word [player_anim_id],0x8	; 02A70
 	mov	[bp+0x4],ax		; 02A75
-	jnz	short anim_process_check_approach_phase		; 02A78 jnz 0x2a8b
+	jnz	short demo_player_ai_check_approach_phase		; 02A78 jnz 0x2a8b
 	mov	ax,0xb			; 02A7A
 	push	ax			; 02A7D
 	call	play_sound		; 02A7E
@@ -942,13 +936,13 @@ anim_process_compute_distance:
 	add	sp,0xa			; 02A86
 	pop	bp			; 02A89
 	ret				; 02A8A
-anim_process_check_approach_phase:
+demo_player_ai_check_approach_phase:
 	cmp	word [combat_phase],0x1		; 02A8B
-	jnz	short anim_process_check_phase_return_block		; 02A90 jnz 0x2ab8
+	jnz	short demo_player_ai_check_phase_return_block		; 02A90 jnz 0x2ab8
 	cmp	word [player_anim_id],0x3f	; 02A92
-	jnl	short anim_process_check_phase_return_block		; 02A97 jnl 0x2ab8
+	jnl	short demo_player_ai_check_phase_return_block		; 02A97 jnl 0x2ab8
 	cmp	word [enemy_anim_id],0x43	; 02A99
-	jnz	short anim_process_approach_return_idle		; 02A9E jnz 0x2ab1
+	jnz	short demo_player_ai_approach_return_idle		; 02A9E jnz 0x2ab1
 	mov	ax,0x1			; 02AA0
 	push	ax			; 02AA3
 	call	rand_range		; 02AA4
@@ -957,57 +951,57 @@ anim_process_check_approach_phase:
 	add	sp,0xa			; 02AAC
 	pop	bp			; 02AAF
 	ret				; 02AB0
-anim_process_approach_return_idle:
+demo_player_ai_approach_return_idle:
 	db	0x33, 0xC0		; 02AB1 xor ax,ax
 	add	sp,0xa			; 02AB3
 	pop	bp			; 02AB6
 	ret				; 02AB7
-anim_process_check_phase_return_block:
+demo_player_ai_check_phase_return_block:
 	cmp	word [combat_phase],0x1		; 02AB8
-	jnz	short anim_process_check_player_hit		; 02ABD jnz 0x2ac7
+	jnz	short demo_player_ai_check_player_hit		; 02ABD jnz 0x2ac7
 	mov	ax,0xf			; 02ABF
 	add	sp,0xa			; 02AC2
 	pop	bp			; 02AC5
 	ret				; 02AC6
-anim_process_check_player_hit:
+demo_player_ai_check_player_hit:
 	cmp	word [player_was_hit],0x1		; 02AC7
-	jnz	short anim_process_check_distance		; 02ACC jnz 0x2af5
+	jnz	short demo_player_ai_check_distance		; 02ACC jnz 0x2af5
 	mov	word [player_was_hit],0x0		; 02ACE
 	sub	word [player_x],0x4	; 02AD4
 	mov	ax,[player_anim_id]		; 02AD9
 	db	0x3D, 0x04, 0x00	; 02ADC cmp ax,0x4
-	jng	short anim_process_hit_return_idle		; 02ADF jng 0x2aee
+	jng	short demo_player_ai_hit_return_idle		; 02ADF jng 0x2aee
 	db	0x3D, 0x08, 0x00	; 02AE1 cmp ax,0x8
-	jnl	short anim_process_hit_return_idle		; 02AE4 jnl 0x2aee
+	jnl	short demo_player_ai_hit_return_idle		; 02AE4 jnl 0x2aee
 	mov	ax,0x1b			; 02AE6
 	add	sp,0xa			; 02AE9
 	pop	bp			; 02AEC
 	ret				; 02AED
-anim_process_hit_return_idle:
+demo_player_ai_hit_return_idle:
 	db	0x33, 0xC0		; 02AEE xor ax,ax
 	add	sp,0xa			; 02AF0
 	pop	bp			; 02AF3
 	ret				; 02AF4
-anim_process_check_distance:
+demo_player_ai_check_distance:
 	cmp	word [bp+0x4],0x2c	; 02AF5
-	jng	short anim_process_roll_random		; 02AF9 jng 0x2b08
+	jng	short demo_player_ai_roll_random		; 02AF9 jng 0x2b08
 	push	word [bp+0x4]		; 02AFB
 	call	anim_command		; 02AFE
 	db	0x8B, 0xE5		; 02B01 mov sp,bp
 	add	sp,0xa			; 02B03
 	pop	bp			; 02B06
 	ret				; 02B07
-anim_process_roll_random:
+demo_player_ai_roll_random:
 	mov	ax,0xff			; 02B08
 	push	ax			; 02B0B
 	call	rand_range		; 02B0C
 	db	0x8B, 0xE5		; 02B0F mov sp,bp
 	cmp	word [bp+0x4],0x1c	; 02B11
 	mov	[bp+0x8],ax		; 02B15
-	jnl	short anim_process_check_command_tier		; 02B18 jnl 0x2b1f
+	jnl	short demo_player_ai_check_command_tier		; 02B18 jnl 0x2b1f
 	mov	word [bp+0x4],0x1c	; 02B1A
 ; Tables are indexed by (distance-0x1C)/4*2 only; unlike enemy_ai_decide there is no per-level component.
-anim_process_check_command_tier:
+demo_player_ai_check_command_tier:
 	mov	ax,[bp+0x4]		; 02B1F
 	db	0x2D, 0x1C, 0x00	; 02B22 sub ax,0x1c
 	mov	bx,0x4			; 02B25
@@ -1017,14 +1011,14 @@ anim_process_check_command_tier:
 	db	0x8B, 0xF0		; 02B2D mov si,ax
 	mov	ax,[bp+0x8]		; 02B2F
 	cmp	ax,[si+close_tier1_thresholds_player]		; 02B32
-	jl	short anim_process_check_interpolate_tier		; 02B36 jl 0x2b45
+	jl	short demo_player_ai_check_interpolate_tier		; 02B36 jl 0x2b45
 	push	word [bp+0x4]		; 02B38
 	call	anim_command		; 02B3B
 	db	0x8B, 0xE5		; 02B3E mov sp,bp
 	add	sp,0xa			; 02B40
 	pop	bp			; 02B43
 	ret				; 02B44
-anim_process_check_interpolate_tier:
+demo_player_ai_check_interpolate_tier:
 	mov	ax,[bp+0x4]		; 02B45
 	db	0x2D, 0x1C, 0x00	; 02B48 sub ax,0x1c
 	mov	bx,0x4			; 02B4B
@@ -1034,12 +1028,12 @@ anim_process_check_interpolate_tier:
 	db	0x8B, 0xF0		; 02B53 mov si,ax
 	mov	ax,[bp+0x8]		; 02B55
 	cmp	ax,[si+close_tier2_thresholds_player]		; 02B58
-	jl	short anim_process_check_frame_update_tier		; 02B5C jl 0x2b66
-	call	anim_interpolate	; 02B5E
+	jl	short demo_player_ai_check_frame_update_tier		; 02B5C jl 0x2b66
+	call	pick_anim_4_to_6	; 02B5E
 	add	sp,0xa			; 02B61
 	pop	bp			; 02B64
 	ret				; 02B65
-anim_process_check_frame_update_tier:
+demo_player_ai_check_frame_update_tier:
 	mov	ax,[bp+0x4]		; 02B66
 	db	0x2D, 0x1C, 0x00	; 02B69 sub ax,0x1c
 	mov	bx,0x4			; 02B6C
@@ -1049,12 +1043,12 @@ anim_process_check_frame_update_tier:
 	db	0x8B, 0xF0		; 02B74 mov si,ax
 	mov	ax,[bp+0x8]		; 02B76
 	cmp	ax,[si+close_tier3_thresholds_player]		; 02B79
-	jl	short anim_process_fallback_command		; 02B7D jl 0x2b87
-	call	anim_frame_update	; 02B7F
+	jl	short demo_player_ai_fallback_command		; 02B7D jl 0x2b87
+	call	pick_anim_2_to_4	; 02B7F
 	add	sp,0xa			; 02B82
 	pop	bp			; 02B85
 	ret				; 02B86
-anim_process_fallback_command:
+demo_player_ai_fallback_command:
 	push	word [bp+0x4]		; 02B87
 	call	anim_command		; 02B8A
 	db	0x8B, 0xE5		; 02B8D mov sp,bp

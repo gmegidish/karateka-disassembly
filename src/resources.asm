@@ -10,7 +10,7 @@
 ;   [bp+0x5e] = command count accumulator (returned in AX)
 ;   [bp+0x5a] = total bytecode size written
 ;   [bp+0x64] = IOB pointer from fopen_iob
-;   [bp+0x52] = bytes read from fread_iob
+;   [bp+0x52] = bytes read from fgets
 ;   [bp+0x02] = 80-byte local buffer for reading text lines
 ; The value returned in AX and stored at [bp+0x5E] only counts lines with an unrecognized command, since parse_anim_command increments it solely on a failed match.
 load_anim_script:
@@ -43,7 +43,7 @@ load_anim_script_read_line_loop:
 	push	ax			; 012AE
 	lea	ax,[bp+0x2]		; 012AF ; local line buffer
 	push	ax			; 012B2
-	call	fread_iob		; 012B3 ; read next line from script file
+	call	fgets		; 012B3 ; read next line from script file
 	db	0x8B, 0xE5		; 012B6 mov sp,bp
 	test	ax,ax			; 012B8 ; 0 = EOF
 	mov	[bp+0x52],ax		; 012BA

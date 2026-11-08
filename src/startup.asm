@@ -60,7 +60,7 @@ crt_startup_scan_env_strings:
 	jnz	short crt_startup_scan_env_strings		; 00045 jnz 0x40  ; not double null, keep scanning
 	inc	di			; 00047  ; skip 2-byte string count
 	db	0x81, 0xE7, 0xFE, 0xFF	; 00048 and di,0xfffe  ; word-align
-	mov	[program_name_off],di		; 0004C  ; save program name offset
+	mov	[env_block_size],di		; 0004C  ; save program name offset
 crt_startup_env_scan_done:
 	pop	es			; 00050
 
@@ -194,7 +194,7 @@ crt_startup_invalid_stack_size:
 ; Available bytes = (top_segment - SS) * 16, capped at 0xFFF0 if > 64KB.
 
 crt_startup_compute_memory:
-	mov	ax,[program_name_off]		; 000F6  ; program name size
+	mov	ax,[env_block_size]		; 000F6  ; program name size
 	mov	bx,[requested_stack_size]		; 000F9  ; requested stack size
 	shr	bx,1			; 000FD  ; round down to even
 	db	0x03, 0xDB		; 000FF add bx,bx  ; (effectively bx & 0xFFFE)
@@ -257,8 +257,8 @@ crt_startup_setup_stack_and_heap:
 	db	0x8B, 0xC3		; 0016E mov ax,bx
 	db	0x25, 0x0F, 0x00	; 00170 and ax,0xf  ; remainder (fractional paragraph bytes)
 	db	0x81, 0xE3, 0xF0, 0xFF	; 00173 and bx,0xfff0  ; whole paragraphs
-	mov	[heap_size],bx		; 00177  ; heap size in paragraphs
-	mov	[heap_remainder],ax		; 0017B  ; heap remainder
+	mov	[heap_bytes_lo],bx		; 00177  ; heap size in paragraphs
+	mov	[heap_bytes_hi],ax		; 0017B  ; heap remainder
 	call	reset_heap		; 0017E
 	db	0x0B, 0xC0		; 00181 or ax,ax  ; check return value
 	jnz	short crt_startup_insufficient_memory		; 00183 jnz 0x139  ; nonzero = error
@@ -276,7 +276,7 @@ crt_startup_setup_stack_and_heap:
 	push	ax			; 00189  ; push 0 (argv terminator / return address)
 	db	0x8B, 0xEC		; 0018A mov bp,sp  ; save frame pointer for DOS 1.x exit
 	les	di,word [env_string_off]		; 0018C  ; load env pointer
-	mov	di,[program_name_off]		; 00190  ; program name offset
+	mov	di,[env_block_size]		; 00190  ; program name offset
 ; Copies the whole environment block (word-rounded size at [0x6f]) onto the stack, last word first.
 crt_startup_push_env_block_loop:
 	sub	di,0x2			; 00194  ; push program name word-by-word (back to front)

@@ -10,7 +10,7 @@
 ; Output: populates enemy animation offset table
 build_enemy_anim_offsets:
 	lea	bx,[enemy_anim_frames]		; 019A2
-	lea	di,[enemy_frame_bak]		; 019A6
+	lea	di,[enemy_seq_offsets]		; 019A6
 	call	build_anim_offsets	; 019AA
 	ret				; 019AD
 
@@ -150,9 +150,9 @@ compact_anim_data_publish_first_row_pointers:
 	mov	ax,[scenery_row_starts]		; 01AA7
 	mov	bx,[scenery_row_middles]		; 01AAA
 	mov	cx,[scenery_row_ends]		; 01AAE
-	mov	[player_anim_div_a],ax		; 01AB2
+	mov	[scenery_row_start_ptr],ax		; 01AB2
 	mov	[scenery_row_end_ptr],cx		; 01AB5
-	mov	[player_anim_div_b],bx		; 01AB9
+	mov	[scenery_row_mid_ptr],bx		; 01AB9
 	add	sp,0xc			; 01ABD
 	pop	bp			; 01AC0
 	ret				; 01AC1

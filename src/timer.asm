@@ -67,10 +67,10 @@ run_anim_script_finished:
 	ret				; 01785
 
 ; --- anim handler: set_tune (opcode 0x00) ---
-; Reads 1-byte param, stores to player_sprite_cmd [0xBB30].
+; Reads 1-byte param, stores to frame_sound_id [0xBB30].
 ; Advances script_pc by 2 (opcode + 1 param byte).
 	mov	al,[si+anim_script_arg1]		; 01786  al = param byte at [script_pc + 1 + 0xBD04]
-	mov	[player_sprite_cmd],al		; 0178A  player_sprite_cmd = param
+	mov	[frame_sound_id],al		; 0178A  frame_sound_id = param
 	add	word [script_pc],0x2	; 0178D  script_pc += 2
 	ret				; 01792
 
@@ -88,20 +88,20 @@ run_anim_script_finished:
 ; If relative_pos_mode > 0, adds player_x to x_pos.
 ; Writes 4-byte entry to list at [0xBB2E] offset, then advances pointer.
 ; Advances script_pc by 5.
-	mov	di,[player_anim_end]		; 017A0  di = write pointer into figure list
+	mov	di,[figure_list_cursor]		; 017A0  di = write pointer into figure list
 	mov	al,[si+anim_script_arg1]		; 017A4  al = figure_id
-	mov	[di+player_sprite_cmd],al		; 017A8  write figure_id to list (0xBB30 base)
+	mov	[di+frame_sound_id],al		; 017A8  write figure_id to list (0xBB30 base)
 	mov	ax,[si+anim_script_arg2]		; 017AC  ax = x_pos (word at param bytes 2-3)
 	cmp	byte [anim_rel_pos_mode],0x0	; 017B0  relative_pos_mode active?
 	jz	short run_anim_script_set_fig_store_x		; 017B5 jz 0x17bf  no, use absolute position
 	dec	byte [anim_rel_pos_mode]		; 017B7  decrement relative_pos_mode counter
 	add	ax,[player_x]		; 017BB  add player_x for relative positioning
 run_anim_script_set_fig_store_x:
-	mov	[di+player_anim_ctr],ax		; 017BF  write x_pos to list
+	mov	[di+screen_wipe_flag],ax		; 017BF  write x_pos to list
 	mov	al,[si+anim_script_arg4]		; 017C3  al = y_pos (param byte 4)
-	mov	[di+player_anim_buf],al		; 017C7  write y_pos to list
+	mov	[di+figure_list],al		; 017C7  write y_pos to list
 	mov	byte [di+figure_list_x],0xff	; 017CB  write 0xFF terminator after entry
-	add	word [player_anim_end],0x4	; 017D0  advance write pointer by 4
+	add	word [figure_list_cursor],0x4	; 017D0  advance write pointer by 4
 	add	word [script_pc],0x5	; 017D5  script_pc += 5
 	ret				; 017DA
 
@@ -115,7 +115,7 @@ run_anim_script_set_fig_store_x:
 	shl	bx,1			; 017E1  bx = slot_index * 2
 	shl	bx,1			; 017E3  bx = slot_index * 4
 	mov	ax,[si+anim_script_arg2]		; 017E5  ax = new x_pos
-	mov	[bx+player_anim_buf],ax		; 017E9  write x_pos to figure slot
+	mov	[bx+figure_list],ax		; 017E9  write x_pos to figure slot
 	mov	ax,[si+anim_script_arg4]		; 017ED  ax = new y_pos/flags
 	mov	[bx+figure_list_x_hi],ax		; 017F1  write y_pos/flags to figure slot
 	add	word [script_pc],0x6	; 017F5  script_pc += 6
@@ -145,30 +145,30 @@ anim_cmd_do_scr_done:
 	shl	bx,1			; 01812  bx = slot * 2
 	shl	bx,1			; 01814  bx = slot * 4
 	add	bx,0x3			; 01816  bx = slot * 4 + 3 (offset into list)
-	sub	word [player_anim_end],0x4	; 01819  shrink list by one entry
+	sub	word [figure_list_cursor],0x4	; 01819  shrink list by one entry
 anim_cmd_do_scr_del_fig_shift_loop:
 	mov	ax,[bx+figure_list_x]		; 0181E  copy next entry down
-	mov	[bx+player_sprite_cmd],ax		; 01822
+	mov	[bx+frame_sound_id],ax		; 01822
 	mov	ax,[bx+figure_list_y]		; 01826
 	mov	[bx+anim_fig_bg],ax		; 0182A
 	add	bx,0x4			; 0182E  advance to next slot
-	cmp	bx,[player_anim_end]		; 01831  past end of list?
+	cmp	bx,[figure_list_cursor]		; 01831  past end of list?
 	jl	short anim_cmd_do_scr_del_fig_shift_loop		; 01835 jl 0x181e  keep shifting
-	mov	byte [bx+player_sprite_cmd],0xff	; 01837  write terminator
+	mov	byte [bx+frame_sound_id],0xff	; 01837  write terminator
 	add	word [script_pc],0x2	; 0183C  script_pc += 2
 	ret				; 01841
 
 ; --- anim handler: set_wipe (opcode 0x0C) ---
-; Enables wipe mode (player_anim_ctr = 1).
+; Enables wipe mode (screen_wipe_flag = 1).
 ; Advances script_pc by 1.
-	mov	byte [player_anim_ctr],0x1	; 01842  enable wipe
+	mov	byte [screen_wipe_flag],0x1	; 01842  enable wipe
 	inc	word [script_pc]		; 01847  script_pc += 1
 	ret				; 0184B
 
 ; --- anim handler: set_nowipe (opcode 0x0E) ---
-; Disables wipe mode (player_anim_ctr = 0).
+; Disables wipe mode (screen_wipe_flag = 0).
 ; Advances script_pc by 1.
-	mov	byte [player_anim_ctr],0x0	; 0184C  disable wipe
+	mov	byte [screen_wipe_flag],0x0	; 0184C  disable wipe
 	inc	word [script_pc]		; 01851  script_pc += 1
 	ret				; 01855
 
@@ -189,17 +189,17 @@ anim_cmd_do_scr_wait_advance_pc:
 ; Clears all figure slots, resets render state:
 ;   [0xBB2A] = 0xFFFF (no active animation)
 ;   anim_render_mode = 1 (normal)
-;   player_sprite_cmd = 0, player_anim_ctr = 0
+;   frame_sound_id = 0, screen_wipe_flag = 0
 ;   first figure entry = 0xFF (empty list)
-;   player_anim_end = 3 (write pointer past 3-byte header)
+;   figure_list_cursor = 3 (write pointer past 3-byte header)
 ; Advances script_pc by 1.
 anim_cmd_init_sal:
-	mov	word [anim_state_bb2a],0xffff	; 0186C  anim_state = no animation
+	mov	word [last_drawn_camera_x],0xffff	; 0186C  anim_state = no animation
 	mov	word [anim_render_mode],0x1		; 01872  anim_render_mode = normal
-	mov	byte [player_sprite_cmd],0x0	; 01878  player_sprite_cmd = 0
-	mov	word [player_anim_ctr],0x0	; 0187D  player_anim_ctr = 0
-	mov	byte [player_anim_buf],0xff	; 01883  first list entry = terminator (empty)
-	mov	word [player_anim_end],0x3	; 01888  write pointer = 3 (past header)
+	mov	byte [frame_sound_id],0x0	; 01878  frame_sound_id = 0
+	mov	word [screen_wipe_flag],0x0	; 0187D  screen_wipe_flag = 0
+	mov	byte [figure_list],0xff	; 01883  first list entry = terminator (empty)
+	mov	word [figure_list_cursor],0x3	; 01888  write pointer = 3 (past header)
 	inc	word [script_pc]		; 0188E  script_pc += 1
 	ret				; 01892
 
@@ -341,7 +341,7 @@ play_music_sequence:
 ; Table = 0xC3D4 (secondary offset table destination).
 build_anim_offsets_alt:
 	lea	bx,[player_anim_frames]		; 01976  bx = secondary animation data base
-	lea	di,[player_frame_bak]		; 0197A  di = secondary offset table
+	lea	di,[player_seq_offsets]		; 0197A  di = secondary offset table
 
 ; ---- function build_anim_offsets ----
 ; Scans animation frame data to build a table of 42 word offsets,

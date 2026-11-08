@@ -9,9 +9,9 @@
 ;   [bp+0x6] = scene index (callers push scene_index [0x130]):
 ;              2     = player_x and player_x_min both 0x20
 ;              other = player_x 4, player_x_min 0
-;              7     = row index 5 (otherwise row 3 + scene_transition_pending)
+;              7     = row index 5 (otherwise row 3 + draw_health_bars_pending)
 ;
-; Reads:   [0x12e]  = scene_transition_pending, added to the row index
+; Reads:   [0x12e]  = draw_health_bars_pending, added to the row index
 ; Writes:  [0xd672] = cutscene_state (1 becomes 2, otherwise unchanged)
 ;          [0xbcd5] = player_x
 ;          [0x102]  = player_x_min
@@ -51,7 +51,7 @@ place_player_for_scene_choose_anim_row:
 	mov	word [anim_bg_counter],0x5	; 03A73
 	jmp	short place_player_for_scene_load_row		; 03A79 jmp 0x3a82
 place_player_for_scene_row_from_transition_pending:
-	mov	ax,[scene_transition_pending]		; 03A7B
+	mov	ax,[draw_health_bars_pending]		; 03A7B
 	add	[anim_bg_counter],ax		; 03A7E
 place_player_for_scene_load_row:
 	call	load_anim_row		; 03A82
@@ -71,7 +71,7 @@ place_player_for_scene_load_row:
 ;   [0xc3c4+2n] -> [0xc3a4] row end
 ; scene.asm copies [c3a0,c3a2) and [c3a2,c3a4) as two separate blocks.
 ;
-; Writes: [0xbb2a] = 0xFFFF (anim_state_bb2a: no background rendered yet)
+; Writes: [0xbb2a] = 0xFFFF (last_drawn_camera_x: no background rendered yet)
 ;         [0xd652] = 0 (wipe_prev_left)
 ;         [0xee]   = 1 (anim_render_mode: normal)
 ;         [0xc3a0], [0xc3a2], [0xc3a4] as above
@@ -86,7 +86,7 @@ load_anim_row_stack_overflow:
 load_anim_row_stack_ok:
 	db	0x8B, 0xEC		; 03A99 mov bp,sp
 ; Force a background redraw
-	mov	word [anim_state_bb2a],0xffff	; 03A9B
+	mov	word [last_drawn_camera_x],0xffff	; 03A9B
 	mov	word [wipe_prev_left],0x0	; 03AA1
 	mov	word [anim_render_mode],0x1		; 03AA7
 ; Load the row selected by anim_bg_counter
@@ -97,8 +97,8 @@ load_anim_row_stack_ok:
 	mov	cx,[si+scenery_row_middles]		; 03AB8
 	mov	ax,[si+scenery_row_ends]		; 03ABC
 	mov	[scenery_row_end_ptr],ax		; 03AC0
-	mov	[player_anim_div_b],cx		; 03AC3
-	mov	[player_anim_div_a],bx		; 03AC7
+	mov	[scenery_row_mid_ptr],cx		; 03AC3
+	mov	[scenery_row_start_ptr],bx		; 03AC7
 	add	sp,0x4			; 03ACB
 	pop	bp			; 03ACE
 	ret				; 03ACF
@@ -127,7 +127,7 @@ load_scroll_anim_row_stack_ok:
 	db	0x8B, 0xEC		; 03ADF mov bp,sp
 	mov	word [wipe_prev_left],0x0	; 03AE1
 	mov	ax,0x2			; 03AE7
-	mov	word [anim_state_bb2a],0xffff	; 03AEA
+	mov	word [last_drawn_camera_x],0xffff	; 03AEA
 ; scroll_counter selects the row
 	mov	bx,[scroll_counter]		; 03AF0
 	mov	[anim_bg_counter],bx		; 03AF4
@@ -137,8 +137,8 @@ load_scroll_anim_row_stack_ok:
 	mov	[anim_render_mode],ax		; 03B02
 	mov	ax,[bx+scenery_row_ends]		; 03B05
 	mov	[scenery_row_end_ptr],ax		; 03B09
-	mov	[player_anim_div_a],cx		; 03B0C
-	mov	[player_anim_div_b],dx		; 03B10
+	mov	[scenery_row_start_ptr],cx		; 03B0C
+	mov	[scenery_row_mid_ptr],dx		; 03B10
 	add	sp,0x4			; 03B14
 	pop	bp			; 03B17
 	ret				; 03B18
@@ -149,7 +149,7 @@ load_scroll_anim_row_stack_ok:
 ;
 ; Reads:  [0xce28] = enemy frame table entry (0xcdea + 2*0x1F, so likely the
 ;                    frame for animation 0x1F)
-; Writes: [0xd5aa] = 1 (enemy_active)
+; Writes: [0xd5aa] = 1 (special_enemy_active)
 ;         [0x110]  = 0x1F (enemy_anim_id)
 ;         [0xcde8] = enemy_frame_ptr, from [0xce28]
 ;         [0xd5ac] = enemy_y_off = rand_range(2) * 12, so 0, 12 or 24
@@ -166,7 +166,7 @@ activate_enemy_stack_overflow:
 activate_enemy_stack_ok:
 	db	0x8B, 0xEC		; 03B28 mov bp,sp
 ; Activate the enemy with animation 0x1F
-	mov	word [enemy_active],0x1	; 03B2A
+	mov	word [special_enemy_active],0x1	; 03B2A
 	mov	word [enemy_anim_id],0x1f	; 03B30
 	mov	ax,[enemy_seq_eagle_fly]		; 03B36
 ; enemy_y_off = rand_range(2) * 12
@@ -189,14 +189,14 @@ activate_enemy_stack_ok:
 ; One step of health loss with a 4-pixel push to the left, plus sound 1.
 ; No parameters.
 ;
-; Reads/writes: [0x116] = enemy_health in data.asm, decremented once per call
+; Reads/writes: [0x116] = player_hit_points in data.asm, decremented once per call
 ;               (the code also uses this word as a left wipe column count)
 ; Writes: [0xbcd5] = player_x, minus 4
 ; When [0x116] reaches 0:
 ;   [0xf8] = 1 (combat_active), [0xc3d2] = [0xc40c] (the frame levels.asm
 ;   calls the death animation frame). Returns AX = 0.
 ; Otherwise:
-;   [0x124] += 1 (enemy_health_regen), [0x10c] = 0 (player_anim_id),
+;   [0x124] += 1 (player_regen_pending), [0x10c] = 0 (player_anim_id),
 ;   [0xc3d2] = [0xc3d4]. AX is left holding that frame pointer.
 ; Both callers ignore the return value (they zero AX right after).
 health_decrement_push:
@@ -216,10 +216,10 @@ health_decrement_push_stack_ok:
 	db	0x8B, 0xE5		; 03B74 mov sp,bp
 	sub	word [player_x],0x4	; 03B76
 ; Lose one point of health
-	mov	ax,[enemy_health]		; 03B7B
+	mov	ax,[player_hit_points]		; 03B7B
 	dec	ax			; 03B7E
 	test	ax,ax			; 03B7F
-	mov	[enemy_health],ax		; 03B81
+	mov	[player_hit_points],ax		; 03B81
 	jnz	short health_decrement_push_health_remains		; 03B84 jnz 0x3b99
 	mov	word [combat_active],0x1		; 03B86
 	mov	ax,[player_seq_death]		; 03B8C
@@ -230,9 +230,9 @@ health_decrement_push_stack_ok:
 	ret				; 03B98
 ; Health remains: back to the idle animation
 health_decrement_push_health_remains:
-	inc	word [enemy_health_regen]		; 03B99
+	inc	word [player_regen_pending]		; 03B99
 	mov	word [player_anim_id],0x0	; 03B9D
-	mov	ax,[player_frame_bak]		; 03BA3
+	mov	ax,[player_seq_offsets]		; 03BA3
 	mov	[player_frame_ptr],ax		; 03BA6
 	add	sp,0x2			; 03BA9
 	pop	bp			; 03BAC
@@ -249,7 +249,7 @@ health_decrement_push_health_remains:
 ;          0   = all sounds
 ;          1   = effects only: 1-8 and 22-24 play; 9-21 and 25 up are silent
 ;          2   = silent
-;        (consume_key temporarily forces mode 0, see input.asm 04245)
+;        (play_sound_5_forced temporarily forces mode 0, see input.asm 04245)
 ; Writes: speaker port 0x61, and the music_* variables for tunes.
 ; Clobbers: AX, BX, CX, DX. Returns nothing useful.
 ;

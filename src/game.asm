@@ -7,11 +7,11 @@
 ; initializes controls, loads the game disk, then runs the main game loop.
 ;
 ; After game_main_loop returns, enters the FRAME LOOP (loc_00316):
-;   timer_wait -> poll_keyboard -> scene_update -> level_setup -> render_figures
+;   timer_wait -> poll_keyboard -> scene_update -> resolve_hits -> render_figures
 ; Handles approach_flag [0x154] values: 2=vsync(8), 3=vsync(24), 4=vsync(22), else=vsync(1)
 ; Calls cutscene_play and handles scene transitions with fade effects.
-; In this binary reset_to_game_start (002A7) never returns, so the load_game_disk check and check_disk_prompt retry after it are unreachable, and the three pushed arguments are discarded.
-; Actual frame loop order: poll_keyboard(1), timer_wait_3ticks, scene_update, level_setup, render_figures.
+; In this binary skip_disk_check (002A7) never returns, so the load_game_disk check and check_disk_prompt retry after it are unreachable, and the three pushed arguments are discarded.
+; Actual frame loop order: poll_keyboard(1), timer_wait_3ticks, scene_update, resolve_hits, render_figures.
 ; The approach_flag values select play_sound indices 8, 24 and 22, else 1.
 ; [0x16a] is the restart flag: set by Ctrl+R in key_to_move or by a nonzero cutscene_play result.
 game_init:
@@ -31,9 +31,9 @@ game_init_stack_ok:
 	jnz	short game_init_graphics_card_ok		; 00273 jnz 0x281
 	mov	ax,str_no_graphics - DS_BASE	; 00275
 	push	ax			; 00278
-	call	print_error		; 00279
+	call	puts		; 00279
 	db	0x8B, 0xE5		; 0027C mov sp,bp
-	call	show_insert_disk	; 0027E
+	call	exit	; 0027E
 game_init_graphics_card_ok:
 	call	patch_font_tables	; 00281
 	call	install_handlers	; 00284
@@ -45,7 +45,7 @@ game_init_graphics_card_ok:
 ; init_controls found a joystick: [0xdf46]=0 lets poll_keyboard read it.
 game_init_joystick_detected:
 	mov	word [keyboard_only],0x0	; 00296
-; Disk-check retry loop. In this binary it never loops: reset_to_game_start at 002A7 does not return.
+; Disk-check retry loop. In this binary it never loops: skip_disk_check at 002A7 does not return.
 game_init_verify_game_disk:
 	mov	ax,0x737		; 0029C
 	push	ax			; 0029F
@@ -53,18 +53,18 @@ game_init_verify_game_disk:
 	push	ax			; 002A3
 	db	0x33, 0xC0		; 002A4 xor ax,ax
 	push	ax			; 002A6
-	call	reset_to_game_start	; 002A7
+	call	skip_disk_check	; 002A7
 	db	0x8B, 0xE5		; 002AA mov sp,bp
 	call	load_game_disk		; 002AC
 	test	ax,ax			; 002AF
 	jnz	short game_init_start_new_game		; 002B1 jnz 0x2b8
 	call	check_disk_prompt	; 002B3
 	jmp	short game_init_verify_game_disk		; 002B6 jmp 0x29c
-; Reached from a successful disk check, from reset_to_game_start, or on restart (Ctrl+R or input_advance > 0).
+; Reached from a successful disk check, from skip_disk_check, or on restart (Ctrl+R or input_advance > 0).
 game_init_start_new_game:
 	call	load_player_anim_data	; 002B8
 	db	0x33, 0xC0		; 002BB xor ax,ax
-	mov	word [player_hits_left],0xd	; 002BD
+	mov	word [enemy_hit_points],0xd	; 002BD
 	mov	[enemy_frozen],ax		; 002C3
 	mov	[scene_locked],ax		; 002C6
 	mov	[scene_param_e2],ax		; 002C9
@@ -85,7 +85,7 @@ game_init_start_new_game:
 	mov	[scroll_counter],ax		; 002F6
 	mov	[scene_index],ax		; 002F9
 	mov	[approach_timer],ax		; 002FC
-	mov	[enemy_active],ax		; 002FF
+	mov	[special_enemy_active],ax		; 002FF
 	call	game_main_loop		; 00302
 	db	0x33, 0xC0		; 00305 xor ax,ax
 	mov	[player_was_hit],ax		; 00307
@@ -104,7 +104,7 @@ game_init_frame_loop:
 	db	0x8B, 0xE5		; 0032B mov sp,bp
 	call	timer_wait_3ticks	; 0032D
 	call	scene_update		; 00330
-	call	level_setup		; 00333
+	call	resolve_hits		; 00333
 	call	render_figures		; 00336
 	mov	ax,[approach_flag]		; 00339
 	test	ax,ax			; 0033C
@@ -162,7 +162,7 @@ game_init_check_anim_row_state_1:
 	mov	word [anim_bg_counter],0x1	; 003B8
 	call	load_anim_row		; 003BE
 game_init_scene_transition:
-	call	scene_transition	; 003C1
+	call	draw_health_bars	; 003C1
 	jmp	near game_init_frame_loop			; 003C4
 
 ; ---- function game_main_loop ----
@@ -171,13 +171,13 @@ game_init_scene_transition:
 ; and plays the intro (title screen, animated intro, story text).
 ;
 ; GAMEPLAY LOOP at game_main_loop_demo_frame_loop:
-;   timer_wait -> scene_update -> level_setup -> render_figures
-;   -> handle approach_flag -> scene_transition -> game_scene
+;   timer_wait -> scene_update -> resolve_hits -> render_figures
+;   -> handle approach_flag -> draw_health_bars -> game_scene
 ; Loops until game_scene returns 1 (scene complete).
 ; On completion, calls init_combat_state(0) and jumps to set_video_mode.
 ; When the demo ends, the raw jmp 0x612 at 0053F (code offset 0x412) restarts the title sequence, not set_video_mode.
 ; A title step or cal00 returning nonzero runs load_scene then exits; cal01 returning nonzero runs game_shutdown then exits.
-; The loop at game_main_loop_demo_frame_loop is an attract demo, not player-controlled play: anim_mode=1 makes scene_update call anim_process for the player.
+; The loop at game_main_loop_demo_frame_loop is an attract demo, not player-controlled play: anim_mode=1 makes scene_update call demo_player_ai for the player.
 game_main_loop:
 	push	bp			; 003C7
 	sub	sp,0x4			; 003C8
@@ -295,7 +295,7 @@ game_main_loop_play_cal01_intro:
 	jz	short game_main_loop_start_demo		; 004D3 jz 0x4da
 	call	game_shutdown		; 004D5
 	jmp	short game_main_loop_reset_and_return		; 004D8 jmp 0x542
-; Attract demo: anim_mode=1 makes scene_update drive the player with anim_process.
+; Attract demo: anim_mode=1 makes scene_update drive the player with demo_player_ai.
 game_main_loop_start_demo:
 	mov	word [current_level],0x0		; 004DA
 	mov	word [enemy_atk_freq],0xfa	; 004E0
@@ -307,7 +307,7 @@ game_main_loop_demo_frame_loop:
 	jz	short game_main_loop_demo_finished		; 004F8 jz 0x537
 	call	timer_wait_3ticks	; 004FA
 	call	scene_update		; 004FD
-	call	level_setup		; 00500
+	call	resolve_hits		; 00500
 	call	render_figures		; 00503
 	mov	ax,[approach_flag]		; 00506
 	test	ax,ax			; 00509
@@ -327,7 +327,7 @@ game_main_loop_approach_default_sound:
 game_main_loop_clear_approach_flag:
 	mov	word [approach_flag],0x0	; 00526
 game_main_loop_scene_transition:
-	call	scene_transition	; 0052C
+	call	draw_health_bars	; 0052C
 	call	game_scene		; 0052F
 	mov	[bp+0x2],ax		; 00532
 	jmp	short game_main_loop_demo_frame_loop		; 00535 jmp 0x4f4

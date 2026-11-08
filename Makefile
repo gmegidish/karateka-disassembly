@@ -11,7 +11,10 @@ build:
 verify: build/NEW.EXE
 	cmp build/NEW.EXE disk/KARATEKA.EXE && echo "MATCH OK" || echo "MISMATCH!"
 
+hebrew: $(SRC_FILES)
+	nasm -f bin -DHEBREW -i src/ src/karateka.asm -o disk/HEBREW.EXE
+
 clean:
 	rm -f build/NEW.EXE
 
-.PHONY: all verify clean
+.PHONY: all verify clean hebrew

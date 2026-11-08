@@ -21,18 +21,18 @@ FUNCTION_NAMES = {
     0x05D48: "dos_delete_file",      # INT 21h/41h - delete file (also 43h get/set attr)
     0x05D7E: "dos_ioctl",            # INT 21h/44h - IOCTL
     0x05D8D: "dos_rename_file",      # INT 21h/56h - rename file
-    0x05DAB: "crt_init_io",          # C runtime I/O initialization
-    0x05E33: "parse_number",         # scanf-style number parser (decimal/octal/hex/long)
+    0x05DAB: "crt_exit_forward",          # Forwards to crt_exit, passing [bp+4] (the exit status) and [bp+6]. Does no I/O setup and does not return.
+    0x05E33: "scanf_convert",         # Performs one whole scanf conversion, reading input through a getc callback: 'd' (optional sign), 'o', 'x', 'h' (unsigned 16-bit decimal), 'c' and 's', with optional width and 'l' modifier.
     0x06342: "crt_file_read_byte",   # FILE buffer refill / getc implementation
     0x0644E: "crt_file_write_byte",  # FILE buffer write / putc implementation
     0x06655: "crt_alloc_file_buffer", # Allocate dynamic I/O buffer for FILE struct
     0x066B9: "strlen",               # C runtime strlen()
-    0x066DF: "format_string",        # String formatting (printf-like)
+    0x066DF: "setbuf",        # setbuf(FILE *[bp+6], buffer [bp+8]). Not a formatter.
     0x06725: "dos_read_line",        # INT 21h/0Ah - buffered input
     0x06731: "heap_init_free_list",  # Initialize heap free-list head node
     0x06779: "heap_expand",          # Grow heap by N blocks of 0x400 bytes
     0x0682D: "crt_malloc",           # Free-list malloc implementation
-    0x06810: "string_copy",          # String copy utility
+    0x06810: "malloc_16",          # malloc(size) with a 16-bit size: zero-extends [bp+0xC] and calls crt_malloc. Not a string copy.
     0x06954: "crt_free_small",       # 16-bit free wrapper (zero-extends, calls crt_free)
     0x06974: "crt_free",             # Free-list free with block coalescing
     0x06AF4: "crt_strcmp",            # C runtime strcmp() - compare two null-terminated strings
@@ -40,7 +40,7 @@ FUNCTION_NAMES = {
     0x06B57: "crt_mul_long",         # Unsigned 32-bit multiply (AX:BX * CX:DX)
     0x06B84: "dos_int21",            # Generic INT 21h wrapper
     0x06B96: "crt_file_reset_buffer", # Free FILE buffer, reset to inline mode
-    0x06BF5: "crt_long_multiply",    # 32-bit multiply helper
+    0x06BF5: "crt_div_long",    # Signed 32-bit division, not multiplication: AX:BX / CX:DX (high:low pairs).
 
     # === Video / Display ===
     0x005E5: "game_shutdown",        # Calls cleanup, sets video mode, clears state
@@ -53,14 +53,14 @@ FUNCTION_NAMES = {
     0x04396: "clear_video_buffer",   # Clear 32KB video segment to zero
     0x04273: "video_set_mode_4",     # INT 10h/00h - set CGA mode 4 (320x200 4-color)
     0x04352: "check_graphics_card",  # INT 11h + INT 10h/0Fh - check for graphics adapter
-    0x04373: "video_init",           # INT 10h/00h + INT 21h/0Eh - init video + select disk
+    0x04373: "restore_video_mode",           # Restores the original video state and selects a disk drive; initialises nothing.
 
     # === Keyboard / Input ===
     0x016A3: "check_ctrl_q",         # INT 21h/06h - check for Ctrl+Q (quit)
     0x04149: "poll_keyboard",        # Main keyboard polling - checks Ctrl+Q, special keys
     0x041FC: "wait_for_key",         # INT 21h/07h - blocking keyboard read
     0x04233: "flush_keyboard",       # Flush keyboard buffer
-    0x04241: "consume_key",          # Read and discard a keystroke
+    0x04241: "play_sound_5_forced",          # Plays sound 5 (play_sound_buzz_low) with sound_mode forced to 0, so it is heard even when muted, then restores sound_mode.
     0x044D3: "check_joystick",       # Check joystick input
 
     # === Joystick ===
@@ -79,10 +79,10 @@ FUNCTION_NAMES = {
     # === Disk / File Operations ===
     0x016C2: "read_disk_sector",     # INT 13h - copy protection disk verification
     0x01718: "load_game_disk",       # Verify game disk signature is present
-    0x0169C: "reset_to_game_start",  # Non-local goto (longjmp) back to game_init
-    0x04B7F: "show_insert_disk",     # "make sure your karateka disk is in drive a"
-    0x04FDD: "load_file",            # High-level file load (calls dos_read_file)
-    0x052D8: "write_file_data",      # Write buffer to file with optional LF->CRLF translation
+    0x0169C: "skip_disk_check",  # Bypasses the disk check. Its one caller is at 0x2A7 in game_init, which pushes three
+    0x04B7F: "exit",     # Behaves as C exit(status): closes all 20 IOB streams with fclose_iob and every file slot with close_file_slot, then crt_exit_forward forwards the status to crt_exit.
+    0x04FDD: "file_read",            # read(slot, buffer, count): reads from an already-open file slot found with get_file_slot.
+    0x052D8: "file_write",      # write(slot, buffer, count): writes a buffer to a file slot with optional LF->CRLF translation.
     0x055F9: "close_file_slot",      # Close DOS file handle and clear file slot
     0x05659: "delete_resource_file", # Delete file (only in real-disk mode)
     0x056DE: "strcpy",               # C runtime strcpy() - copy null-terminated string
@@ -135,9 +135,9 @@ FUNCTION_NAMES = {
     0x00569: "game_scene",           # Scene management
     0x005AD: "load_scene",           # Load a new scene
     0x00629: "rand_range",            # Random integer in [0, max_value]
-    0x00640: "draw_sprite",           # Render sprite to offscreen buffer (normal case)
-    0x0083C: "draw_sprite_mirrored", # Render sprite entering from left (X < camera)
-    0x0094C: "draw_sprite_rightedge", # Render sprite clipped at right edge (X + width > 320)
+    0x00640: "draw_sprite_flipped",           # Draws a sprite horizontally flipped into the offscreen buffer at DS:0x337.
+    0x0083C: "draw_sprite_unflipped", # Draws a sprite unflipped, left to right. Despite the old name nothing is mirrored and no bits are reversed.
+    0x0094C: "draw_sprite_unflipped_columns", # The column loop of draw_sprite_unflipped: draws unflipped columns left to right using its stack frame.
 
     # === Combat System ===
     0x01AC2: "init_combat_level",     # Initialize new combat encounter/level
@@ -151,21 +151,21 @@ FUNCTION_NAMES = {
 
     # === Scene / Level Management ===
     0x022E1: "scene_update",         # Scene state update
-    0x02BDD: "level_setup",          # Level/stage setup
-    0x0301C: "scene_transition",     # Scene transition effect
+    0x02BDD: "resolve_hits",          # Per-frame hit resolution, called once per frame after scene_update (00333, 00500).
+    0x0301C: "draw_health_bars",     # Draws the two health bars into the offscreen buffer. Runs every frame from both frame loops (003C1, 0052C) and from prepare_screen_buffer unless script_running is set.
     0x0316F: "blit_column_data",     # Copy 7 words from SI to CGA column at DI (stride 80)
     0x0317F: "blit_transition_col_left", # Blit left-side wipe column from buffer 0xd654
     0x03196: "blit_transition_col_right", # Blit right-side wipe column from buffer 0xd662
     0x031AA: "cutscene_play",        # Play cutscene sequence (16 callees)
-    0x03162: "clear_gate_column",    # Clear 7-row column in transition buffer (gate animation)
+    0x03162: "clear_health_pip",    # Clears one health bar pip: 7 rows of one zero word each at DI, 0x50-byte stride.
 
     # === Animation System ===
-    0x029E9: "anim_frame_update",    # Animation frame update
-    0x02A0F: "anim_interpolate",     # Animation interpolation
-    0x02A49: "anim_process",         # Process animation command
+    0x029E9: "pick_anim_2_to_4",    # Returns a random animation table index: rand_range(2) + 2, so 2, 3 or 4.
+    0x02A0F: "pick_anim_4_to_6",     # Returns a random animation table index: 4 or 5 when player_faces_right == 1, otherwise 4, 5 or 6.
+    0x02A49: "demo_player_ai",         # Chooses the player's next animation with no input, in place of player_anim_select.
     0x02B94: "anim_command",         # Execute animation command
     0x02F2D: "anim_set_bg",          # Set background for animation
-    0x02F98: "anim_set_figure",      # Set figure for animation
+    0x02F98: "player_strike_special_enemy",      # The player's strike on the special enemy (the one activate_enemy starts in anim 0x1F).
 
     # === Screen Effects ===
     0x03A2D: "place_player_for_scene",          # Positions the player for a scene and selects its animation row
@@ -197,8 +197,8 @@ FUNCTION_NAMES = {
     0x043AA: "check_hit_zone",       # Check if combat move hits based on move type and distance
     0x04619: "init_controls",        # Initialize control scheme
     0x04A37: "fclose_iob",           # Flush and close an IOB file entry
-    0x04A91: "fgets_iob",            # Read line from stdin IOB until newline or EOF
-    0x04B0A: "fread_iob",            # Read N bytes from IOB stream into buffer, return bytes read
+    0x04A91: "gets",            # Reads a line from stdin IOB (0xe1b0) until newline (0x0A) or EOF (0xFFFF).
+    0x04B0A: "fgets",            # Reads a line of at most N-1 bytes from an IOB (file stream) into a buffer.
 
     # === File / Resource Management ===
     0x04883: "init_iob_entry",       # Initialize IOB entry for file reading, open file and set up buffer
@@ -206,10 +206,10 @@ FUNCTION_NAMES = {
     0x04DB9: "open_file_slot",       # Find free file table slot, set up flags for file operation
     0x04FB8: "open_file_rw",         # Thin wrapper: open_file_slot with read+write+create flags
     0x04D77: "get_file_slot",        # Validate file slot index, return pointer to 42-byte file table entry
-    0x05501: "seek_and_read",        # Seek to offset in file, read data block
-    # 0x05356 is a call site within write_file_data, not a separate function
-    0x05907: "init_file_system",     # Initialize file system
-    0x0589A: "print_error",          # Print error message and exit
+    0x05501: "file_lseek",        # lseek(slot, offset, whence): moves the file position and returns it.
+    # 0x05356 is a call site within file_write, not a separate function
+    0x05907: "fputs",     # fputs(string, stream): writes a null-terminated string to a FILE stream, character by character. Initialises nothing.
+    0x0589A: "puts",          # puts(string): writes a null-terminated string to stdout, followed by a newline.
     0x05DE3: "dos_putchar",          # INT 21h/02h - write character to stdout
 
     # === Math ===
@@ -225,11 +225,11 @@ FUNCTION_NAMES = {
     0x05706: "strncpy_terminated",   # Copy up to N chars and NUL-terminate, no references found
     0x05879: "scanf_read_char",      # Next scanf input char, stored at DS:0xE43C
     0x05D5F: "dos_file_attributes",  # INT 21h/43h - get/set attributes, no references found
-    0x05DBB: "dos_getch_noecho",     # INT 21h/08h - load_file read callback
+    0x05DBB: "dos_getch_noecho",     # INT 21h/08h - file_read read callback
     0x05DCF: "dos_getche",           # INT 21h/01h - no references found
-    0x05DF7: "dos_aux_getc",         # INT 21h/03h - load_file callback
-    0x05E0B: "dos_aux_putc",         # INT 21h/04h - load_file/write_file_data callback
-    0x05E1F: "dos_printer_putc",     # INT 21h/05h - write_file_data callback
+    0x05DF7: "dos_aux_getc",         # INT 21h/03h - file_read callback
+    0x05E0B: "dos_aux_putc",         # INT 21h/04h - file_read/file_write callback
+    0x05E1F: "dos_printer_putc",     # INT 21h/05h - file_write callback
     0x06766: "heap_expand_all",      # heap_expand(0), no references found
     0x067F5: "heap_free_bytes",      # Returns [0xE4BC]*4 as a long, no references found
 }

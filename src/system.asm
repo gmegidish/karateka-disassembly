@@ -159,11 +159,11 @@ calibrate_joystick_axis:
 ; Buttons are active-low: bit 4 = button 1, bit 5 = button 2.
 ; Sets joy_button_state bits: 0x20 = button 1, 0x10 = button 2.
 ; Returns: AX = button state bitmask
-; As coded: port bit 4 pressed alone gives 0x10 / joy_btn_2, port bit 5 pressed alone gives 0x20 / joy_btn_1, and both pressed together returns 0.
+; As coded: port bit 4 pressed alone gives 0x10 / joy_btn_bit4, port bit 5 pressed alone gives 0x20 / joy_btn_bit5, and both pressed together returns 0.
 read_joystick_buttons:
 	mov	word [joy_button_state],0x0	; 0470D  clear joy_button_state
-	mov	byte [joy_btn_2],0x0	; 04713  clear joy_btn_2
-	mov	byte [joy_btn_1],0x0	; 04718  clear joy_btn_1
+	mov	byte [joy_btn_bit4],0x0	; 04713  clear joy_btn_bit4
+	mov	byte [joy_btn_bit5],0x0	; 04718  clear joy_btn_bit5
 	cmp	byte [joystick_present],0x0	; 0471D  joystick_present?
 	jz	short read_joystick_buttons_return_state		; 04722 jz 0x4752  ; no joystick, return 0
 	mov	dx,0x201		; 04724  joystick port
@@ -175,13 +175,13 @@ read_joystick_buttons:
 	test	ah,0x10			; 04732  button 1 pressed? (was bit 4)
 	jnz	short read_joystick_buttons_test_port_bit5		; 04735 jnz 0x4742  ; no, skip
 	db	0x81, 0x0E, 0x9F, 0xE1, 0x20, 0x00	; 04737 or word [0xe19f],0x20  ; set bit 5 in button_state
-	mov	byte [joy_btn_1],0x1	; 0473D  joy_btn_1 = 1
+	mov	byte [joy_btn_bit5],0x1	; 0473D  joy_btn_bit5 = 1
 ; AH bits are active-high here, so the jnz above skips when port bit 4 IS pressed.
 read_joystick_buttons_test_port_bit5:
 	test	ah,0x20			; 04742  button 2 pressed? (was bit 5)
 	jnz	short read_joystick_buttons_return_state		; 04745 jnz 0x4752  ; no, skip
 	db	0x81, 0x0E, 0x9F, 0xE1, 0x10, 0x00	; 04747 or word [0xe19f],0x10  ; set bit 4 in button_state
-	mov	byte [joy_btn_2],0x1	; 0474D  joy_btn_2 = 1
+	mov	byte [joy_btn_bit4],0x1	; 0474D  joy_btn_bit4 = 1
 read_joystick_buttons_return_state:
 	mov	ax,[joy_button_state]		; 04752  return joy_button_state
 	ret				; 04755
@@ -467,7 +467,7 @@ init_iob_entry_append_seek_to_end:
 	db	0x33, 0xDB		; 04928 xor bx,bx
 	push	bx			; 0492A
 	push	word [bp+0x6]		; 0492B  file slot
-	call	seek_and_read		; 0492E  seek to end of file
+	call	file_lseek		; 0492E  seek to end of file
 	db	0x8B, 0xE5		; 04931 mov sp,bp
 	db	0x82			; 04933
 	db	0x7E, 0x0C		; 04934 jng 0x4942
@@ -650,49 +650,51 @@ fclose_iob_clear_and_close:
 	pop	bp			; 04A8F
 	ret				; 04A90
 
-; ---- function fgets_iob ----
+; ---- function gets ----
 ; Reads a line from stdin IOB (0xe1b0) until newline (0x0A) or EOF (0xFFFF).
 ; Null-terminates the output buffer.
 ; Input: [bp+0xc] = output buffer pointer
 ; Output: AX = buffer pointer if data was read, 0 if EOF with no data
 ; Behaves as C gets() on stdin: no length limit, and the newline is replaced by the terminator.
-fgets_iob:
+; After a newline a second NUL is written one byte past the first (0x4AD6, then 0x4B02).
+; No caller, no stored address found (dead CRT code).
+gets:
 	push	bp			; 04A91
 	sub	sp,0x8			; 04A92
 	db	0x8B, 0xEC		; 04A95 mov bp,sp
 	mov	word [bp+0x4],0x0	; 04A97  bytes_read = 0
-fgets_iob_read_char_loop:
+gets_read_char_loop:
 ; Try to read one byte from IOB inline buffer first
 	mov	ax,[iob_stdin_read_count]		; 04A9C  iob_stdin.count (bytes remaining in buffer)
 	dec	ax			; 04A9F
 	test	ax,ax			; 04AA0
 	mov	[iob_stdin_read_count],ax		; 04AA2
-	js	short fgets_iob_refill_buffer		; 04AA5 js 0x4ab5  ; buffer empty, refill
+	js	short gets_refill_buffer		; 04AA5 js 0x4ab5  ; buffer empty, refill
 	mov	si,[iob_stdin]		; 04AA7  iob_stdin.ptr (current buffer position)
 	inc	word [iob_stdin]		; 04AAB  advance pointer
 	mov	al,[si]			; 04AAF  read one byte
 	xor	ah,ah			; 04AB1
-	jmp	short fgets_iob_check_char		; 04AB3 jmp 0x4abe
-fgets_iob_refill_buffer:
+	jmp	short gets_check_char		; 04AB3 jmp 0x4abe
+gets_refill_buffer:
 ; Buffer empty: call crt_file_read_byte to refill and get one byte
 	mov	ax,0xe1b0		; 04AB5  iob_stdin
 	push	ax			; 04AB8
 	call	crt_file_read_byte	; 04AB9
 	db	0x8B, 0xE5		; 04ABC mov sp,bp
-fgets_iob_check_char:
+gets_check_char:
 	db	0x3D, 0xFF, 0xFF	; 04ABE cmp ax,0xffff  ; EOF?
 	mov	[bp+0x6],ax		; 04AC1  save current byte
-	jz	short fgets_iob_line_done		; 04AC4 jz 0x4aed  ; EOF reached
+	jz	short gets_line_done		; 04AC4 jz 0x4aed  ; EOF reached
 	db	0x3D, 0x0A, 0x00	; 04AC6 cmp ax,0xa  ; newline (LF)?
-	jnz	short fgets_iob_store_char		; 04AC9 jnz 0x4adb  ; no, store byte
+	jnz	short gets_store_char		; 04AC9 jnz 0x4adb  ; no, store byte
 ; Newline found: null-terminate and return
 	mov	ax,[bp+0x4]		; 04ACB  bytes_read
 	inc	word [bp+0x4]		; 04ACE
 	mov	si,[bp+0xc]		; 04AD1  output buffer
 	db	0x03, 0xF0		; 04AD4 add si,ax
 	mov	byte [si],0x0		; 04AD6  null-terminate
-	jmp	short fgets_iob_line_done		; 04AD9 jmp 0x4aed
-fgets_iob_store_char:
+	jmp	short gets_line_done		; 04AD9 jmp 0x4aed
+gets_store_char:
 ; Store byte in output buffer and continue
 	mov	ax,[bp+0x4]		; 04ADB  bytes_read
 	inc	word [bp+0x4]		; 04ADE
@@ -700,15 +702,15 @@ fgets_iob_store_char:
 	db	0x03, 0xF0		; 04AE4 add si,ax
 	mov	ax,[bp+0x6]		; 04AE6  current byte
 	mov	[si],al			; 04AE9  store it
-	jmp	short fgets_iob_read_char_loop		; 04AEB jmp 0x4a9c  ; read next byte
-fgets_iob_line_done:
+	jmp	short gets_read_char_loop		; 04AEB jmp 0x4a9c  ; read next byte
+gets_line_done:
 	cmp	word [bp+0x4],0x0	; 04AED  any bytes read?
-	jnz	short fgets_iob_terminate_and_return		; 04AF1 jnz 0x4afa  ; yes
+	jnz	short gets_terminate_and_return		; 04AF1 jnz 0x4afa  ; yes
 	db	0x33, 0xC0		; 04AF3 xor ax,ax  ; return 0 (EOF, no data)
 	add	sp,0x8			; 04AF5
 	pop	bp			; 04AF8
 	ret				; 04AF9
-fgets_iob_terminate_and_return:
+gets_terminate_and_return:
 ; Null-terminate and return buffer pointer
 	mov	ax,[bp+0xc]		; 04AFA  output buffer
 	mov	si,[bp+0x4]		; 04AFD  bytes_read
@@ -718,45 +720,45 @@ fgets_iob_terminate_and_return:
 	pop	bp			; 04B08
 	ret				; 04B09
 
-; ---- function fread_iob ----
-; Reads up to N bytes from an IOB (file stream) into a buffer.
-; Stops early on newline (0x0A) or EOF (0xFFFF).
+; ---- function fgets ----
+; Reads a line of at most N-1 bytes from an IOB (file stream) into a buffer.
+; Stops early after storing a newline (0x0A), or on EOF (0xFFFF).
 ; Input: [bp+0x10] = IOB pointer, [bp+0xe] = max byte count, [bp+0xc] = dest buffer
 ; Output: AX = buffer pointer if data read, 0 if EOF with no data
 ; Behaves as C fgets(buf, n, stream): reads at most n-1 bytes, keeps the newline, and null-terminates.
-fread_iob:
+fgets:
 	push	bp			; 04B0A
 	sub	sp,0x8			; 04B0B
 	db	0x8B, 0xEC		; 04B0E mov bp,sp
 	mov	word [bp+0x4],0x0	; 04B10  bytes_read = 0
-fread_iob_read_char_loop:
+fgets_read_char_loop:
 	mov	ax,[bp+0xe]		; 04B15  max count
 	dec	ax			; 04B18  leave room for null terminator
 	mov	bx,[bp+0x4]		; 04B19  bytes_read
 	db	0x3B, 0xD8		; 04B1C cmp bx,ax  ; reached limit?
-	jnl	short fread_iob_terminate_string		; 04B1E jnl 0x4b61  ; yes, done
+	jnl	short fgets_terminate_string		; 04B1E jnl 0x4b61  ; yes, done
 ; Try inline buffer read first
 	mov	si,[bp+0x10]		; 04B20  IOB pointer
 	mov	ax,[si+0x2]		; 04B23  IOB.count
 	dec	ax			; 04B26
 	mov	[si+0x2],ax		; 04B27
 	test	ax,ax			; 04B2A
-	js	short fread_iob_refill_buffer		; 04B2C js 0x4b3a  ; buffer empty, refill
+	js	short fgets_refill_buffer		; 04B2C js 0x4b3a  ; buffer empty, refill
 	mov	ax,[si]			; 04B2E  IOB.ptr
 	inc	word [si]		; 04B30  advance pointer
 	db	0x8B, 0xF8		; 04B32 mov di,ax
 	mov	bl,[di]			; 04B34  read byte from buffer
 	xor	bh,bh			; 04B36
-	jmp	short fread_iob_check_eof_and_store		; 04B38 jmp 0x4b44
-fread_iob_refill_buffer:
+	jmp	short fgets_check_eof_and_store		; 04B38 jmp 0x4b44
+fgets_refill_buffer:
 	push	word [bp+0x10]		; 04B3A  IOB pointer
 	call	crt_file_read_byte	; 04B3D  refill buffer and get byte
 	db	0x8B, 0xE5		; 04B40 mov sp,bp
 	db	0x8B, 0xD8		; 04B42 mov bx,ax
-fread_iob_check_eof_and_store:
+fgets_check_eof_and_store:
 	mov	[bp+0x6],bx		; 04B44  save current byte
 	inc	bx			; 04B47  check for EOF (0xFFFF + 1 = 0)
-	jz	short fread_iob_terminate_string		; 04B48 jz 0x4b61  ; EOF
+	jz	short fgets_terminate_string		; 04B48 jz 0x4b61  ; EOF
 	mov	ax,[bp+0x4]		; 04B4A  bytes_read
 	inc	word [bp+0x4]		; 04B4D
 	mov	si,[bp+0xc]		; 04B50  dest buffer
@@ -764,39 +766,40 @@ fread_iob_check_eof_and_store:
 	mov	ax,[bp+0x6]		; 04B55  current byte
 	mov	[si],al			; 04B58  store it
 	db	0x3D, 0x0A, 0x00	; 04B5A cmp ax,0xa  ; newline?
-	jnz	short fread_iob_read_char_loop		; 04B5D jnz 0x4b15  ; no, continue reading
-	jmp	short fread_iob_terminate_string		; 04B5F jmp 0x4b61  ; yes, stop
-fread_iob_terminate_string:
+	jnz	short fgets_read_char_loop		; 04B5D jnz 0x4b15  ; no, continue reading
+	jmp	short fgets_terminate_string		; 04B5F jmp 0x4b61  ; yes, stop
+fgets_terminate_string:
 	mov	ax,[bp+0x4]		; 04B61  bytes_read
 	mov	si,[bp+0xc]		; 04B64  dest buffer
 	db	0x03, 0xF0		; 04B67 add si,ax
 	mov	byte [si],0x0		; 04B69  null-terminate
 	test	ax,ax			; 04B6C  any bytes read?
-	jnz	short fread_iob_return_buffer		; 04B6E jnz 0x4b77  ; yes
+	jnz	short fgets_return_buffer		; 04B6E jnz 0x4b77  ; yes
 	db	0x33, 0xC0		; 04B70 xor ax,ax  ; return 0 (EOF, no data)
 	add	sp,0x8			; 04B72
 	pop	bp			; 04B75
 	ret				; 04B76
-fread_iob_return_buffer:
+fgets_return_buffer:
 	mov	ax,[bp+0xc]		; 04B77  return buffer pointer
 	add	sp,0x8			; 04B7A
 	pop	bp			; 04B7D
 	ret				; 04B7E
 
-; ---- function show_insert_disk ----
-; Closes all 20 IOB entries and all file slots, then reinitializes I/O.
-; Called when a disk swap is needed (e.g., "insert disk" prompt).
-; Behaves as C exit(status): closes every stream and file slot, then crt_init_io forwards the status to crt_exit. It does not return and prints nothing.
-show_insert_disk:
+; ---- function exit ----
+; Behaves as C exit(status): closes all 20 IOB streams with fclose_iob and every file slot with close_file_slot, then crt_exit_forward forwards the status to crt_exit.
+; Input: [bp+0x8] = exit status. [bp+0xa] is passed along too, but crt_exit ignores it.
+; Does not return, prints nothing and prompts for nothing.
+; Callers: game_init at 0x27E (no graphics adapter, no status pushed), main at 0x5A61 and 0x5A9F (status 1) and 0x5B24 (status 0).
+exit:
 	push	bp			; 04B7F
 	sub	sp,0x4			; 04B80
 	db	0x8B, 0xEC		; 04B83 mov bp,sp
 	mov	word [bp+0x2],0x0	; 04B85  loop counter i = 0
-show_insert_disk_close_iobs_loop:
+exit_close_iobs_loop:
 ; Close all 20 IOB entries (14 bytes each, starting at 0xe1b0)
 	mov	ax,[bp+0x2]		; 04B8A
 	db	0x3D, 0x14, 0x00	; 04B8D cmp ax,0x14  ; i < 20?
-	jnl	short show_insert_disk_close_slots		; 04B90 jnl 0x4ba5  ; done with IOBs
+	jnl	short exit_close_slots		; 04B90 jnl 0x4ba5  ; done with IOBs
 	mov	bx,0xe			; 04B92  14 bytes per IOB
 	imul	bx			; 04B95
 	add	ax,0xe1b0		; 04B97  iob_array + i*14
@@ -804,24 +807,24 @@ show_insert_disk_close_iobs_loop:
 	call	fclose_iob		; 04B9B
 	db	0x8B, 0xE5		; 04B9E mov sp,bp
 	inc	word [bp+0x2]		; 04BA0
-	jmp	short show_insert_disk_close_iobs_loop		; 04BA3 jmp 0x4b8a
-show_insert_disk_close_slots:
+	jmp	short exit_close_iobs_loop		; 04BA3 jmp 0x4b8a
+exit_close_slots:
 ; Close all file slots
 	mov	word [bp+0x2],0x0	; 04BA5  i = 0
-show_insert_disk_close_slots_loop:
+exit_close_slots_loop:
 	mov	ax,[bp+0x2]		; 04BAA
 	cmp	ax,[file_slot_count]		; 04BAD  i < file_slot_count?
-	jnl	short show_insert_disk_exit_process		; 04BB1 jnl 0x4bbe  ; done
+	jnl	short exit_exit_process		; 04BB1 jnl 0x4bbe  ; done
 	push	ax			; 04BB3
 	call	close_file_slot		; 04BB4
 	db	0x8B, 0xE5		; 04BB7 mov sp,bp
 	inc	word [bp+0x2]		; 04BB9
-	jmp	short show_insert_disk_close_slots_loop		; 04BBC jmp 0x4baa
-show_insert_disk_exit_process:
+	jmp	short exit_close_slots_loop		; 04BBC jmp 0x4baa
+exit_exit_process:
 ; Reinitialize the I/O system
 	push	word [bp+0xa]		; 04BBE
 	push	word [bp+0x8]		; 04BC1
-	call	crt_init_io		; 04BC4
+	call	crt_exit_forward		; 04BC4
 	db	0x8B, 0xE5		; 04BC7 mov sp,bp
 	add	sp,0x4			; 04BC9
 	pop	bp			; 04BCC
@@ -832,15 +835,15 @@ show_insert_disk_exit_process:
 ; If not enough heap space: on DOS 2+, grows via crt_realloc_up; on DOS 1.x returns 0.
 ; Input: [bp+0x10]::[bp+0x12] = requested size (low:high, 32-bit)
 ; Output: AX = segment address of allocated block, or 0 if failed
-; The returned value is stack_top + heap_offset, a DS-relative pointer, not a segment. heap_size/heap_remainder together hold a 32-bit byte count (low/high).
+; The returned value is stack_top + heap_offset, a DS-relative pointer, not a segment. heap_bytes_lo/heap_bytes_hi together hold a 32-bit byte count (low/high).
 heap_alloc:
 	push	bp			; 04BCE
 	sub	sp,0xc			; 04BCF
 	db	0x8B, 0xEC		; 04BD2 mov bp,sp
 	mov	ax,[bp+0x12]		; 04BD4  size high word
 	mov	bx,[bp+0x10]		; 04BD7  size low word
-	mov	cx,[heap_remainder]		; 04BDA  heap_remainder
-	mov	dx,[heap_size]		; 04BDE  heap_size
+	mov	cx,[heap_bytes_hi]		; 04BDA  heap_bytes_hi
+	mov	dx,[heap_bytes_lo]		; 04BDE  heap_bytes_lo
 	call	crt_cmp_long		; 04BE2  compare requested vs available
 	jng	short heap_alloc_carve_block		; 04BE5 jng 0x4c50  ; enough space, allocate directly
 ; Not enough heap: try to grow
@@ -893,8 +896,8 @@ heap_alloc_add_grown_space:
 	mov	ax,[bp+0xa]		; 04C3E
 	mov	bx,[bp+0x8]		; 04C41
 	db	0x81, 0xE3, 0xF0, 0xFF	; 04C44 and bx,0xfff0
-	add	[heap_size],bx		; 04C48  heap_size += new paragraphs (low)
-	adc	[heap_remainder],ax		; 04C4C  heap_remainder += carry (high)
+	add	[heap_bytes_lo],bx		; 04C48  heap_bytes_lo += new paragraphs (low)
+	adc	[heap_bytes_hi],ax		; 04C4C  heap_bytes_hi += carry (high)
 heap_alloc_carve_block:
 ; Allocate from current heap position
 	mov	ax,[stack_top]		; 04C50  stack_top (heap base segment)
@@ -902,9 +905,9 @@ heap_alloc_carve_block:
 	db	0x03, 0xC3		; 04C57 add ax,bx  ; AX = allocated segment
 	mov	cx,[bp+0x10]		; 04C59  requested size (low)
 	add	[heap_offset],cx		; 04C5C  advance heap_offset
-	sub	[heap_size],cx		; 04C60  decrease heap_size
+	sub	[heap_bytes_lo],cx		; 04C60  decrease heap_bytes_lo
 	mov	bx,[bp+0x12]		; 04C64  requested size (high)
-	sbb	[heap_remainder],bx		; 04C67  decrease heap_remainder
+	sbb	[heap_bytes_hi],bx		; 04C67  decrease heap_bytes_hi
 	mov	[bp+0x4],ax		; 04C6B  return value = allocated segment
 	add	sp,0xc			; 04C6E
 	pop	bp			; 04C71
@@ -956,15 +959,15 @@ reset_heap:
 	jns	short reset_heap_dos1_add_unused_space		; 04CB4 jns 0x4cb7
 	dec	bx			; 04CB6  negative: set high word to -1
 reset_heap_dos1_add_unused_space:
-	mov	cx,[heap_size]		; 04CB7  heap_size
+	mov	cx,[heap_bytes_lo]		; 04CB7  heap_bytes_lo
 	db	0x03, 0xC1		; 04CBB add ax,cx  ; AX:BX = used + remaining
-	mov	dx,[heap_remainder]		; 04CBD  heap_remainder
+	mov	dx,[heap_bytes_hi]		; 04CBD  heap_bytes_hi
 	db	0x13, 0xDA		; 04CC1 adc bx,dx
 	mov	cx,[stack_top]		; 04CC3  stack_top
 	db	0x33, 0xD2		; 04CC7 xor dx,dx
-	mov	[heap_size],ax		; 04CC9  restore heap_size
+	mov	[heap_bytes_lo],ax		; 04CC9  restore heap_bytes_lo
 	db	0x03, 0xC1		; 04CCC add ax,cx
-	mov	[heap_remainder],bx		; 04CCE  restore heap_remainder
+	mov	[heap_bytes_hi],bx		; 04CCE  restore heap_bytes_hi
 	db	0x13, 0xDA		; 04CD2 adc bx,dx
 	mov	[bp+0x4],ax		; 04CD4
 	db	0x8B, 0xC3		; 04CD7 mov ax,bx
@@ -977,8 +980,8 @@ reset_heap_dos1_add_unused_space:
 	jng	short reset_heap_clear_state		; 04CEA jng 0x4d56
 	sub	dx,[bp+0x0]		; 04CEC
 	sbb	cx,[bp+0x2]		; 04CEF
-	mov	[heap_remainder],cx		; 04CF2
-	mov	[heap_size],dx		; 04CF6
+	mov	[heap_bytes_hi],cx		; 04CF2
+	mov	[heap_bytes_lo],dx		; 04CF6
 	jmp	short reset_heap_clear_state		; 04CFA jmp 0x4d56
 reset_heap_dos2_shrink_block:
 ; DOS 2+ path: shrink DOS memory allocation back
@@ -1021,8 +1024,8 @@ reset_heap_store_new_size:
 	mov	ax,[bp+0xc]		; 04D45
 	mov	bx,[bp+0xa]		; 04D48
 	db	0x81, 0xE3, 0xF0, 0xFF	; 04D4B and bx,0xfff0
-	mov	[heap_remainder],ax		; 04D4F  heap_remainder = new value
-	mov	[heap_size],bx		; 04D52  heap_size = new value
+	mov	[heap_bytes_hi],ax		; 04D4F  heap_bytes_hi = new value
+	mov	[heap_bytes_lo],bx		; 04D52  heap_bytes_lo = new value
 reset_heap_clear_state:
 ; Reset heap offset and free-list pointers
 	mov	ax,[heap_base_off]		; 04D56  heap_base_off
@@ -1030,7 +1033,7 @@ reset_heap_clear_state:
 	db	0x33, 0xC9		; 04D5B xor cx,cx
 	mov	[heap_offset],ax		; 04D5D  heap_offset = heap_base_off (reset)
 	mov	[heap_free_head_b],cx		; 04D60  clear free-list head B
-	mov	[heap_free_head_d],cx		; 04D64  clear free-list head D
+	mov	[heap_free_units],cx		; 04D64  clear free-list head D
 	mov	[heap_free_head_a],bx		; 04D68  clear free-list head A
 	mov	[heap_free_head_c],bx		; 04D6C  clear free-list head C
 	db	0x8B, 0xC3		; 04D70 mov ax,bx  ; return 0

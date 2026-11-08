@@ -20,7 +20,7 @@
 ; DS = DGROUP (code+data segment)
 ; ES = PSP segment (set by DOS before program start)
 ; The init_iob_entry calls are really fopen(name, mode, iob), reopening redirected streams on DOS 1: stdin from [stdin_redir] mode "r", stdout from [stdout_redir] mode "w", or from the name after '>' mode "a" for '>>', and stderr with an empty name mode "a".
-; On a failed open, init_file_system prints "Can't open stdin file" or "Can't open stdout file" to stderr and show_insert_disk(1) exits.
+; On a failed open, fputs prints "Can't open stdin file" or "Can't open stdout file" to stderr and exit(1) exits.
 ; DOS 2+ goes straight to the code at 0x5AA6 that sets up the predefined handles.
 main:
 	push	bp			; 05953
@@ -159,7 +159,7 @@ main_open_stderr:
 ; stderr setup failed, initialize CRT I/O manually
 	mov	ax,0x1			; 05A42
 	push	ax			; 05A45
-	call	crt_init_io		; 05A46 - crt_init_io(1)
+	call	crt_exit_forward		; 05A46 - crt_exit_forward(1)
 	db	0x8B, 0xE5		; 05A49 mov sp,bp
 
 ; --- Phase 4: Initialize file system ---
@@ -171,21 +171,21 @@ main_check_stdin_opened:
 	push	word [bp+0xc]		; 05A51 - stderr result
 	mov	ax,0xe487		; 05A54 - file system config address
 	push	ax			; 05A57
-	call	init_file_system	; 05A58
+	call	fputs	; 05A58
 	db	0x8B, 0xE5		; 05A5B mov sp,bp
 	mov	ax,0x1			; 05A5D
 	push	ax			; 05A60
-	call	show_insert_disk	; 05A61 - prompt for game disk
+	call	exit	; 05A61 - prompt for game disk
 	db	0x8B, 0xE5		; 05A64 mov sp,bp
 
 main_set_stdin_buffer:
 ; Format stdin I/O block string
 	push	word [stdio_bufsiz]	; 05A66 - default buffer size (512)
-	call	string_copy		; 05A6A
+	call	malloc_16		; 05A6A
 	db	0x8B, 0xE5		; 05A6D mov sp,bp
 	push	ax			; 05A6F
 	push	word [bp+0x8]		; 05A70
-	call	format_string		; 05A73
+	call	setbuf		; 05A73
 	db	0x8B, 0xE5		; 05A76 mov sp,bp
 
 ; Clear bit 3 of stdin I/O block flags
@@ -205,11 +205,11 @@ main_stdout_open_failed:
 	push	word [bp+0xc]		; 05A8F - stderr result
 	mov	ax,0xe49e		; 05A92 - second file system config address
 	push	ax			; 05A95
-	call	init_file_system	; 05A96
+	call	fputs	; 05A96
 	db	0x8B, 0xE5		; 05A99 mov sp,bp
 	mov	ax,0x1			; 05A9B
 	push	ax			; 05A9E
-	call	show_insert_disk	; 05A9F - prompt for game disk
+	call	exit	; 05A9F - prompt for game disk
 	db	0x8B, 0xE5		; 05AA2 mov sp,bp
 	jmp	short main_call_game_init		; 05AA4 jmp 0x5b14
 
@@ -267,7 +267,7 @@ main_call_game_init:
 ; Cleanup: dismiss disk prompt
 	db	0x33, 0xC0		; 05B21 xor ax,ax
 	push	ax			; 05B23
-	call	show_insert_disk	; 05B24 - show_insert_disk(0) = dismiss
+	call	exit	; 05B24 - exit(0) = dismiss
 	db	0x8B, 0xE5		; 05B27 mov sp,bp
 	add	sp,0xe			; 05B29 - free locals
 	pop	bp			; 05B2C

@@ -263,11 +263,10 @@ dos_rename_file_return_success:
 	pop	bp			; 05DA9
 	ret				; 05DAA
 
-; ---- function crt_init_io ----
-; Initializes all FILE structs and IOB entries.
-; Called at startup and after disk swap.
-; Not I/O setup: it forwards to crt_exit, passing [bp+4] and [bp+6].
-crt_init_io:
+; ---- function crt_exit_forward ----
+; Forwards to crt_exit, passing [bp+4] (the exit status) and [bp+6]. Does no I/O setup and does not return.
+; Callers: exit at 0x4BC4, and main at 0x5A46 when reopening stderr fails on DOS 1.
+crt_exit_forward:
 	push	bp			; 05DAB
 	db	0x8B, 0xEC		; 05DAC mov bp,sp
 	push	word [bp+0x6]		; 05DAE
@@ -279,7 +278,7 @@ crt_init_io:
 
 ; ---- function dos_getch_noecho ----
 ; INT 21h/08h - read one console character without echo.
-; Reached indirectly: load_file stores its address as the device read callback.
+; Reached indirectly: file_read stores its address as the device read callback.
 ; Output: AX = character
 dos_getch_noecho:
 	push	bp			; 05DBB
@@ -326,7 +325,7 @@ dos_putchar:
 
 ; ---- function dos_aux_getc ----
 ; INT 21h/03h - read one character from the auxiliary device.
-; Reached indirectly: load_file stores its address as the AUX read callback.
+; Reached indirectly: file_read stores its address as the AUX read callback.
 ; Output: AX = character
 dos_aux_getc:
 	push	bp			; 05DF7
@@ -342,7 +341,7 @@ dos_aux_getc:
 
 ; ---- function dos_aux_putc ----
 ; INT 21h/04h - write one character to the auxiliary device.
-; Reached indirectly: load_file and write_file_data store its address as a callback.
+; Reached indirectly: file_read and file_write store its address as a callback.
 ; Input: [bp+4] = character
 ; Output: AX = character
 dos_aux_putc:
@@ -359,7 +358,7 @@ dos_aux_putc:
 
 ; ---- function dos_printer_putc ----
 ; INT 21h/05h - write one character to the printer.
-; Reached indirectly: write_file_data stores its address as the PRN write callback.
+; Reached indirectly: file_write stores its address as the PRN write callback.
 ; Input: [bp+4] = character
 ; Output: AX = character
 dos_printer_putc:
@@ -374,16 +373,15 @@ dos_printer_putc:
 	pop	bp			; 05E31
 	ret				; 05E32
 
-; ---- function parse_number ----
-; scanf-style decimal/octal/hex number parser from string.
-; Handles %d, %o, %x format conversions with optional sign.
-; Actually one scanf conversion, not just numbers: 'd', 'o', 'x', 'h' (unsigned 16-bit decimal), 'c' and 's', with optional width and 'l' modifier.
+; ---- function scanf_convert ----
+; Performs one whole scanf conversion, reading input through a getc callback: 'd' (optional sign), 'o', 'x', 'h' (unsigned 16-bit decimal), 'c' and 's', with optional width and 'l' modifier.
+; Called once per % field by scanf_format_parser at 0x57F1.
 ; Input: [bp+0x22] = format pointer just after '%', [bp+0x24] = getc callback, [bp+0x26] = where the lookahead char is stored, [bp+0x28] = pointer to the output pointer (0 discards the value).
 ; Locals: [bp+0xc] = long flag, [bp+0xe] = field width (0 = unlimited), [bp+0x8] = current char, [bp+0x10] = sign mask for 'd', [bp+0x12]/[bp+0x14] = value low/high.
 ; Output: AX = format pointer after the conversion char, or 0 on EOF, mismatch or unknown conversion.
 ; ctype bits at [char+0xe4c5]: 1 = uppercase, 2 = lowercase, 4 = digit, 8 = whitespace, 0x80 = hex digit.
 ; The 's' path writes its terminator through [bp+0x28] without the null check the other paths make.
-parse_number:
+scanf_convert:
 	push	bp			; 05E33
 	sub	sp,0x1e			; 05E34
 	db	0x8B, 0xEC		; 05E37 mov bp,sp
@@ -397,8 +395,8 @@ parse_number:
 	db	0x81, 0xE1, 0x04, 0x00	; 05E49 and cx,0x4
 	mov	[bp+0xc],ax		; 05E4D
 	mov	[bp+0xe],ax		; 05E50
-	jz	short parse_number_check_long_modifier		; 05E53 jz 0x5e85
-parse_number_width_digit_loop:
+	jz	short scanf_convert_check_long_modifier		; 05E53 jz 0x5e85
+scanf_convert_width_digit_loop:
 	mov	ax,[bp+0xe]		; 05E55
 	mov	bx,0xa			; 05E58
 	imul	bx			; 05E5B
@@ -417,78 +415,78 @@ parse_number_width_digit_loop:
 	mov	al,[si+ctype_with_eof]		; 05E7A
 	xor	ah,ah			; 05E7E
 	db	0x25, 0x04, 0x00	; 05E80 and ax,0x4
-	jnz	short parse_number_width_digit_loop		; 05E83 jnz 0x5e55
-parse_number_check_long_modifier:
+	jnz	short scanf_convert_width_digit_loop		; 05E83 jnz 0x5e55
+scanf_convert_check_long_modifier:
 	mov	si,[bp+0x22]		; 05E85
 	mov	al,[si]			; 05E88
 	xor	ah,ah			; 05E8A
 	db	0x3D, 0x6C, 0x00	; 05E8C cmp ax,0x6c
-	jnz	short parse_number_read_first_char		; 05E8F jnz 0x5e99
+	jnz	short scanf_convert_read_first_char		; 05E8F jnz 0x5e99
 	inc	word [bp+0x22]		; 05E91
 	mov	word [bp+0xc],0x1	; 05E94
-parse_number_read_first_char:
+scanf_convert_read_first_char:
 	call	word near [bp+0x24]	; 05E99
 	mov	si,[bp+0x22]		; 05E9C
 	mov	bl,[si]			; 05E9F
 	xor	bh,bh			; 05EA1
 	cmp	bx,0x63			; 05EA3
 	mov	[bp+0x8],ax		; 05EA6
-	jz	short parse_number_check_input_eof		; 05EA9 jz 0x5ec1
-parse_number_skip_whitespace_loop:
+	jz	short scanf_convert_check_input_eof		; 05EA9 jz 0x5ec1
+scanf_convert_skip_whitespace_loop:
 	mov	si,[bp+0x8]		; 05EAB
 	mov	al,[si+ctype_by_char]		; 05EAE
 	xor	ah,ah			; 05EB2
 	db	0x25, 0x08, 0x00	; 05EB4 and ax,0x8
-	jz	short parse_number_check_input_eof		; 05EB7 jz 0x5ec1
+	jz	short scanf_convert_check_input_eof		; 05EB7 jz 0x5ec1
 	call	word near [bp+0x24]	; 05EB9
 	mov	[bp+0x8],ax		; 05EBC
-	jmp	short parse_number_skip_whitespace_loop		; 05EBF jmp 0x5eab
-parse_number_check_input_eof:
+	jmp	short scanf_convert_skip_whitespace_loop		; 05EBF jmp 0x5eab
+scanf_convert_check_input_eof:
 	mov	ax,[bp+0x8]		; 05EC1
 	db	0x3D, 0xFF, 0xFF	; 05EC4 cmp ax,0xffff
-	jnz	short parse_number_dispatch_conversion		; 05EC7 jnz 0x5ed5
+	jnz	short scanf_convert_dispatch_conversion		; 05EC7 jnz 0x5ed5
 	mov	si,[bp+0x26]		; 05EC9
 	mov	[si],ax			; 05ECC
 	db	0x33, 0xC0		; 05ECE xor ax,ax
 	add	sp,0x1e			; 05ED0
 	pop	bp			; 05ED3
 	ret				; 05ED4
-parse_number_dispatch_conversion:
+scanf_convert_dispatch_conversion:
 	mov	si,[bp+0x22]		; 05ED5
 	mov	al,[si]			; 05ED8
 	xor	ah,ah			; 05EDA
-	jmp	near parse_number_format_scan_table_start			; 05EDC
+	jmp	near scanf_convert_format_scan_table_start			; 05EDC
 	db	0x33, 0xC0		; 05EDF xor ax,ax
 	mov	bx,[bp+0xe]		; 05EE1
 	test	bx,bx			; 05EE4
 	mov	[bp+0x10],ax		; 05EE6
-	jz	short parse_number_decimal_check_sign		; 05EE9 jz 0x5ef0
+	jz	short scanf_convert_decimal_check_sign		; 05EE9 jz 0x5ef0
 	cmp	bx,0x1			; 05EEB
-	jng	short parse_number_decimal_require_digit		; 05EEE jng 0x5f16
-parse_number_decimal_check_sign:
+	jng	short scanf_convert_decimal_require_digit		; 05EEE jng 0x5f16
+scanf_convert_decimal_check_sign:
 	mov	ax,[bp+0x8]		; 05EF0
 	db	0x3D, 0x2D, 0x00	; 05EF3 cmp ax,0x2d
-	jz	short parse_number_decimal_consume_sign		; 05EF6 jz 0x5efd
+	jz	short scanf_convert_decimal_consume_sign		; 05EF6 jz 0x5efd
 	db	0x3D, 0x2B, 0x00	; 05EF8 cmp ax,0x2b
-	jnz	short parse_number_decimal_require_digit		; 05EFB jnz 0x5f16
-parse_number_decimal_consume_sign:
+	jnz	short scanf_convert_decimal_require_digit		; 05EFB jnz 0x5f16
+scanf_convert_decimal_consume_sign:
 	cmp	word [bp+0x8],0x2d	; 05EFD
-	jnz	short parse_number_decimal_sign_is_plus		; 05F01 jnz 0x5f08
+	jnz	short scanf_convert_decimal_sign_is_plus		; 05F01 jnz 0x5f08
 	mov	ax,0xffff		; 05F03
-	jmp	short parse_number_decimal_store_sign		; 05F06 jmp 0x5f0a
-parse_number_decimal_sign_is_plus:
+	jmp	short scanf_convert_decimal_store_sign		; 05F06 jmp 0x5f0a
+scanf_convert_decimal_sign_is_plus:
 	db	0x33, 0xC0		; 05F08 xor ax,ax
-parse_number_decimal_store_sign:
+scanf_convert_decimal_store_sign:
 	mov	[bp+0x10],ax		; 05F0A
 	call	word near [bp+0x24]	; 05F0D
 	dec	word [bp+0xe]		; 05F10
 	mov	[bp+0x8],ax		; 05F13
-parse_number_decimal_require_digit:
+scanf_convert_decimal_require_digit:
 	mov	si,[bp+0x8]		; 05F16
 	mov	al,[si+ctype_by_char]		; 05F19
 	xor	ah,ah			; 05F1D
 	db	0x25, 0x04, 0x00	; 05F1F and ax,0x4
-	jnz	short parse_number_decimal_init_value		; 05F22 jnz 0x5f32
+	jnz	short scanf_convert_decimal_init_value		; 05F22 jnz 0x5f32
 	db	0x8B, 0xC6		; 05F24 mov ax,si
 	mov	si,[bp+0x26]		; 05F26
 	mov	[si],ax			; 05F29
@@ -496,10 +494,10 @@ parse_number_decimal_require_digit:
 	add	sp,0x1e			; 05F2D
 	pop	bp			; 05F30
 	ret				; 05F31
-parse_number_decimal_init_value:
+scanf_convert_decimal_init_value:
 	mov	word [bp+0x14],0x0	; 05F32
 	mov	word [bp+0x12],0x0	; 05F37
-parse_number_decimal_digit_loop:
+scanf_convert_decimal_digit_loop:
 	mov	ax,[bp+0x14]		; 05F3C
 	mov	bx,[bp+0x12]		; 05F3F
 	db	0x33, 0xC9		; 05F42 xor cx,cx
@@ -509,9 +507,9 @@ parse_number_decimal_digit_loop:
 	db	0x81, 0xE1, 0x0F, 0x00	; 05F4D and cx,0xf
 	db	0x33, 0xD2		; 05F51 xor dx,dx
 	test	cx,cx			; 05F53
-	jns	short parse_number_decimal_add_digit		; 05F55 jns 0x5f58
+	jns	short scanf_convert_decimal_add_digit		; 05F55 jns 0x5f58
 	dec	dx			; 05F57
-parse_number_decimal_add_digit:
+scanf_convert_decimal_add_digit:
 	db	0x03, 0xD9		; 05F58 add bx,cx
 	db	0x13, 0xC2		; 05F5A adc ax,dx
 	mov	[bp+0x14],ax		; 05F5C
@@ -522,45 +520,45 @@ parse_number_decimal_add_digit:
 	dec	ax			; 05F6B
 	test	ax,ax			; 05F6C
 	mov	[bp+0xe],ax		; 05F6E
-	jz	short parse_number_decimal_finish		; 05F71 jz 0x5f81
+	jz	short scanf_convert_decimal_finish		; 05F71 jz 0x5f81
 	mov	si,[bp+0x8]		; 05F73
 	mov	al,[si+ctype_by_char]		; 05F76
 	xor	ah,ah			; 05F7A
 	db	0x25, 0x04, 0x00	; 05F7C and ax,0x4
-	jnz	short parse_number_decimal_digit_loop		; 05F7F jnz 0x5f3c
-parse_number_decimal_finish:
+	jnz	short scanf_convert_decimal_digit_loop		; 05F7F jnz 0x5f3c
+scanf_convert_decimal_finish:
 	cmp	word [bp+0x28],0x0	; 05F81
-	jnz	short parse_number_decimal_apply_sign		; 05F85 jnz 0x5f8a
-	jmp	near parse_number_store_lookahead_return_next_format			; 05F87
-parse_number_decimal_apply_sign:
+	jnz	short scanf_convert_decimal_apply_sign		; 05F85 jnz 0x5f8a
+	jmp	near scanf_convert_store_lookahead_return_next_format			; 05F87
+scanf_convert_decimal_apply_sign:
 	mov	ax,[bp+0x10]		; 05F8A
 	test	ax,ax			; 05F8D
-	jns	short parse_number_decimal_store_result		; 05F8F jns 0x5f9b
+	jns	short scanf_convert_decimal_store_result		; 05F8F jns 0x5f9b
 	not	word [bp+0x14]		; 05F91
 	neg	word [bp+0x12]		; 05F94
 	sbb	word [bp+0x14],0xffffffffffffffff	; 05F97
-parse_number_decimal_store_result:
+scanf_convert_decimal_store_result:
 	cmp	word [bp+0xc],0x0	; 05F9B
-	jnz	short parse_number_decimal_store_long		; 05F9F jnz 0x5fae
+	jnz	short scanf_convert_decimal_store_long		; 05F9F jnz 0x5fae
 	mov	di,[bp+0x28]		; 05FA1
 	mov	si,[di]			; 05FA4
 	mov	ax,[bp+0x12]		; 05FA6
 	mov	[si],ax			; 05FA9
-	jmp	near parse_number_store_lookahead_return_next_format			; 05FAB
-parse_number_decimal_store_long:
+	jmp	near scanf_convert_store_lookahead_return_next_format			; 05FAB
+scanf_convert_decimal_store_long:
 	mov	di,[bp+0x28]		; 05FAE
 	mov	si,[di]			; 05FB1
 	mov	ax,[bp+0x14]		; 05FB3
 	mov	bx,[bp+0x12]		; 05FB6
 	mov	[si+0x2],ax		; 05FB9
 	mov	[si],bx			; 05FBC
-	jmp	near parse_number_store_lookahead_return_next_format			; 05FBE
+	jmp	near scanf_convert_store_lookahead_return_next_format			; 05FBE
 	mov	ax,[bp+0x8]		; 05FC1
 	db	0x3D, 0x30, 0x00	; 05FC4 cmp ax,0x30
-	jl	short parse_number_octal_no_digit_return_zero		; 05FC7 jl 0x5fce
+	jl	short scanf_convert_octal_no_digit_return_zero		; 05FC7 jl 0x5fce
 	db	0x3D, 0x37, 0x00	; 05FC9 cmp ax,0x37
-	jng	short parse_number_octal_init_value		; 05FCC jng 0x5fdd
-parse_number_octal_no_digit_return_zero:
+	jng	short scanf_convert_octal_init_value		; 05FCC jng 0x5fdd
+scanf_convert_octal_no_digit_return_zero:
 	mov	ax,[bp+0x8]		; 05FCE
 	mov	si,[bp+0x26]		; 05FD1
 	mov	[si],ax			; 05FD4
@@ -568,15 +566,15 @@ parse_number_octal_no_digit_return_zero:
 	add	sp,0x1e			; 05FD8
 	pop	bp			; 05FDB
 	ret				; 05FDC
-parse_number_octal_init_value:
+scanf_convert_octal_init_value:
 	mov	word [bp+0x14],0x0	; 05FDD
 	mov	word [bp+0x12],0x0	; 05FE2
-parse_number_octal_digit_loop:
+scanf_convert_octal_digit_loop:
 	mov	cx,0x3			; 05FE7
 	mov	ax,[bp+0x14]		; 05FEA
 	mov	bx,[bp+0x12]		; 05FED
 ; 32-bit left shift by 3
-parse_number_octal_shift_loop:
+scanf_convert_octal_shift_loop:
 	shl	bx,1			; 05FF0
 	rcl	ax,1			; 05FF2
 	loop	0x5ff0			; 05FF4
@@ -584,9 +582,9 @@ parse_number_octal_shift_loop:
 	db	0x81, 0xE1, 0x07, 0x00	; 05FF9 and cx,0x7
 	db	0x33, 0xD2		; 05FFD xor dx,dx
 	test	cx,cx			; 05FFF
-	jns	short parse_number_octal_add_digit		; 06001 jns 0x6004
+	jns	short scanf_convert_octal_add_digit		; 06001 jns 0x6004
 	dec	dx			; 06003
-parse_number_octal_add_digit:
+scanf_convert_octal_add_digit:
 	db	0x03, 0xD9		; 06004 add bx,cx
 	db	0x13, 0xC2		; 06006 adc ax,dx
 	mov	[bp+0x14],ax		; 06008
@@ -597,36 +595,36 @@ parse_number_octal_add_digit:
 	dec	ax			; 06017
 	test	ax,ax			; 06018
 	mov	[bp+0xe],ax		; 0601A
-	jz	short parse_number_octal_finish		; 0601D jz 0x602b
+	jz	short scanf_convert_octal_finish		; 0601D jz 0x602b
 	cmp	word [bp+0x8],0x30	; 0601F
-	jl	short parse_number_octal_finish		; 06023 jl 0x602b
+	jl	short scanf_convert_octal_finish		; 06023 jl 0x602b
 	cmp	word [bp+0x8],0x37	; 06025
-	jng	short parse_number_octal_digit_loop		; 06029 jng 0x5fe7
-parse_number_octal_finish:
+	jng	short scanf_convert_octal_digit_loop		; 06029 jng 0x5fe7
+scanf_convert_octal_finish:
 	cmp	word [bp+0x28],0x0	; 0602B
-	jnz	short parse_number_octal_store_result		; 0602F jnz 0x6034
-	jmp	near parse_number_store_lookahead_return_next_format			; 06031
-parse_number_octal_store_result:
+	jnz	short scanf_convert_octal_store_result		; 0602F jnz 0x6034
+	jmp	near scanf_convert_store_lookahead_return_next_format			; 06031
+scanf_convert_octal_store_result:
 	cmp	word [bp+0xc],0x0	; 06034
-	jnz	short parse_number_octal_store_long		; 06038 jnz 0x6047
+	jnz	short scanf_convert_octal_store_long		; 06038 jnz 0x6047
 	mov	di,[bp+0x28]		; 0603A
 	mov	si,[di]			; 0603D
 	mov	ax,[bp+0x12]		; 0603F
 	mov	[si],ax			; 06042
-	jmp	near parse_number_store_lookahead_return_next_format			; 06044
-parse_number_octal_store_long:
+	jmp	near scanf_convert_store_lookahead_return_next_format			; 06044
+scanf_convert_octal_store_long:
 	mov	di,[bp+0x28]		; 06047
 	mov	si,[di]			; 0604A
 	mov	ax,[bp+0x14]		; 0604C
 	mov	bx,[bp+0x12]		; 0604F
 	mov	[si+0x2],ax		; 06052
 	mov	[si],bx			; 06055
-	jmp	near parse_number_store_lookahead_return_next_format			; 06057
+	jmp	near scanf_convert_store_lookahead_return_next_format			; 06057
 	mov	si,[bp+0x8]		; 0605A
 	mov	al,[si+ctype_by_char]		; 0605D
 	xor	ah,ah			; 06061
 	and	ax,0x80			; 06063
-	jnz	short parse_number_hex_read_after_first_digit		; 06066 jnz 0x6076
+	jnz	short scanf_convert_hex_read_after_first_digit		; 06066 jnz 0x6076
 	db	0x8B, 0xC6		; 06068 mov ax,si
 	mov	si,[bp+0x26]		; 0606A
 	mov	[si],ax			; 0606D
@@ -634,106 +632,106 @@ parse_number_octal_store_long:
 	add	sp,0x1e			; 06071
 	pop	bp			; 06074
 	ret				; 06075
-parse_number_hex_read_after_first_digit:
+scanf_convert_hex_read_after_first_digit:
 	mov	ax,[bp+0x8]		; 06076
 	mov	[bp+0xa],ax		; 06079
 	call	word near [bp+0x24]	; 0607C
 	mov	bx,[bp+0xe]		; 0607F
 	test	bx,bx			; 06082
 	mov	[bp+0x8],ax		; 06084
-	jz	short parse_number_hex_check_0x_prefix		; 06087 jz 0x608e
+	jz	short scanf_convert_hex_check_0x_prefix		; 06087 jz 0x608e
 	cmp	bx,0x2			; 06089
-	jng	short parse_number_hex_convert_first_digit		; 0608C jng 0x60d0
-parse_number_hex_check_0x_prefix:
+	jng	short scanf_convert_hex_convert_first_digit		; 0608C jng 0x60d0
+scanf_convert_hex_check_0x_prefix:
 	cmp	word [bp+0xa],0x30	; 0608E
-	jnz	short parse_number_hex_convert_first_digit		; 06092 jnz 0x60d0
+	jnz	short scanf_convert_hex_convert_first_digit		; 06092 jnz 0x60d0
 	mov	ax,[bp+0x8]		; 06094
 	db	0x3D, 0x78, 0x00	; 06097 cmp ax,0x78
-	jz	short parse_number_hex_consume_prefix_x		; 0609A jz 0x60a1
+	jz	short scanf_convert_hex_consume_prefix_x		; 0609A jz 0x60a1
 	db	0x3D, 0x58, 0x00	; 0609C cmp ax,0x58
-	jnz	short parse_number_hex_convert_first_digit		; 0609F jnz 0x60d0
-parse_number_hex_consume_prefix_x:
+	jnz	short scanf_convert_hex_convert_first_digit		; 0609F jnz 0x60d0
+scanf_convert_hex_consume_prefix_x:
 	call	word near [bp+0x24]	; 060A1
 	db	0x8B, 0xF0		; 060A4 mov si,ax
 	mov	bl,[si+ctype_by_char]		; 060A6
 	xor	bh,bh			; 060AA
 	and	bx,0x80			; 060AC
 	mov	[bp+0x8],ax		; 060B0
-	jnz	short parse_number_hex_prefix_init_value		; 060B3 jnz 0x60c1
+	jnz	short scanf_convert_hex_prefix_init_value		; 060B3 jnz 0x60c1
 	mov	si,[bp+0x26]		; 060B5
 	mov	[si],ax			; 060B8
 	db	0x33, 0xC0		; 060BA xor ax,ax
 	add	sp,0x1e			; 060BC
 	pop	bp			; 060BF
 	ret				; 060C0
-parse_number_hex_prefix_init_value:
+scanf_convert_hex_prefix_init_value:
 	mov	word [bp+0x14],0x0	; 060C1
 	mov	word [bp+0x12],0x0	; 060C6
 	dec	word [bp+0xe]		; 060CB
-	jmp	short parse_number_hex_digit_loop		; 060CE jmp 0x6130
-parse_number_hex_convert_first_digit:
+	jmp	short scanf_convert_hex_digit_loop		; 060CE jmp 0x6130
+scanf_convert_hex_convert_first_digit:
 	mov	si,[bp+0xa]		; 060D0
 	mov	al,[si+ctype_by_char]		; 060D3
 	xor	ah,ah			; 060D7
 	db	0x25, 0x04, 0x00	; 060D9 and ax,0x4
-	jz	short parse_number_hex_first_check_uppercase		; 060DC jz 0x60f0
+	jz	short scanf_convert_hex_first_check_uppercase		; 060DC jz 0x60f0
 	db	0x8B, 0xC6		; 060DE mov ax,si
 	db	0x2D, 0x30, 0x00	; 060E0 sub ax,0x30
 	db	0x33, 0xDB		; 060E3 xor bx,bx
 	test	ax,ax			; 060E5
-	jns	short parse_number_hex_store_first_decimal_digit		; 060E7 jns 0x60ea
+	jns	short scanf_convert_hex_store_first_decimal_digit		; 060E7 jns 0x60ea
 	dec	bx			; 060E9
-parse_number_hex_store_first_decimal_digit:
+scanf_convert_hex_store_first_decimal_digit:
 	mov	[bp+0x12],ax		; 060EA
 	mov	[bp+0x14],bx		; 060ED
-parse_number_hex_first_check_uppercase:
+scanf_convert_hex_first_check_uppercase:
 	mov	si,[bp+0xa]		; 060F0
 	mov	al,[si+ctype_by_char]		; 060F3
 	xor	ah,ah			; 060F7
 	db	0x25, 0x01, 0x00	; 060F9 and ax,0x1
-	jz	short parse_number_hex_first_check_lowercase		; 060FC jz 0x6110
+	jz	short scanf_convert_hex_first_check_lowercase		; 060FC jz 0x6110
 	db	0x8B, 0xC6		; 060FE mov ax,si
 	db	0x2D, 0x37, 0x00	; 06100 sub ax,0x37
 	db	0x33, 0xDB		; 06103 xor bx,bx
 	test	ax,ax			; 06105
-	jns	short parse_number_hex_store_first_uppercase_digit		; 06107 jns 0x610a
+	jns	short scanf_convert_hex_store_first_uppercase_digit		; 06107 jns 0x610a
 	dec	bx			; 06109
-parse_number_hex_store_first_uppercase_digit:
+scanf_convert_hex_store_first_uppercase_digit:
 	mov	[bp+0x12],ax		; 0610A
 	mov	[bp+0x14],bx		; 0610D
-parse_number_hex_first_check_lowercase:
+scanf_convert_hex_first_check_lowercase:
 	mov	si,[bp+0xa]		; 06110
 	mov	al,[si+ctype_by_char]		; 06113
 	xor	ah,ah			; 06117
 	db	0x25, 0x02, 0x00	; 06119 and ax,0x2
-	jz	short parse_number_hex_digit_loop		; 0611C jz 0x6130
+	jz	short scanf_convert_hex_digit_loop		; 0611C jz 0x6130
 	db	0x8B, 0xC6		; 0611E mov ax,si
 	db	0x2D, 0x57, 0x00	; 06120 sub ax,0x57
 	db	0x33, 0xDB		; 06123 xor bx,bx
 	test	ax,ax			; 06125
-	jns	short parse_number_hex_store_first_lowercase_digit		; 06127 jns 0x612a
+	jns	short scanf_convert_hex_store_first_lowercase_digit		; 06127 jns 0x612a
 	dec	bx			; 06129
-parse_number_hex_store_first_lowercase_digit:
+scanf_convert_hex_store_first_lowercase_digit:
 	mov	[bp+0x12],ax		; 0612A
 	mov	[bp+0x14],bx		; 0612D
-parse_number_hex_digit_loop:
+scanf_convert_hex_digit_loop:
 	mov	ax,[bp+0xe]		; 06130
 	dec	ax			; 06133
 	test	ax,ax			; 06134
 	mov	[bp+0xe],ax		; 06136
-	jnz	short parse_number_hex_check_next_digit		; 06139 jnz 0x613e
-	jmp	near parse_number_hex_finish			; 0613B
-parse_number_hex_check_next_digit:
+	jnz	short scanf_convert_hex_check_next_digit		; 06139 jnz 0x613e
+	jmp	near scanf_convert_hex_finish			; 0613B
+scanf_convert_hex_check_next_digit:
 	mov	si,[bp+0x8]		; 0613E
 	mov	al,[si+ctype_by_char]		; 06141
 	xor	ah,ah			; 06145
 	and	ax,0x80			; 06147
-	jz	short parse_number_hex_finish		; 0614A jz 0x61c8
+	jz	short scanf_convert_hex_finish		; 0614A jz 0x61c8
 	mov	cx,0x4			; 0614C
 	mov	ax,[bp+0x14]		; 0614F
 	mov	bx,[bp+0x12]		; 06152
 ; 32-bit left shift by 4
-parse_number_hex_shift_loop:
+scanf_convert_hex_shift_loop:
 	shl	bx,1			; 06155
 	rcl	ax,1			; 06157
 	loop	0x6155			; 06159
@@ -742,75 +740,75 @@ parse_number_hex_shift_loop:
 	db	0x81, 0xE1, 0x04, 0x00	; 06161 and cx,0x4
 	mov	[bp+0x14],ax		; 06165
 	mov	[bp+0x12],bx		; 06168
-	jz	short parse_number_hex_next_check_uppercase		; 0616B jz 0x617f
+	jz	short scanf_convert_hex_next_check_uppercase		; 0616B jz 0x617f
 	db	0x8B, 0xCE		; 0616D mov cx,si
 	sub	cx,0x30			; 0616F
 	db	0x33, 0xD2		; 06172 xor dx,dx
 	test	cx,cx			; 06174
-	jns	short parse_number_hex_merge_decimal_digit		; 06176 jns 0x6179
+	jns	short scanf_convert_hex_merge_decimal_digit		; 06176 jns 0x6179
 	dec	dx			; 06178
-parse_number_hex_merge_decimal_digit:
+scanf_convert_hex_merge_decimal_digit:
 	or	[bp+0x14],dx		; 06179
 	or	[bp+0x12],cx		; 0617C
-parse_number_hex_next_check_uppercase:
+scanf_convert_hex_next_check_uppercase:
 	mov	si,[bp+0x8]		; 0617F
 	mov	al,[si+ctype_by_char]		; 06182
 	xor	ah,ah			; 06186
 	db	0x25, 0x01, 0x00	; 06188 and ax,0x1
-	jz	short parse_number_hex_next_check_lowercase		; 0618B jz 0x619f
+	jz	short scanf_convert_hex_next_check_lowercase		; 0618B jz 0x619f
 	db	0x8B, 0xC6		; 0618D mov ax,si
 	db	0x2D, 0x37, 0x00	; 0618F sub ax,0x37
 	db	0x33, 0xDB		; 06192 xor bx,bx
 	test	ax,ax			; 06194
-	jns	short parse_number_hex_merge_uppercase_digit		; 06196 jns 0x6199
+	jns	short scanf_convert_hex_merge_uppercase_digit		; 06196 jns 0x6199
 	dec	bx			; 06198
-parse_number_hex_merge_uppercase_digit:
+scanf_convert_hex_merge_uppercase_digit:
 	or	[bp+0x14],bx		; 06199
 	or	[bp+0x12],ax		; 0619C
-parse_number_hex_next_check_lowercase:
+scanf_convert_hex_next_check_lowercase:
 	mov	si,[bp+0x8]		; 0619F
 	mov	al,[si+ctype_by_char]		; 061A2
 	xor	ah,ah			; 061A6
 	db	0x25, 0x02, 0x00	; 061A8 and ax,0x2
-	jz	short parse_number_hex_read_next_char		; 061AB jz 0x61bf
+	jz	short scanf_convert_hex_read_next_char		; 061AB jz 0x61bf
 	db	0x8B, 0xC6		; 061AD mov ax,si
 	db	0x2D, 0x57, 0x00	; 061AF sub ax,0x57
 	db	0x33, 0xDB		; 061B2 xor bx,bx
 	test	ax,ax			; 061B4
-	jns	short parse_number_hex_merge_lowercase_digit		; 061B6 jns 0x61b9
+	jns	short scanf_convert_hex_merge_lowercase_digit		; 061B6 jns 0x61b9
 	dec	bx			; 061B8
-parse_number_hex_merge_lowercase_digit:
+scanf_convert_hex_merge_lowercase_digit:
 	or	[bp+0x14],bx		; 061B9
 	or	[bp+0x12],ax		; 061BC
-parse_number_hex_read_next_char:
+scanf_convert_hex_read_next_char:
 	call	word near [bp+0x24]	; 061BF
 	mov	[bp+0x8],ax		; 061C2
-	jmp	near parse_number_hex_digit_loop			; 061C5
-parse_number_hex_finish:
+	jmp	near scanf_convert_hex_digit_loop			; 061C5
+scanf_convert_hex_finish:
 	cmp	word [bp+0x28],0x0	; 061C8
-	jnz	short parse_number_hex_store_result		; 061CC jnz 0x61d1
-	jmp	near parse_number_store_lookahead_return_next_format			; 061CE
-parse_number_hex_store_result:
+	jnz	short scanf_convert_hex_store_result		; 061CC jnz 0x61d1
+	jmp	near scanf_convert_store_lookahead_return_next_format			; 061CE
+scanf_convert_hex_store_result:
 	cmp	word [bp+0xc],0x0	; 061D1
-	jnz	short parse_number_hex_store_long		; 061D5 jnz 0x61e4
+	jnz	short scanf_convert_hex_store_long		; 061D5 jnz 0x61e4
 	mov	di,[bp+0x28]		; 061D7
 	mov	si,[di]			; 061DA
 	mov	ax,[bp+0x12]		; 061DC
 	mov	[si],ax			; 061DF
-	jmp	near parse_number_store_lookahead_return_next_format			; 061E1
-parse_number_hex_store_long:
+	jmp	near scanf_convert_store_lookahead_return_next_format			; 061E1
+scanf_convert_hex_store_long:
 	mov	di,[bp+0x28]		; 061E4
 	mov	si,[di]			; 061E7
 	mov	ax,[bp+0x14]		; 061E9
 	mov	bx,[bp+0x12]		; 061EC
 	mov	[si+0x2],ax		; 061EF
 	mov	[si],bx			; 061F2
-	jmp	near parse_number_store_lookahead_return_next_format			; 061F4
+	jmp	near scanf_convert_store_lookahead_return_next_format			; 061F4
 	mov	si,[bp+0x8]		; 061F7
 	mov	al,[si+ctype_by_char]		; 061FA
 	xor	ah,ah			; 061FE
 	db	0x25, 0x04, 0x00	; 06200 and ax,0x4
-	jnz	short parse_number_short_init_value		; 06203 jnz 0x6213
+	jnz	short scanf_convert_short_init_value		; 06203 jnz 0x6213
 	db	0x8B, 0xC6		; 06205 mov ax,si
 	mov	si,[bp+0x26]		; 06207
 	mov	[si],ax			; 0620A
@@ -818,9 +816,9 @@ parse_number_hex_store_long:
 	add	sp,0x1e			; 0620E
 	pop	bp			; 06211
 	ret				; 06212
-parse_number_short_init_value:
+scanf_convert_short_init_value:
 	mov	word [bp+0x10],0x0	; 06213
-parse_number_short_digit_loop:
+scanf_convert_short_digit_loop:
 	mov	ax,[bp+0x10]		; 06218
 	mov	bx,0xa			; 0621B
 	imul	bx			; 0621E
@@ -834,112 +832,112 @@ parse_number_short_digit_loop:
 	dec	ax			; 06235
 	test	ax,ax			; 06236
 	mov	[bp+0xe],ax		; 06238
-	jz	short parse_number_short_finish		; 0623B jz 0x624b
+	jz	short scanf_convert_short_finish		; 0623B jz 0x624b
 	mov	si,[bp+0x8]		; 0623D
 	mov	al,[si+ctype_by_char]		; 06240
 	xor	ah,ah			; 06244
 	db	0x25, 0x04, 0x00	; 06246 and ax,0x4
-	jnz	short parse_number_short_digit_loop		; 06249 jnz 0x6218
-parse_number_short_finish:
+	jnz	short scanf_convert_short_digit_loop		; 06249 jnz 0x6218
+scanf_convert_short_finish:
 	cmp	word [bp+0x28],0x0	; 0624B
-	jnz	short parse_number_short_store_value		; 0624F jnz 0x6254
-	jmp	near parse_number_store_lookahead_return_next_format			; 06251
-parse_number_short_store_value:
+	jnz	short scanf_convert_short_store_value		; 0624F jnz 0x6254
+	jmp	near scanf_convert_store_lookahead_return_next_format			; 06251
+scanf_convert_short_store_value:
 	mov	di,[bp+0x28]		; 06254
 	mov	si,[di]			; 06257
 	mov	ax,[bp+0x10]		; 06259
 	mov	[si],ax			; 0625C
-	jmp	near parse_number_store_lookahead_return_next_format			; 0625E
+	jmp	near scanf_convert_store_lookahead_return_next_format			; 0625E
 	cmp	word [bp+0x28],0x0	; 06261
-	jz	short parse_number_char_copy_loop		; 06265 jz 0x6275
+	jz	short scanf_convert_char_copy_loop		; 06265 jz 0x6275
 	mov	si,[bp+0x28]		; 06267
 	mov	ax,[si]			; 0626A
 	inc	word [si]		; 0626C
 	mov	bx,[bp+0x8]		; 0626E
 	db	0x8B, 0xF0		; 06271 mov si,ax
 	mov	[si],bl			; 06273
-parse_number_char_copy_loop:
+scanf_convert_char_copy_loop:
 	mov	ax,[bp+0xe]		; 06275
 	dec	ax			; 06278
 	test	ax,ax			; 06279
 	mov	[bp+0xe],ax		; 0627B
-	jng	short parse_number_char_check_eof		; 0627E jng 0x629f
+	jng	short scanf_convert_char_check_eof		; 0627E jng 0x629f
 	call	word near [bp+0x24]	; 06280
 	mov	[bp+0x8],ax		; 06283
 	inc	ax			; 06286
-	jz	short parse_number_char_check_eof		; 06287 jz 0x629f
+	jz	short scanf_convert_char_check_eof		; 06287 jz 0x629f
 	cmp	word [bp+0x28],0x0	; 06289
-	jz	short parse_number_char_copy_loop		; 0628D jz 0x6275
+	jz	short scanf_convert_char_copy_loop		; 0628D jz 0x6275
 	mov	si,[bp+0x28]		; 0628F
 	mov	ax,[si]			; 06292
 	inc	word [si]		; 06294
 	mov	bx,[bp+0x8]		; 06296
 	db	0x8B, 0xF0		; 06299 mov si,ax
 	mov	[si],bl			; 0629B
-	jmp	short parse_number_char_copy_loop		; 0629D jmp 0x6275
-parse_number_char_check_eof:
+	jmp	short scanf_convert_char_copy_loop		; 0629D jmp 0x6275
+scanf_convert_char_check_eof:
 	mov	ax,[bp+0x8]		; 0629F
 	db	0x3D, 0xFF, 0xFF	; 062A2 cmp ax,0xffff
-	jnz	short parse_number_char_return_next_format		; 062A5 jnz 0x62b3
+	jnz	short scanf_convert_char_return_next_format		; 062A5 jnz 0x62b3
 	mov	si,[bp+0x26]		; 062A7
 	mov	[si],ax			; 062AA
 	db	0x33, 0xC0		; 062AC xor ax,ax
 	add	sp,0x1e			; 062AE
 	pop	bp			; 062B1
 	ret				; 062B2
-parse_number_char_return_next_format:
+scanf_convert_char_return_next_format:
 	mov	ax,[bp+0x22]		; 062B3
 	inc	ax			; 062B6
 	add	sp,0x1e			; 062B7
 	pop	bp			; 062BA
 	ret				; 062BB
-parse_number_string_store_char:
+scanf_convert_string_store_char:
 	cmp	word [bp+0x28],0x0	; 062BC
-	jz	short parse_number_string_read_next_char		; 062C0 jz 0x62d0
+	jz	short scanf_convert_string_read_next_char		; 062C0 jz 0x62d0
 	mov	si,[bp+0x28]		; 062C2
 	mov	ax,[si]			; 062C5
 	inc	word [si]		; 062C7
 	mov	bx,[bp+0x8]		; 062C9
 	db	0x8B, 0xF0		; 062CC mov si,ax
 	mov	[si],bl			; 062CE
-parse_number_string_read_next_char:
+scanf_convert_string_read_next_char:
 	call	word near [bp+0x24]	; 062D0
 	mov	[bp+0x8],ax		; 062D3
 	inc	ax			; 062D6
-	jz	short parse_number_string_terminate		; 062D7 jz 0x62f2
+	jz	short scanf_convert_string_terminate		; 062D7 jz 0x62f2
 	mov	ax,[bp+0xe]		; 062D9
 	dec	ax			; 062DC
 	test	ax,ax			; 062DD
 	mov	[bp+0xe],ax		; 062DF
-	jz	short parse_number_string_terminate		; 062E2 jz 0x62f2
+	jz	short scanf_convert_string_terminate		; 062E2 jz 0x62f2
 	mov	si,[bp+0x8]		; 062E4
 	mov	al,[si+ctype_by_char]		; 062E7
 	xor	ah,ah			; 062EB
 	db	0x25, 0x08, 0x00	; 062ED and ax,0x8
-	jz	short parse_number_string_store_char		; 062F0 jz 0x62bc
-parse_number_string_terminate:
+	jz	short scanf_convert_string_store_char		; 062F0 jz 0x62bc
+scanf_convert_string_terminate:
 	mov	di,[bp+0x28]		; 062F2
 	mov	si,[di]			; 062F5
 	mov	byte [si],0x0		; 062F7
-	jmp	short parse_number_store_lookahead_return_next_format		; 062FA jmp 0x6331
-parse_number_unknown_format_return_zero:
+	jmp	short scanf_convert_store_lookahead_return_next_format		; 062FA jmp 0x6331
+scanf_convert_unknown_format_return_zero:
 	db	0x33, 0xC0		; 062FC xor ax,ax
 	add	sp,0x1e			; 062FE
 	pop	bp			; 06301
 	ret				; 06302
 ; Data, not code (misdecoded): 6 word pairs of format char, handler offset
-; ('s','c','h','x','o','d'), scanned by the loop at parse_number_format_lookup_loop.
-parse_number_format_jump_table:
-	jnc	short parse_number_format_table_s_handler_ptr		; 06303 jnc 0x6305
+; ('s','c','h','x','o','d'), scanned by the loop at scanf_convert_format_lookup_loop.
+scanf_convert_format_jump_table:
+	jnc	short scanf_convert_format_table_s_handler_ptr		; 06303 jnc 0x6305
 ; Not code: the word holding the 's' handler offset in the format table.
-parse_number_format_table_s_handler_ptr:
+scanf_convert_format_table_s_handler_ptr:
 	mov	sp,0x6362		; 06305
 	add	[bx+di+0x62],ah		; 06308
 	push	word 0xf700		; 0630B
 	popa				; 0630E
-	js	short parse_number_format_table_x_handler_ptr		; 0630F js 0x6311
+	js	short scanf_convert_format_table_x_handler_ptr		; 0630F js 0x6311
 ; Not code: the word holding the 'x' handler offset in the format table.
-parse_number_format_table_x_handler_ptr:
+scanf_convert_format_table_x_handler_ptr:
 	pop	dx			; 06311
 	pusha				; 06312
 	outsw				; 06313
@@ -948,17 +946,17 @@ parse_number_format_table_x_handler_ptr:
 	fs	add bh,bl		; 06317
 	pop	si			; 0631A
 ; AX = format char; sets SI to the last switch table entry before the backward scan
-parse_number_format_scan_table_start:
+scanf_convert_format_scan_table_start:
 	mov	si,0x14			; 0631B
-parse_number_format_lookup_loop:
+scanf_convert_format_lookup_loop:
 	cmp	ax,[cs:si+0x6303]	; 0631E
-	jnz	short parse_number_format_lookup_next		; 06323 jnz 0x632a
+	jnz	short scanf_convert_format_lookup_next		; 06323 jnz 0x632a
 	jmp	word near [cs:si+0x6305]	; 06325
-parse_number_format_lookup_next:
+scanf_convert_format_lookup_next:
 	sub	si,0x4			; 0632A
-	jns	short parse_number_format_lookup_loop		; 0632D jns 0x631e
-	jmp	short parse_number_unknown_format_return_zero		; 0632F jmp 0x62fc
-parse_number_store_lookahead_return_next_format:
+	jns	short scanf_convert_format_lookup_loop		; 0632D jns 0x631e
+	jmp	short scanf_convert_unknown_format_return_zero		; 0632F jmp 0x62fc
+scanf_convert_store_lookahead_return_next_format:
 	mov	ax,[bp+0x8]		; 06331
 	mov	si,[bp+0x26]		; 06334
 	mov	[si],ax			; 06337
@@ -1037,7 +1035,7 @@ crt_file_read_byte_fill_buffer:
 	push	word [bp+0x6]		; 063C7
 	push	word [si+0x6]		; 063CA
 	push	ax			; 063CD
-	call	load_file		; 063CE
+	call	file_read		; 063CE
 	db	0x8B, 0xE5		; 063D1 mov sp,bp
 	test	ax,ax			; 063D3
 	mov	[bp+0x4],ax		; 063D5
@@ -1194,7 +1192,7 @@ crt_file_write_byte_unbuffered_write:
 	push	cx			; 06513
 	push	bx			; 06514
 	mov	[bp+0x4],al		; 06515
-	call	write_file_data		; 06518
+	call	file_write		; 06518
 	db	0x8B, 0xE5		; 0651B mov sp,bp
 	mov	word [bp+0x10],0xffff	; 0651D
 	mov	[bp+0x5],ax		; 06522
@@ -1262,7 +1260,7 @@ crt_file_write_byte_write_buffer:
 	push	word [bp+0x9]		; 065B0
 	push	word [si+0x6]		; 065B3
 	push	ax			; 065B6
-	call	write_file_data		; 065B7
+	call	file_write		; 065B7
 	db	0x8B, 0xE5		; 065BA mov sp,bp
 	mov	[bp+0x5],ax		; 065BC
 	jmp	short crt_file_write_byte_check_write_result		; 065BF jmp 0x65c9
@@ -1354,7 +1352,7 @@ crt_alloc_file_buffer:
 	ret				; 06674
 crt_alloc_file_buffer_allocate:
 	push	word [stdio_bufsiz]		; 06675
-	call	string_copy		; 06679
+	call	malloc_16		; 06679
 	db	0x8B, 0xE5		; 0667C mov sp,bp
 	mov	si,[bp+0x6]		; 0667E
 	mov	[si],ax			; 06681
@@ -1405,11 +1403,12 @@ strlen_return_length:
 	pop	bp			; 066DD
 	ret				; 066DE
 
-; ---- function format_string ----
-; printf-like string formatter (internal Lattice C runtime).
-; Handles %d, %s, %x, %o, %c, %ld format specifiers.
-; Not a formatter: this is setbuf(FILE *[bp+6], buffer [bp+8]). It clears the FILE's buffer, and when buffer is non-null installs it with flag 8 and size [stdio_bufsiz].
-format_string:
+; ---- function setbuf ----
+; setbuf(FILE *[bp+6], buffer [bp+8]). Not a formatter.
+; crt_file_reset_buffer first frees any allocated buffer and makes the stream unbuffered, which is the result for a null buffer.
+; A non-null buffer clears flag 4 (unbuffered), sets flag 8 (caller-supplied), and becomes the next-byte pointer and base with size [stdio_bufsiz].
+; Output: AX = 0
+setbuf:
 	push	bp			; 066DF
 	sub	sp,0x2			; 066E0
 	db	0x8B, 0xEC		; 066E3 mov bp,sp
@@ -1417,12 +1416,12 @@ format_string:
 	call	crt_file_reset_buffer	; 066E8
 	db	0x8B, 0xE5		; 066EB mov sp,bp
 	cmp	word [bp+0x8],0x0	; 066ED
-	jnz	short format_string_install_user_buffer		; 066F1 jnz 0x66fa
+	jnz	short setbuf_install_user_buffer		; 066F1 jnz 0x66fa
 	db	0x33, 0xC0		; 066F3 xor ax,ax
 	add	sp,0x2			; 066F5
 	pop	bp			; 066F8
 	ret				; 066F9
-format_string_install_user_buffer:
+setbuf_install_user_buffer:
 	mov	si,[bp+0x6]		; 066FA
 	mov	al,[si+0x8]		; 066FD
 	xor	ah,ah			; 06700
@@ -1465,7 +1464,7 @@ heap_init_free_list:
 	mov	bx,[heap_free_head_b]		; 0673A
 	test	bx,bx			; 0673E
 	mov	[heap_free_head_c],ax		; 06740
-	mov	[heap_free_head_d],bx		; 06743
+	mov	[heap_free_units],bx		; 06743
 	jnz	short heap_init_free_list_write_head_block		; 06747 jnz 0x6751
 	mov	ax,0xffff		; 06749
 	add	sp,0x2			; 0674C
@@ -1475,7 +1474,7 @@ heap_init_free_list_write_head_block:
 	mov	si,[heap_free_head_c]		; 06751
 	db	0x33, 0xC0		; 06755 xor ax,ax
 	mov	[si],ax			; 06757
-	mov	ax,[heap_free_head_d]		; 06759
+	mov	ax,[heap_free_units]		; 06759
 	mov	[si+0x2],ax		; 0675C
 	db	0x33, 0xC0		; 0675F xor ax,ax
 	add	sp,0x2			; 06761
@@ -1568,7 +1567,7 @@ heap_free_bytes:
 	push	bp			; 067F5
 	sub	sp,0x8			; 067F6
 	db	0x8B, 0xEC		; 067F9 mov bp,sp
-	mov	ax,[heap_free_head_d]		; 067FB
+	mov	ax,[heap_free_units]		; 067FB
 	shl	ax,1			; 067FE
 	shl	ax,1			; 06800
 	db	0x33, 0xDB		; 06802 xor bx,bx
@@ -1579,11 +1578,11 @@ heap_free_bytes:
 	pop	bp			; 0680E
 	ret				; 0680F
 
-; ---- function string_copy ----
-; Copies null-terminated string.
-; Input: [bp+4] = destination, [bp+6] = source
-; Not a string copy: it zero-extends [bp+0xC] and calls crt_malloc, so it is malloc(size) with a 16-bit size. Output: AX = block or 0.
-string_copy:
+; ---- function malloc_16 ----
+; malloc(size) with a 16-bit size: zero-extends [bp+0xC] and calls crt_malloc. Not a string copy.
+; Output: AX = block or 0
+; Callers: crt_alloc_file_buffer at 0x6679 and main at 0x5A6A, both passing [stdio_bufsiz].
+malloc_16:
 	push	bp			; 06810
 	sub	sp,0x8			; 06811
 	db	0x8B, 0xEC		; 06814 mov bp,sp
@@ -1631,7 +1630,7 @@ crt_malloc_round_size_to_units:
 	mov	bx,[bp+0x0]		; 06860
 	db	0x33, 0xC9		; 06863 xor cx,cx
 	mov	dx,0x4			; 06865
-	call	crt_long_multiply	; 06868
+	call	crt_div_long	; 06868
 	mov	si,0xe4ba		; 0686B
 	mov	cx,[si]			; 0686E
 	mov	[bp+0xe],ax		; 06870
@@ -1672,12 +1671,12 @@ crt_malloc_split_block_tail:
 	shl	ax,1			; 068C4
 	add	[bp+0x6],ax		; 068C6
 crt_malloc_update_free_total:
-	mov	ax,[heap_free_head_d]		; 068C9
+	mov	ax,[heap_free_units]		; 068C9
 	db	0x33, 0xDB		; 068CC xor bx,bx
 	sub	ax,[bp+0xc]		; 068CE
 	sbb	bx,[bp+0xe]		; 068D1
 	mov	bx,[bp+0x6]		; 068D4
-	mov	[heap_free_head_d],ax		; 068D7
+	mov	[heap_free_units],ax		; 068D7
 	db	0x8B, 0xC3		; 068DA mov ax,bx
 	add	sp,0x10			; 068DC
 	pop	bp			; 068DF
@@ -1790,13 +1789,13 @@ crt_free_round_size_to_units:
 	db	0x8B, 0xC1		; 069A9 mov ax,cx
 	db	0x33, 0xC9		; 069AB xor cx,cx
 	mov	dx,0x4			; 069AD
-	call	crt_long_multiply	; 069B0
+	call	crt_div_long	; 069B0
 	mov	[bp+0x10],bx		; 069B3
 	shl	bx,1			; 069B6
 	shl	bx,1			; 069B8
 	mov	cx,[bp+0xc]		; 069BA
 	db	0x03, 0xCB		; 069BD add cx,bx
-	mov	bx,[heap_free_head_d]		; 069BF
+	mov	bx,[heap_free_units]		; 069BF
 	db	0x33, 0xD2		; 069C3 xor dx,dx
 	add	bx,[bp+0x10]		; 069C5
 	db	0x13, 0xD0		; 069C8 adc dx,ax
@@ -1805,7 +1804,7 @@ crt_free_round_size_to_units:
 	mov	[bp+0x12],ax		; 069CF
 	mov	[bp+0xe],cx		; 069D2
 	mov	[bp+0x4],dx		; 069D5
-	mov	[heap_free_head_d],bx		; 069D8
+	mov	[heap_free_units],bx		; 069D8
 	mov	[bp+0x8],si		; 069DC
 ; walks free list looking for the insertion point
 crt_free_scan_free_list_loop:
@@ -1860,11 +1859,11 @@ crt_free_check_overlap_current:
 	mov	ax,[bp+0xc]		; 06A48
 	cmp	ax,[bp+0x6]		; 06A4B
 	jnc	short crt_free_check_append_to_current		; 06A4E jnc 0x6a66
-	mov	ax,[heap_free_head_d]		; 06A50
+	mov	ax,[heap_free_units]		; 06A50
 	db	0x33, 0xDB		; 06A53 xor bx,bx
 	sub	ax,[bp+0x10]		; 06A55
 	sbb	bx,[bp+0x12]		; 06A58
-	mov	[heap_free_head_d],ax		; 06A5B
+	mov	[heap_free_units],ax		; 06A5B
 	mov	ax,0xffff		; 06A5E
 	add	sp,0x14			; 06A61
 	pop	bp			; 06A64
@@ -1880,11 +1879,11 @@ crt_free_check_append_to_current:
 	mov	bx,[bp+0xe]		; 06A77
 	db	0x3B, 0xD8		; 06A7A cmp bx,ax
 	jna	short crt_free_append_to_current		; 06A7C jna 0x6a94
-	mov	ax,[heap_free_head_d]		; 06A7E
+	mov	ax,[heap_free_units]		; 06A7E
 	db	0x33, 0xDB		; 06A81 xor bx,bx
 	sub	ax,[bp+0x10]		; 06A83
 	sbb	bx,[bp+0x12]		; 06A86
-	mov	[heap_free_head_d],ax		; 06A89
+	mov	[heap_free_units],ax		; 06A89
 	mov	ax,0xffff		; 06A8C
 	add	sp,0x14			; 06A8F
 	pop	bp			; 06A92
@@ -2093,97 +2092,98 @@ crt_file_reset_buffer_use_inline_buffer:
 	pop	bp			; 06BF3
 	ret				; 06BF4
 
-; ---- function crt_long_multiply ----
-; 32-bit multiply helper used by compiler-generated code.
-; Actually signed 32-bit division: AX:BX / CX:DX. Output: AX:BX = quotient, CX:DX = remainder. crt_malloc and crt_free call it to divide by 4.
-crt_long_multiply:
+; ---- function crt_div_long ----
+; Signed 32-bit division, not multiplication: AX:BX / CX:DX (high:low pairs).
+; Output: AX:BX = quotient, CX:DX = remainder with the dividend's sign. A zero divisor or dividend returns 0 in both.
+; crt_malloc at 0x6868 and crt_free at 0x69B0 call it to divide a byte count by 4.
+crt_div_long:
 	push	bp			; 06BF5
 	sub	sp,0x4			; 06BF6
 	db	0x8B, 0xEC		; 06BF9 mov bp,sp
 	mov	[bp+0x0],cx		; 06BFB
 	db	0x0B, 0xCA		; 06BFE or cx,dx
-	jnz	short crt_long_multiply_divisor_nonzero		; 06C00 jnz 0x6c09
+	jnz	short crt_div_long_divisor_nonzero		; 06C00 jnz 0x6c09
 	db	0x33, 0xC0		; 06C02 xor ax,ax
 	db	0x33, 0xDB		; 06C04 xor bx,bx
-	jmp	near crt_long_multiply_return			; 06C06
-crt_long_multiply_divisor_nonzero:
+	jmp	near crt_div_long_return			; 06C06
+crt_div_long_divisor_nonzero:
 	mov	[bp+0x2],ax		; 06C09
 	db	0x0B, 0xC3		; 06C0C or ax,bx
-	jnz	short crt_long_multiply_make_dividend_positive		; 06C0E jnz 0x6c17
+	jnz	short crt_div_long_make_dividend_positive		; 06C0E jnz 0x6c17
 	db	0x33, 0xC9		; 06C10 xor cx,cx
 	db	0x33, 0xD2		; 06C12 xor dx,dx
-	jmp	near crt_long_multiply_return			; 06C14
-crt_long_multiply_make_dividend_positive:
+	jmp	near crt_div_long_return			; 06C14
+crt_div_long_make_dividend_positive:
 	mov	cx,[bp+0x0]		; 06C17
 	mov	ax,[bp+0x2]		; 06C1A
 	db	0x8B, 0xF0		; 06C1D mov si,ax
 	test	si,si			; 06C1F
-	jns	short crt_long_multiply_record_quotient_sign		; 06C21 jns 0x6c2a
+	jns	short crt_div_long_record_quotient_sign		; 06C21 jns 0x6c2a
 	not	ax			; 06C23
 	neg	bx			; 06C25
 	db	0x1D, 0xFF, 0xFF	; 06C27 sbb ax,0xffff
-crt_long_multiply_record_quotient_sign:
+crt_div_long_record_quotient_sign:
 	db	0x33, 0xF1		; 06C2A xor si,cx
 	mov	[bp+0x0],si		; 06C2C
 	db	0x33, 0xF6		; 06C2F xor si,si
 	test	cx,cx			; 06C31
-	jns	short crt_long_multiply_check_divisor_size		; 06C33 jns 0x6c3c
+	jns	short crt_div_long_check_divisor_size		; 06C33 jns 0x6c3c
 	not	cx			; 06C35
 	neg	dx			; 06C37
 	sbb	cx,0xffffffffffffffff	; 06C39
-crt_long_multiply_check_divisor_size:
-	jnz	short crt_long_multiply_divide_32bit_setup		; 06C3C jnz 0x6c5b
+crt_div_long_check_divisor_size:
+	jnz	short crt_div_long_divide_32bit_setup		; 06C3C jnz 0x6c5b
 	test	dx,dx			; 06C3E
-	js	short crt_long_multiply_divide_32bit_setup		; 06C40 js 0x6c5b
+	js	short crt_div_long_divide_32bit_setup		; 06C40 js 0x6c5b
 	mov	di,0x20			; 06C42
-crt_long_multiply_divide_16bit_loop:
+crt_div_long_divide_16bit_loop:
 	shl	bx,1			; 06C45
 	rcl	ax,1			; 06C47
 	rcl	si,1			; 06C49
 	db	0x3B, 0xF2		; 06C4B cmp si,dx
-	jc	short crt_long_multiply_16bit_next_bit		; 06C4D jc 0x6c52
+	jc	short crt_div_long_16bit_next_bit		; 06C4D jc 0x6c52
 	db	0x2B, 0xF2		; 06C4F sub si,dx
 	inc	bx			; 06C51
-crt_long_multiply_16bit_next_bit:
+crt_div_long_16bit_next_bit:
 	dec	di			; 06C52
-	jnz	short crt_long_multiply_divide_16bit_loop		; 06C53 jnz 0x6c45
+	jnz	short crt_div_long_divide_16bit_loop		; 06C53 jnz 0x6c45
 	db	0x33, 0xC9		; 06C55 xor cx,cx
 	db	0x8B, 0xD6		; 06C57 mov dx,si
-	jmp	short crt_long_multiply_apply_quotient_sign		; 06C59 jmp 0x6c7c
-crt_long_multiply_divide_32bit_setup:
+	jmp	short crt_div_long_apply_quotient_sign		; 06C59 jmp 0x6c7c
+crt_div_long_divide_32bit_setup:
 	mov	di,0x10			; 06C5B
-crt_long_multiply_divide_32bit_loop:
+crt_div_long_divide_32bit_loop:
 	shl	bx,1			; 06C5E
 	rcl	ax,1			; 06C60
 	rcl	si,1			; 06C62
 	db	0x3B, 0xF1		; 06C64 cmp si,cx
-	jc	short crt_long_multiply_32bit_next_bit		; 06C66 jc 0x6c73
-	jnz	short crt_long_multiply_32bit_subtract		; 06C68 jnz 0x6c6e
+	jc	short crt_div_long_32bit_next_bit		; 06C66 jc 0x6c73
+	jnz	short crt_div_long_32bit_subtract		; 06C68 jnz 0x6c6e
 	db	0x3B, 0xC2		; 06C6A cmp ax,dx
-	jc	short crt_long_multiply_32bit_next_bit		; 06C6C jc 0x6c73
-crt_long_multiply_32bit_subtract:
+	jc	short crt_div_long_32bit_next_bit		; 06C6C jc 0x6c73
+crt_div_long_32bit_subtract:
 	db	0x2B, 0xC2		; 06C6E sub ax,dx
 	db	0x1B, 0xF1		; 06C70 sbb si,cx
 	inc	bx			; 06C72
-crt_long_multiply_32bit_next_bit:
+crt_div_long_32bit_next_bit:
 	dec	di			; 06C73
-	jnz	short crt_long_multiply_divide_32bit_loop		; 06C74 jnz 0x6c5e
+	jnz	short crt_div_long_divide_32bit_loop		; 06C74 jnz 0x6c5e
 	db	0x8B, 0xCE		; 06C76 mov cx,si
 	db	0x8B, 0xD0		; 06C78 mov dx,ax
 	db	0x33, 0xC0		; 06C7A xor ax,ax
-crt_long_multiply_apply_quotient_sign:
+crt_div_long_apply_quotient_sign:
 	test	word [bp+0x0],0x8000	; 06C7C
-	jz	short crt_long_multiply_apply_remainder_sign		; 06C81 jz 0x6c8a
+	jz	short crt_div_long_apply_remainder_sign		; 06C81 jz 0x6c8a
 	not	ax			; 06C83
 	neg	bx			; 06C85
 	db	0x1D, 0xFF, 0xFF	; 06C87 sbb ax,0xffff
-crt_long_multiply_apply_remainder_sign:
+crt_div_long_apply_remainder_sign:
 	test	word [bp+0x2],0x8000	; 06C8A
-	jz	short crt_long_multiply_return		; 06C8F jz 0x6c98
+	jz	short crt_div_long_return		; 06C8F jz 0x6c98
 	not	cx			; 06C91
 	neg	dx			; 06C93
 	sbb	cx,0xffffffffffffffff	; 06C95
-crt_long_multiply_return:
+crt_div_long_return:
 	add	sp,0x4			; 06C98
 	pop	bp			; 06C9B
 	ret				; 06C9C

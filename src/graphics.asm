@@ -25,7 +25,7 @@ clear_screen:
 ; ---- function next_sprite_bytes ----
 ; Returns the next decoded byte of a sprite from each of its two parallel
 ; RLE-compressed streams (image and mask). Called once per sprite byte by
-; draw_sprite / draw_sprite_mirrored / draw_sprite_rightedge, which set up the
+; draw_sprite_flipped / draw_sprite_unflipped / draw_sprite_unflipped_columns, which set up the
 ; read positions and zero both repeat counters for each sprite.
 ; No parameters. No stack frame. Clobbers SI.
 ;
@@ -120,28 +120,28 @@ next_sprite_bytes_return:
 ;              nonzero = full copy via update_display
 ;
 ; Sprite routing: if the X word has bit 15 clear and bit 14 set, bit 14 is
-; removed and the slot goes to draw_sprite; every other slot goes to
-; draw_sprite_mirrored with X unchanged. Bit 15 set is a negative X, so bit 14
+; removed and the slot goes to draw_sprite_flipped; every other slot goes to
+; draw_sprite_unflipped with X unchanged. Bit 15 set is a negative X, so bit 14
 ; is only a flag for non-negative X. scene.asm sets bit 14 as its flip bit, and
-; draw_sprite is the path that bit-reverses the sprite data, so draw_sprite
+; draw_sprite_flipped is the path that bit-reverses the sprite data, so draw_sprite_flipped
 ; is likely the horizontally flipped renderer despite the function names.
 render_figures:
-	mov	word [player_anim_end],0x3	; 00BC9
+	mov	word [figure_list_cursor],0x3	; 00BC9
 	mov	al,[anim_fig_bg]		; 00BCF
 	call	prepare_screen_buffer	; 00BD2
 render_figures_next_slot:
 ; -- walk the figure list until the 0xFF sprite id --
-	mov	si,[player_anim_end]		; 00BD5
-	mov	al,[si+player_sprite_cmd]		; 00BD9
+	mov	si,[figure_list_cursor]		; 00BD5
+	mov	al,[si+frame_sound_id]		; 00BD9
 	cmp	al,0xff			; 00BDD
 	jz	short render_figures_present_frame		; 00BDF jz 0xc14
 ; slot fields: AX = sprite id, DX = X word, CX = Y
 	mov	ah,0x0			; 00BE1
-	mov	cl,[si+player_anim_buf]		; 00BE3
+	mov	cl,[si+figure_list]		; 00BE3
 	mov	ch,0x0			; 00BE7
 	push	cx			; 00BE9
-	mov	dx,[si+player_anim_ctr]		; 00BEA
-; -- bit 15 clear and bit 14 set: flagged slot goes to draw_sprite --
+	mov	dx,[si+screen_wipe_flag]		; 00BEA
+; -- bit 15 clear and bit 14 set: flagged slot goes to draw_sprite_flipped --
 	test	dx,0x8000		; 00BEE
 	jnz	short render_figures_draw_default		; 00BF2 jnz 0xc05
 	test	dx,0x4000		; 00BF4
@@ -149,27 +149,27 @@ render_figures_next_slot:
 	xor	dx,0x4000		; 00BFA
 	push	dx			; 00BFE
 	push	ax			; 00BFF
-	call	draw_sprite		; 00C00
+	call	draw_sprite_flipped		; 00C00
 	jmp	short render_figures_slot_done		; 00C03 jmp 0xc0a
 ; Reached when X has bit 15 set or bit 14 clear
 render_figures_draw_default:
 ; -- default path: X word passed unchanged --
 	push	dx			; 00C05
 	push	ax			; 00C06
-	call	draw_sprite_mirrored	; 00C07
+	call	draw_sprite_unflipped	; 00C07
 render_figures_slot_done:
 	add	sp,0x6			; 00C0A
-	add	word [player_anim_end],0x4	; 00C0D
+	add	word [figure_list_cursor],0x4	; 00C0D
 	jmp	short render_figures_next_slot		; 00C12 jmp 0xbd5
 render_figures_present_frame:
 ; -- list done: present the frame, then call the sound dispatcher --
-	cmp	byte [player_anim_ctr],0x0	; 00C14
+	cmp	byte [screen_wipe_flag],0x0	; 00C14
 	jnz	short render_figures_wipe_reveal		; 00C19 jnz 0xc42
 	cmp	word [anim_render_mode],0x0		; 00C1B
 	jz	short render_figures_partial_copy		; 00C20 jz 0xc32
 ; -- [0xee] nonzero: full copy --
 	call	update_display		; 00C22
-	mov	al,[player_sprite_cmd]		; 00C25
+	mov	al,[frame_sound_id]		; 00C25
 	mov	ah,0x0			; 00C28
 	push	ax			; 00C2A
 	call	play_sound		; 00C2B
@@ -178,7 +178,7 @@ render_figures_present_frame:
 render_figures_partial_copy:
 ; -- [0xee] == 0: partial copy --
 	call	update_display_partial		; 00C32
-	mov	al,[player_sprite_cmd]		; 00C35
+	mov	al,[frame_sound_id]		; 00C35
 	mov	ah,0x0			; 00C38
 	push	ax			; 00C3A
 	call	play_sound		; 00C3B
@@ -187,7 +187,7 @@ render_figures_partial_copy:
 render_figures_wipe_reveal:
 ; -- wipe flag set: reveal with the column wipe --
 	call	blit_buffer_to_vram	; 00C42
-	mov	al,[player_sprite_cmd]		; 00C45
+	mov	al,[frame_sound_id]		; 00C45
 	mov	ah,0x0			; 00C48
 	push	ax			; 00C4A
 	call	play_sound		; 00C4B
@@ -209,12 +209,12 @@ render_figures_wipe_reveal:
 ;   [0xbb2a] = camera_x at the last update_display_partial (0xFFFF forces a redraw).
 ;              The mid-screen scenery is only rebuilt when camera_x differs,
 ;              matching the smaller region update_display_partial copies otherwise.
-;   [0xbcd0] = script_running; scene_transition is skipped while it is set
+;   [0xbcd0] = script_running; draw_health_bars is skipped while it is set
 ;
 ; Screen regions written (scanline numbers; pixel value = 2-bit colour index):
 ;   Top step, only when [0xee] == 1:
 ;     level < 2 : lines 0-79 filled with pixel value 1 (0x5555)
-;     level >= 2: entire buffer cleared; scene_transition if no script running
+;     level >= 2: entire buffer cleared; draw_health_bars if no script running
 ;   Level < 2:
 ;     if camera moved: lines 32-127 filled with value 1, 34 lines of fuji.bcg
 ;       (DS:0xACB2) copied to lines 80-113, then line 106 set to value 3 and
@@ -254,14 +254,14 @@ prepare_screen_buffer_top_clear_all:
 	call	clear_screen		; 00C72
 	cmp	byte [script_running],0x0	; 00C75
 	jnz	short prepare_screen_buffer_layer_dispatch		; 00C7A jnz 0xc7f
-	call	scene_transition	; 00C7C
+	call	draw_health_bars	; 00C7C
 prepare_screen_buffer_layer_dispatch:
 ; -- layer dispatch on current_level --
 	cmp	word [current_level],0x2		; 00C7F
 	jnl	short prepare_screen_buffer_level_2_and_up		; 00C84 jnl 0xce6
 ; -- level < 2 layout: rebuild scenery only if the camera moved --
 	mov	ax,[camera_x]		; 00C86
-	cmp	ax,[anim_state_bb2a]		; 00C89
+	cmp	ax,[last_drawn_camera_x]		; 00C89
 	jz	short prepare_screen_buffer_low_levels_ground		; 00C8D jz 0xcbb
 ; lines 32-127 = value 1
 	mov	cx,0xf00		; 00C8F
@@ -313,7 +313,7 @@ prepare_screen_buffer_level_2_and_up:
 	jnl	short prepare_screen_buffer_level_3_and_up		; 00CF0 jnl 0xd39
 ; -- level 2: rebuild scenery only if the camera moved --
 	mov	ax,[camera_x]		; 00CF2
-	cmp	ax,[anim_state_bb2a]		; 00CF5
+	cmp	ax,[last_drawn_camera_x]		; 00CF5
 	jz	short prepare_screen_buffer_level_2_stripes		; 00CF9 jz 0xd1e
 ; lines 32-127 cleared
 	lea	di,[offscreen_scenery_top]		; 00CFB
@@ -347,7 +347,7 @@ prepare_screen_buffer_level_2_stripe_loop:
 prepare_screen_buffer_level_3_and_up:
 ; -- level >= 3 layout --
 	mov	ax,[camera_x]		; 00D39
-	cmp	ax,[anim_state_bb2a]		; 00D3C
+	cmp	ax,[last_drawn_camera_x]		; 00D3C
 	jz	short prepare_screen_buffer_level_3_stripes		; 00D40 jz 0xd4d
 ; lines 0-113 cleared
 	lea	di,[offscreen_buffer]		; 00D42
@@ -388,8 +388,14 @@ update_display:
 	mov	es,ax			; 00D73
 update_display_line_loop:
 	mov	di,[bx+scanline_offsets]		; 00D75
+%ifdef HEBREW
+	call	mirror_line
+	nop
+	nop
+%else
 	mov	cx,0x28			; 00D79
 	rep	movsw			; 00D7C
+%endif
 	add	bx,0x2			; 00D7E
 	cmp	bx,0x190		; 00D81
 	jnz	short update_display_line_loop		; 00D85 jnz 0xd75
@@ -416,7 +422,7 @@ update_display_partial:
 	lea	si,[offscreen_scenery_top]		; 00D8B
 	mov	bx,0x40			; 00D8F
 	mov	ax,[camera_x]		; 00D92
-	cmp	ax,[anim_state_bb2a]		; 00D95
+	cmp	ax,[last_drawn_camera_x]		; 00D95
 	jnz	short update_display_partial_copy_region		; 00D99 jnz 0xdb5
 ; camera unchanged: copy only the bottom region
 	mov	dl,0x54			; 00D9B
@@ -430,14 +436,20 @@ update_display_partial:
 	sub	bx,0xc			; 00DB2
 update_display_partial_copy_region:
 ; -- record the camera position, then copy the chosen lines --
-	mov	[anim_state_bb2a],ax		; 00DB5
+	mov	[last_drawn_camera_x],ax		; 00DB5
 	push	es			; 00DB8
 	mov	ax,0xb800		; 00DB9
 	mov	es,ax			; 00DBC
 update_display_partial_line_loop:
 	mov	di,[bx+scanline_offsets]		; 00DBE
+%ifdef HEBREW
+	call	mirror_line
+	nop
+	nop
+%else
 	mov	cx,0x28			; 00DC2
 	rep	movsw			; 00DC5
+%endif
 	add	bx,0x2			; 00DC7
 	dec	dl			; 00DCA
 	jnz	short update_display_partial_line_loop		; 00DCC jnz 0xdbe
@@ -490,6 +502,51 @@ clear_above_ground_fill:
 ; The tail `jmp 0xff8` targets code offset 0x0DF8 (the operand is a file
 ; offset, including the 0x200-byte MZ header): the start of the next column.
 blit_buffer_to_vram:
+%ifdef HEBREW
+; Mirrored wipe: same pixel-column order as the original, drawn from the right.
+	push	bp
+	push	dx
+	push	es
+	mov	ax,0xb800
+	mov	es,ax
+	xor	bx,bx
+blit_hebrew_column_loop:
+	mov	dl,6			; source pixel shift: 6, 4, 2, 0
+blit_hebrew_pixel_loop:
+	lea	si,[offscreen_buffer]
+	xor	bp,bp
+blit_hebrew_row_loop:
+	mov	di,[ds:bp+scanline_offsets]
+	add	di,0x4f
+	sub	di,bx
+	mov	al,[bx+si]
+	mov	cl,dl
+	shr	al,cl
+	and	al,0x3
+	mov	cl,6
+	sub	cl,dl			; destination pixel shift
+	shl	al,cl
+	mov	ah,0x3
+	shl	ah,cl
+	not	ah
+	and	[es:di],ah
+	or	[es:di],al
+	add	si,0x50
+	add	bp,0x2
+	cmp	bp,0x190
+	jnz	blit_hebrew_row_loop
+	call	blit_column_delay
+	sub	dl,2
+	jns	blit_hebrew_pixel_loop
+	inc	bx
+	cmp	bx,0x50
+	jnz	blit_hebrew_column_loop
+	pop	es
+	pop	dx
+	pop	bp
+	ret
+	times 249-($-blit_buffer_to_vram) nop
+%else
 	push	bp			; 00DEF
 	db	0x33, 0xDB		; 00DF0 xor bx,bx
 	push	es			; 00DF2
@@ -591,6 +648,7 @@ blit_buffer_to_vram_done:
 	pop	es			; 00EE5
 	pop	bp			; 00EE6
 	ret				; 00EE7
+%endif
 
 ; ---- function blit_column_delay ----
 ; Busy-wait: spins CX from 1000 down to 0 on a single LOOP instruction, so the
@@ -616,7 +674,7 @@ blit_column_delay_spin:
 ;      DS:0x1917 (line 70). game_main_loop has already loaded title.bcg at
 ;      buffer offset 0 (DS:0xA6D6).
 ;   3. update_display, delay_with_input(0x12)
-;   4. draw_sprite_mirrored(sprite 0x5C, x 0x28, y 0xB4)
+;   4. draw_sprite_unflipped(sprite 0x5C, x 0x28, y 0xB4)
 ;   5. update_display, delay_with_input(0x48)
 ;
 ; Returns: AX from the last delay_with_input: nonzero if a key ended the
@@ -642,7 +700,7 @@ title_step_picture:
 	push	ax			; 00F11
 	mov	ax,0x5c			; 00F12
 	push	ax			; 00F15
-	call	draw_sprite_mirrored	; 00F16
+	call	draw_sprite_unflipped	; 00F16
 	add	sp,0x6			; 00F19
 	call	update_display		; 00F1C
 	mov	ax,0x48			; 00F1F
@@ -654,7 +712,7 @@ title_step_picture:
 ; Title-sequence step from game_main_loop: shows one sprite on a blank screen
 ; and waits. No parameters. No stack frame.
 ;
-; Sequence: clear_screen, draw_sprite_mirrored(sprite 0x5B, x 0x6A, y 0x73),
+; Sequence: clear_screen, draw_sprite_unflipped(sprite 0x5B, x 0x6A, y 0x73),
 ; update_display, delay_with_input(0x48). game_main_loop calls
 ; load_sprite_set(0xD) (the ksi/kmi set) first, and that index contains 0x5B.
 ;
@@ -671,7 +729,7 @@ title_step_sprite:
 	push	ax			; 00F31
 	mov	ax,0x5b			; 00F32
 	push	ax			; 00F35
-	call	draw_sprite_mirrored	; 00F36
+	call	draw_sprite_unflipped	; 00F36
 	add	sp,0x6			; 00F39
 	call	update_display		; 00F3C
 	mov	word [title_ctrl_v_armed],0x1	; 00F3F
@@ -727,7 +785,7 @@ load_resource_stack_ok:
 	push	bx			; 00F7A
 	push	ax			; 00F7B
 	mov	[bp+0x6],ax		; 00F7C
-	call	load_file		; 00F7F
+	call	file_read		; 00F7F
 	db	0x8B, 0xE5		; 00F82 mov sp,bp
 ; -- length = prefix bytes, little-endian --
 	mov	si,[bp+0x14]		; 00F84
@@ -745,7 +803,7 @@ load_resource_stack_ok:
 	push	ax			; 00F9F
 	push	word [bp+0x6]		; 00FA0
 	mov	[bp+0x8],bx		; 00FA3
-	call	load_file		; 00FA6
+	call	file_read		; 00FA6
 	db	0x8B, 0xE5		; 00FA9 mov sp,bp
 	push	word [bp+0x6]		; 00FAB
 	call	close_file_slot		; 00FAE
@@ -794,7 +852,7 @@ load_background_stack_ok:
 	push	bx			; 00FE3
 	push	ax			; 00FE4
 	mov	[bp+0x4],ax		; 00FE5
-	call	load_file		; 00FE8
+	call	file_read		; 00FE8
 	db	0x8B, 0xE5		; 00FEB mov sp,bp
 ; -- length = prefix bytes; read the raw image over the prefix, then close --
 	mov	al,[offscreen_length_prefix_hi]		; 00FED
@@ -809,7 +867,7 @@ load_background_stack_ok:
 	push	ax			; 01002
 	push	word [bp+0x4]		; 01003
 	mov	[bp+0x6],bx		; 01006
-	call	load_file		; 01009
+	call	file_read		; 01009
 	db	0x8B, 0xE5		; 0100C mov sp,bp
 	push	word [bp+0x4]		; 0100E
 	call	close_file_slot		; 01011
@@ -866,10 +924,10 @@ load_background_stack_ok:
 ; their banks:
 ;   DS:0x423C (image) .. DS:0x443C      DS:0x873A (mask) .. DS:0x893A
 ;
-; .dat format (one sprite at each index offset; layout as read by draw_sprite):
+; .dat format (one sprite at each index offset; layout as read by draw_sprite_flipped):
 ;   +0 width in bytes (4-pixel columns)
 ;   +1 height in scanlines
-;   +2 skipped by draw_sprite (it starts reading at +3)
+;   +2 skipped by draw_sprite_flipped (it starts reading at +3)
 ;   +3 RLE stream (see next_sprite_bytes) of width*height bytes in column
 ;      order: each column top to bottom, columns left to right
 ; Image and mask of a sprite decode in lock step, one byte from each stream.
@@ -911,7 +969,7 @@ load_sprite_set_stack_ok:
 	push	bx			; 01072
 	push	ax			; 01073
 	mov	[bp+0x8],ax		; 01074
-	call	load_file		; 01077
+	call	file_read		; 01077
 	db	0x8B, 0xE5		; 0107A mov sp,bp
 	push	word [bp+0x8]		; 0107C
 	call	close_file_slot		; 0107F
@@ -992,7 +1050,7 @@ load_sprite_set_load_image_data:
 	push	ax			; 01136
 	mov	[bp+0x8],ax		; 01137
 	mov	[bp+0x10],bx		; 0113A
-	call	load_file		; 0113D
+	call	file_read		; 0113D
 	db	0x8B, 0xE5		; 01140 mov sp,bp
 	push	word [bp+0x8]		; 01142
 	call	close_file_slot		; 01145
@@ -1031,7 +1089,7 @@ load_sprite_set_load_mask_index:
 	push	bx			; 01191
 	push	ax			; 01192
 	mov	[bp+0x8],ax		; 01193
-	call	load_file		; 01196
+	call	file_read		; 01196
 	db	0x8B, 0xE5		; 01199 mov sp,bp
 	push	word [bp+0x8]		; 0119B
 	call	close_file_slot		; 0119E
@@ -1110,7 +1168,7 @@ load_sprite_set_load_mask_data:
 	push	bx			; 01253
 	push	ax			; 01254
 	mov	[bp+0x8],ax		; 01255
-	call	load_file		; 01258
+	call	file_read		; 01258
 	db	0x8B, 0xE5		; 0125B mov sp,bp
 	push	word [bp+0x8]		; 0125D
 	call	close_file_slot		; 01260

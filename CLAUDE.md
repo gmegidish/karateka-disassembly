@@ -30,7 +30,7 @@ Requires: `nasm`, `ndisasm` (both installed via homebrew).
 | 0x0000-0x0254 | ~600B | C runtime startup, error handlers |
 | 0x0255-0x05E4 | ~900B | Game init, main loop, scene mgmt |
 | 0x05E5-0x063F | ~90B | Video mode, cursor |
-| 0x0640-0x0B4D | ~1.2KB | Sprite rendering (draw_sprite, mirrored, right-edge clipping) |
+| 0x0640-0x0B4D | ~1.2KB | Sprite rendering (draw_sprite_flipped, mirrored, right-edge clipping) |
 | 0x0B4E-0x1276 | ~1.8KB | Graphics rendering (screen buffer, backgrounds, animation display) |
 | 0x1277-0x166C | ~1KB | Animation script loading and bytecode compilation |
 | 0x166D-0x1733 | ~200B | File open retry, Ctrl+Q quit, copy protection disk read |
@@ -94,10 +94,10 @@ See `tools/function_names.py` for the complete mapping. Highlights:
 - **scene_update** (0x22E1): Per-frame update — processes player and enemy animation frames, camera follow, sprite buffers
 - **enemy_ai_decide** (0x2605): Enemy AI decision function — returns animation index based on distance, health, combat phase
 - **player_anim_select** (0x205E): Player animation state machine — selects next animation based on combat state
-- **level_setup** (0x2BDD): Combat encounter management — hit detection, health regen, enemy spawn/despawn
+- **resolve_hits** (0x2BDD): Combat encounter management — hit detection, health regen, enemy spawn/despawn
 - **cutscene_play** (0x31AA): Level transition state machine — gate openings, boss introductions, endgame
 - **play_sound** (0x3BAE): Sound dispatcher — 21 callers, plays speaker effects and tunes, blocking until done
-- **draw_sprite** (0x0640): Renders sprite to offscreen buffer with sub-pixel alignment and CGA bit rotation
+- **draw_sprite_flipped** (0x0640): Renders sprite to offscreen buffer with sub-pixel alignment and CGA bit rotation
 - **load_anim_script** (0x1277): Loads animation script file, compiles text commands to bytecode
 - **run_anim_script** (0x1734): Bytecode interpreter for animation scripts (14 opcodes)
 - **fopen_iob** (0x483C): Lattice C fopen — scans IOB array for free slot, opens file
@@ -176,8 +176,8 @@ This regenerates all `src/*.asm` files from the binary and verifies the build.
 - **176 EQU variable definitions** in data.asm covering CRT runtime, game state, combat, animation, joystick, file I/O, heap
 - **Animation script system fully documented** — 14 opcodes, bytecode compiler (parse_anim_command), interpreter (run_anim_script)
 - **Combat system decoded** — player input chain (read_player_input → key_to_move → combat_resolve_move), enemy AI (enemy_ai_decide), hit detection (check_hit_zone), health regen timers
-- **Sprite renderer documented** — three-function pipeline (draw_sprite, draw_sprite_mirrored, draw_sprite_rightedge) with CGA sub-pixel bit rotation
-- **Lattice C runtime identified** — fopen_iob, fclose_iob, fread_iob, fgets_iob, heap_alloc, crt_malloc/free, 25 CRT functions documented
+- **Sprite renderer documented** — three-function pipeline (draw_sprite_flipped, draw_sprite_unflipped, draw_sprite_unflipped_columns) with CGA sub-pixel bit rotation
+- **Lattice C runtime identified** — fopen_iob, fclose_iob, fgets, gets, heap_alloc, crt_malloc/free, 25 CRT functions documented
 - **All code reformatted** with consistent tab indentation
 - **Copy protection identified** — read_disk_sector uses INT 13h to read specific tracks and verify CRC error patterns
 
