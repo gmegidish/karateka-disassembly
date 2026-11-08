@@ -4078,7 +4078,13 @@ db 'of the karateka{', 0  ; 14A2D
 db ' ', 0, ' ', 0, ' ', 0, ' ', 0, ' ', 0, ' ', 0, ' ', 0, ' ', 0  ; 14A3E (16 blank line spacers)
 db ' ', 0, ' ', 0, ' ', 0, ' ', 0, ' ', 0, ' ', 0, ' ', 0, ' ', 0  ; 14A4E
 db 0, 0  ; 14A5E (end of intro / start of outro separator)
+%ifdef HEBREW
+hebrew_outro_line:
+db 0x0B, 'houtro.bcg', 0, 'hend.bcg', 0	; filenames, in the unused outro text
+times 29-($-hebrew_outro_line) db 0
+%else
 db 0x0B, 'and so this adventure ends{', 0  ; 14A60
+%endif
 db 'the evil akuma lies', 0  ; 14A7D
 db 'vanquished| the beautiful', 0  ; 14A91
 db 'mariko safe in your arms{', 0  ; 14AAB

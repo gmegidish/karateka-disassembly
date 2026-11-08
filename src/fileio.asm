@@ -855,7 +855,7 @@ delete_resource_file_thunk:
 ; ---- function scroll_bitmap_run ----
 ; Tail of show_scroll_text in the Hebrew build: streams the intro story from a
 ; bitmap file, 14 rows per block, then closes it on every exit path.
-; HSTORY.BIN is 39 blocks of 14 rows, 80 bytes per row, CGA mode 4 pixels.
+; HSTORY.BIN is 46 blocks of 14 rows, 80 bytes per row, CGA mode 4 pixels.
 ; It takes the place of the dead rename_resource_file, keeping every address fixed.
 ; ponytail: reads the floppy between scroll steps, may stutter on real drives; buffer it if so
 scroll_bitmap_run:
@@ -867,7 +867,7 @@ scroll_bitmap_run:
 	pop	cx
 	pop	cx
 	mov	[scroll_text_ptr],ax
-	mov	byte [scroll_lines_left],39
+	mov	byte [scroll_lines_left],46
 	call	scroll_text_up
 	push	ax
 	push	word [scroll_text_ptr]

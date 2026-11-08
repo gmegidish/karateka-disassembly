@@ -14,7 +14,10 @@ verify: build/NEW.EXE
 hebrew: $(SRC_FILES)
 	nasm -f bin -DHEBREW -i src/ src/karateka.asm -o disk/HEBREW.EXE
 
+hebrew-end: $(SRC_FILES)
+	nasm -f bin -DHEBREW -DSKIP_TO_END -i src/ src/karateka.asm -o disk/HEBEND.EXE
+
 clean:
 	rm -f build/NEW.EXE
 
-.PHONY: all verify clean hebrew
+.PHONY: all verify clean hebrew hebrew-end

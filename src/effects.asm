@@ -949,10 +949,22 @@ show_scroll_text:
 ; early on a keypress.
 show_the_end:
 	call	clear_screen		; 03F56
+%ifdef HEBREW
+; hend.bcg: the Hebrew end screen as a bitmap
+	mov	ax,(offscreen_buffer + 90*80 - resource_buffer) & 0xFFFF
+	push	ax
+	mov	ax,outro_text+11
+	push	ax
+	call	load_resource
+	pop	cx
+	pop	cx
+	times 1 nop
+%else
 	call	update_display		; 03F59
 	lea	di,[offscreen_the_end_text]		; 03F5C
 	lea	si,[text_the_end]		; 03F60
 	call	render_glyphs		; 03F64
+%endif
 	call	update_display		; 03F67
 	mov	ax,0x48			; 03F6A
 	call	delay_with_input	; 03F6D
@@ -973,6 +985,17 @@ show_outro_text:
 	call	flush_keyboard		; 03F71
 	call	clear_screen		; 03F74
 	call	update_display		; 03F77
+%ifdef HEBREW
+; houtro.bcg: the Hebrew outro story as a bitmap
+	mov	ax,(offscreen_buffer + 13*80 - resource_buffer) & 0xFFFF
+	push	ax
+	mov	ax,outro_text
+	push	ax
+	call	load_resource
+	pop	cx
+	pop	cx
+	times 19 nop
+%else
 	push	word [outro_text_line_count]		; 03F7A
 	lea	si,[outro_text]		; 03F7E
 	lea	di,[offscreen_outro_text]		; 03F82
@@ -985,6 +1008,7 @@ show_outro_text_draw_line_loop:
 	dec	byte [outro_text_line_count]		; 03F90
 	jnz	short show_outro_text_draw_line_loop		; 03F94 jnz 0x3f86
 	pop	word [outro_text_line_count]		; 03F96
+%endif
 	call	update_display		; 03F9A
 ; Wait loop: tune, then input_advance and keyboard checks
 show_outro_text_wait_loop:

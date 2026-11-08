@@ -212,7 +212,13 @@ game_main_loop_stack_ok:
 	db	0x8B, 0xE5		; 00410 mov sp,bp
 ; title/credits/demo attract sequence; restarted after the demo finishes
 game_main_loop_title_sequence_start:
+%ifdef SKIP_TO_END
+; Debug: show the ending screens first, then fall into the title sequence.
+	call	show_outro_text
+	call	show_the_end
+%else
 	mov	word [input_advance],0x0	; 00412
+%endif
 	mov	ax,0xd			; 00418
 	push	ax			; 0041B
 	call	load_sprite_set		; 0041C
